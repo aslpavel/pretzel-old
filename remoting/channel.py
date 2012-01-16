@@ -22,7 +22,7 @@ class Channel (object):
         if self.worker is not None:
            raise ChannelError ('channel has already been started')
         self.worker = self.worker_run ()
-        Fork (self.worker.Continue (self.dispose), 'Channel::worker')
+        Fork (self.worker.Continue (self.dispose), 'channel')
 
     def Stop (self):
         if self.worker is None:
@@ -72,8 +72,8 @@ class Channel (object):
                         continue
                     def handler_cont (future):
                         error = future.Error ()
-                        self.sendmsg (future.Result () if error is None else message.Error (*error))
-                    handler (message).Continue (handler_cont)
+                        return self.sendmsg (future.Result () if error is None else message.Error (*error))
+                    Fork (handler (message).Continue (handler_cont).Unwrap (), 'handler')
                 else:
                     # system message
                     if message.port == PORT_RESULT:
@@ -155,6 +155,7 @@ import os, errno, struct, pickle
 class FileChannel (Channel):
     def __init__ (self, core, in_fd, out_fd):
         self.core = core
+        self.disposed = False
 
         # non blocking
         self.in_fd, self.out_fd = in_fd, out_fd
@@ -169,6 +170,9 @@ class FileChannel (Channel):
 
     @Async
     def RecvMsg (self):
+        if self.disposed:
+            raise ChanneldError ('connection is closed')
+
         # recv header
         header = yield self.read (self.header.size)
         if len (header) == 0:
@@ -184,11 +188,14 @@ class FileChannel (Channel):
 
         # unpickle message
         data.seek (0)
-        msg = pickle.load (data)
-        AsyncReturn (msg)
-        # AsyncReturn (pickle.load (data))
+        AsyncReturn (pickle.load (data))
 
     def SendMsg (self, message):
+        if self.disposed:
+            try:
+                raise ChannelError ('connection is closed')
+            except Exception: return FailedFuture (sys.exc_info ())
+
         stream = io.BytesIO ()
         # data
         stream.seek (self.header.size)
@@ -204,6 +211,7 @@ class FileChannel (Channel):
         return self.write (stream.getvalue ()).Continue (debug)
 
     def Dispose (self):
+        self.disposed = True
         self.OnDispose ()
 
     @Async
