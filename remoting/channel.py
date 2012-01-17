@@ -3,7 +3,7 @@ import sys
 
 from .async import *
 from .message import *
-from .common import *
+from .util import *
 
 #-----------------------------------------------------------------------------#
 # Channel                                                                     #
@@ -101,6 +101,29 @@ class Channel (object):
     def sendmsg (self, message):
         return self.SendMsg (message)
 
+class PersistenceChannel (Channel):
+    def __init__ (self):
+        self.persistence = BindPool ()
+        self.not_persistent = {tuple, list, dict, set, frozenset}
+
+        Channel.__init__ (self)
+
+    def BindPersistence (self, slot, save, restore):
+        return self.persistence.Bind (slot, (save, restore))
+
+    def Save (self, target):
+        if type (target) in self.not_persistent:
+            return None
+        for slot, pair in self.persistence.items ():
+            save, restore = pair
+            target_id = save (target)
+            if target_id is not None:
+                return slot, target_id
+
+    def Restore (self, uid):
+        slot, target_id = uid
+        return self.persistence [slot][1] (target_id)
+
 '''
 import struct, pickle
 class SocketChannel (Channel):
@@ -152,7 +175,7 @@ class SocketChannel (Channel):
 #-----------------------------------------------------------------------------#
 import os, errno, struct, pickle
 
-class FileChannel (Channel):
+class FileChannel (PersistenceChannel):
     def __init__ (self, core, in_fd, out_fd):
         self.core = core
         self.disposed = False
@@ -166,7 +189,19 @@ class FileChannel (Channel):
         self.header = struct.Struct ('!I')
         self.OnDispose = Event ()
 
-        Channel.__init__ (self)
+        # Pickler
+        class pickler_type (pickle.Pickler):
+            def persistent_id (this, target):
+                return self.Save (target)
+        self.pickler_type = pickler_type
+
+        # Unpickler
+        class unpickler_type (pickle.Unpickler):
+            def persistent_load (this, pid):
+                return self.Restore (pid)
+        self.unpickler_type = unpickler_type
+
+        PersistenceChannel.__init__ (self)
 
     @Async
     def RecvMsg (self):
@@ -188,7 +223,7 @@ class FileChannel (Channel):
 
         # unpickle message
         data.seek (0)
-        AsyncReturn (pickle.load (data))
+        AsyncReturn (self.unpickler_type (data).load ())
 
     def SendMsg (self, message):
         if self.disposed:
@@ -197,18 +232,17 @@ class FileChannel (Channel):
             except Exception: return FailedFuture (sys.exc_info ())
 
         stream = io.BytesIO ()
+
         # data
         stream.seek (self.header.size)
-        pickle.dump (message, stream, -1)
+        self.pickler_type (stream, -1).dump (message)
+
         # header
         size = stream.tell () - self.header.size
         stream.seek (0)
         stream.write (self.header.pack (size))
 
-        def debug (f):
-            return f.Result ()
-
-        return self.write (stream.getvalue ()).Continue (debug)
+        return self.write (stream.getvalue ())
 
     def Dispose (self):
         self.disposed = True
