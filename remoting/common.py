@@ -23,10 +23,59 @@ class Disposable (object):
     def __bool__ (self):
         return self.dispose is not None
 
-    def Dispse (self):
+    def Dispose (self):
         if self.dispose is not None:
             self.dispose ()
             self.dispose = None
+
+#-----------------------------------------------------------------------------#
+# Composite Disposable                                                        #
+#-----------------------------------------------------------------------------#
+class CompositeDisposable (object):
+    __slots__ = ('disposed', 'disposables')
+
+    def __init__ (self, *disposables):
+        self.disposables = set ()
+        try:
+            for disposable in disposables:
+                disposable.__enter__ ()
+                self.disposables.add (disposable)
+        except:
+            for disposable in disposables:
+                disposable.__exit__ (None, None, None)
+            raise
+        self.disposed = False
+
+    def __iadd__ (self, disposable):
+        disposable.__enter__ ()
+        if self.disposed:
+            disposable.__exit__ (None, None, None)
+        else:
+            self.disposables.add (disposable)
+        return self
+
+    def __isub__ (self, disposable):
+        self.disposables.remove (disposable)
+        disposable.__exit__ ()
+        return self
+
+    def __enter__ (self):
+        return self
+
+    def __exit__ (self, et, eo, tb):
+        self.Dispose ()
+        return False
+
+    def __bool__ (self):
+        return not self.disposed
+
+    def Dispose (self):
+        if self.disposed:
+            return
+        self.disposed = True
+        for disposable in self.disposables:
+            disposable.__exit__ (None, None, None)
+        self.disposables.clear ()
 
 #-----------------------------------------------------------------------------#
 # Event                                                                       #
