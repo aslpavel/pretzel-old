@@ -17,12 +17,13 @@ def FullBootstrap ():
     cage_builder = cage.CageBuilder ()
     cage_builder.AddPath (root_path)
     data = binascii.b2a_base64 (cage_builder.ToBytes ()).strip ().decode ('utf-8')
+    bootstrap = __name__
     return full_payload.format (**locals ())
 
 cage_file = os.path.realpath (inspect.getsourcefile (cage))
 root_path = os.path.realpath (os.path.dirname (sys.modules [__name__.split ('.') [0]].__file__))
 
-full_payload = """
+full_payload = r"""
 # pypy bug fix
 try: import exceptions
 except ImportError: pass
@@ -40,6 +41,8 @@ try:
 finally:
     del cage
     del full_loader
+
+bootstrap = "{bootstrap}"
 """
 
 #------------------------------------------------------------------------------#
@@ -56,10 +59,10 @@ def ModuleBootstrap (source_file, name):
 
     return module_payload.format (**locals ())
 
-module_payload = """
+module_payload = r"""
 import sys, imp, zlib, binascii
 def loader ():
-    source = zlib.decompress (binascii.a2b_base64 (b"{source}")).decode ("utf-8")
+    source = zlib.decompress (binascii.a2b_base64 (b"{source}"))
 
     module = imp.new_module ("{name}")
     module.__file__ = "remote:{source_file}"
