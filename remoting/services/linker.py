@@ -102,7 +102,7 @@ class LinkerService (Service):
         return (self.channel.Request (PORT_LINKER_CALL, func = func, args = args, keys = keys)
             .ContinueWithFunction (lambda msg: msg.result))
 
-    # PERSISTANCE
+    # PERSISTENCE
     def save_Reference (self, ref):
         if isinstance (ref, Reference):
             return ref.ref_type, ref.ref_desc
@@ -209,8 +209,8 @@ REFERENCE_REMOTE = 1
 
 class Reference (object):
     def __init__ (self, type, linker, desc, target):
-        object.__setattr__ (self, 'ref_type', type),
-        object.__setattr__ (self, 'ref_desc', desc),
-        object.__setattr__ (self, 'ref_linker', linker),
+        object.__setattr__ (self, 'ref_type', type)
+        object.__setattr__ (self, 'ref_desc', desc)
+        object.__setattr__ (self, 'ref_linker', linker)
         object.__setattr__ (self, 'ref_target', target)
 # vim: nu ft=python columns=120 :

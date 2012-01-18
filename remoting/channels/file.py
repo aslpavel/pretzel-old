@@ -16,16 +16,17 @@ __all__ = ('FileChannel',)
 #-----------------------------------------------------------------------------#
 class FileChannel (PersistenceChannel):
     def __init__ (self, core, in_fd, out_fd):
+        PersistenceChannel.__init__ (self, core)
+
         self.disposed = False
+        self.OnDispose += lambda: setattr (self, 'disposed', True)
+        self.header = struct.Struct ('!III')
 
         # non blocking
         self.in_fd, self.out_fd = in_fd, out_fd
         BlockingSet (in_fd, False)
         if in_fd != out_fd:
             BlockingSet (out_fd, False)
-
-        self.header = struct.Struct ('!III')
-        self.OnDispose = Event ()
 
         # Pickler
         class pickler_type (pickle.Pickler):
@@ -38,8 +39,6 @@ class FileChannel (PersistenceChannel):
             def persistent_load (this, pid):
                 return self.Restore (pid)
         self.unpickler_type = unpickler_type
-
-        PersistenceChannel.__init__ (self, core)
 
     @Async
     def RecvMsg (self):
@@ -81,10 +80,6 @@ class FileChannel (PersistenceChannel):
         stream.write (self.header.pack (size, message.port, message.uid))
 
         return self.write (stream.getvalue ())
-
-    def Dispose (self):
-        self.disposed = True
-        self.OnDispose ()
 
     @Async
     def write (self, data):

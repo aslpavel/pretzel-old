@@ -17,6 +17,7 @@ class Channel (object):
         self.queue, self.wait, self.worker = {}, None, None
         self.ports = BindPool ()
         self.core  = core
+        self.OnDispose = Event ()
 
     def BindPort (self, port, handler):
         return self.ports.Bind (port, handler)
@@ -38,9 +39,6 @@ class Channel (object):
 
     def RecvMsg (self):
         raise NotImplementedError ()
-
-    def Dispose (self):
-        pass
 
     @Async
     def Request (self, port, **attr):
@@ -111,7 +109,7 @@ class Channel (object):
             self.wait.Wait ()
 
     def dispose (self, future):
-        self.Dispose ()
+        self.OnDispose ()
         return future.Result ()
 
     @Serialize

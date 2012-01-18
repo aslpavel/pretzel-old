@@ -3,6 +3,7 @@ import sys, os
 import fcntl
 import traceback
 
+__all__ = ('Disposable', 'CompositeDisposable', 'Event', 'BindPool', 'BlockingSet', 'Fork', )
 #-----------------------------------------------------------------------------#
 # Disposable                                                                  #
 #-----------------------------------------------------------------------------#
@@ -82,6 +83,8 @@ class CompositeDisposable (object):
 #-----------------------------------------------------------------------------#
 class Event (object):
     """Simple Event implementation"""
+    __slots__ = ('__handlers',)
+
     def __init__ (self):
         self.__handlers = set ()
 
