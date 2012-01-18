@@ -11,9 +11,10 @@ from .util import *
 class ChannelError (Exception): pass
 
 class Channel (object):
-    def __init__ (self):
+    def __init__ (self, core):
         self.queue, self.wait, self.worker = {}, None, None
         self.ports = BindPool ()
+        self.core  = core
 
     def BindPort (self, port, handler):
         return self.ports.Bind (port, handler)
@@ -53,7 +54,10 @@ class Channel (object):
         future = Future (lambda: self.wait_uid (message.uid))
         self.queue [message.uid] = future
 
-        AsyncReturn ((yield future))
+        message_getter = yield future
+        yield self.core.SleepUntil (0) # guaranteed interrupt
+
+        AsyncReturn (message_getter ())
 
     @Async
     def worker_run (self):
@@ -61,25 +65,24 @@ class Channel (object):
         try:
             while True:
                 self.wait = self.RecvMsg ()
-                message = yield self.wait
-                if message is None:
+                message_info = yield self.wait
+                if message_info is None:
                     break
-                if message.port >= PORT_SYSTEM:
+                port, uid, message_getter = message_info
+                if port >= PORT_SYSTEM:
                     # incoming request
-                    handler = self.ports.get (message.port)
+                    handler = self.ports.get (port)
                     if handler is None:
-                        sys.stderr.write (':: error: unbound port {0}\n'.format (message.port))
+                        sys.stderr.write (':: error: unbound port {0}\n'.format (port))
                         continue
-                    def handler_cont (future):
-                        error = future.Error ()
-                        return self.sendmsg (future.Result () if error is None else message.Error (*error))
-                    Fork (handler (message).Continue (handler_cont).Unwrap (), 'handler')
+
+                    Fork (self.handle (handler, message_getter), 'handle')
                 else:
                     # system message
-                    if message.port == PORT_RESULT:
-                        self.queue.pop (message.uid).ResultSet (message)
-                    elif message.port == PORT_ERROR:
-                        self.queue.pop (message.uid).ErrorSet (*message.exc_info ())
+                    if port == PORT_RESULT:
+                        self.queue.pop (uid).ResultSet (message_getter)
+                    elif port == PORT_ERROR:
+                        self.queue.pop (uid).ErrorSet (*message_getter ().exc_info ())
         except Exception:
             et, eo, tb = sys.exc_info ()
             for future in self.queue.values ():
@@ -88,6 +91,18 @@ class Channel (object):
                 raise
         finally:
             self.worker, self.wait = None, None
+
+    @Async
+    def handle (self, handler, message_getter):
+        yield self.core.SleepUntil (0) # guaranteed interrupt
+
+        message, error = message_getter (), None
+        try:
+            result = yield handler (message)
+        except Exception:
+            error = sys.exc_info ()
+
+        yield self.sendmsg (result if error is None else message.Error (*error))
 
     def wait_uid (self, uid):
         while uid in self.queue:
@@ -102,11 +117,11 @@ class Channel (object):
         return self.SendMsg (message)
 
 class PersistenceChannel (Channel):
-    def __init__ (self):
+    def __init__ (self, core):
         self.persistence = BindPool ()
         self.not_persistent = {tuple, list, dict, set, frozenset}
 
-        Channel.__init__ (self)
+        Channel.__init__ (self, core)
 
     def BindPersistence (self, slot, save, restore):
         return self.persistence.Bind (slot, (save, restore))
@@ -177,7 +192,6 @@ import os, errno, struct, pickle
 
 class FileChannel (PersistenceChannel):
     def __init__ (self, core, in_fd, out_fd):
-        self.core = core
         self.disposed = False
 
         # non blocking
@@ -186,7 +200,7 @@ class FileChannel (PersistenceChannel):
         if in_fd != out_fd:
             BlockingSet (out_fd, False)
 
-        self.header = struct.Struct ('!I')
+        self.header = struct.Struct ('!III')
         self.OnDispose = Event ()
 
         # Pickler
@@ -201,7 +215,7 @@ class FileChannel (PersistenceChannel):
                 return self.Restore (pid)
         self.unpickler_type = unpickler_type
 
-        PersistenceChannel.__init__ (self)
+        PersistenceChannel.__init__ (self, core)
 
     @Async
     def RecvMsg (self):
@@ -214,16 +228,16 @@ class FileChannel (PersistenceChannel):
             AsyncReturn (None)
 
         # recv body
-        size, data = self.header.unpack (header) [0], io.BytesIO () 
+        size, port, uid = self.header.unpack (header)
+        data = io.BytesIO ()
         while data.tell () < size:
             chunk = yield self.read (size - data.tell ())
             if len (chunk) == 0:
                 raise ChannelError ('connection has been closed unexpectedly')
             data.write (chunk)
 
-        # unpickle message
         data.seek (0)
-        AsyncReturn (self.unpickler_type (data).load ())
+        AsyncReturn ((port, uid, lambda: self.unpickler_type (data).load ()))
 
     def SendMsg (self, message):
         if self.disposed:
@@ -240,7 +254,7 @@ class FileChannel (PersistenceChannel):
         # header
         size = stream.tell () - self.header.size
         stream.seek (0)
-        stream.write (self.header.pack (size))
+        stream.write (self.header.pack (size, message.port, message.uid))
 
         return self.write (stream.getvalue ())
 

@@ -116,7 +116,7 @@ class LinkerService (Service):
             if ref is None:
                 ref_future = self.restore_remote (ref_type, ref_desc)
                 ref_future.Wait ()
-                return ref_ruture.Result ()
+                return ref_future.Result ()
 
         elif ref_type == REFERENCE_REMOTE:
             ref = self.local_d2r.get (ref_desc)
