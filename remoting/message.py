@@ -24,7 +24,10 @@ class Message (object):
 
     # accessors
     def __getattr__ (self, attr):
-        return self.attr [attr]
+        try: return self.attr [attr]
+        except KeyError:
+            pass
+        raise AttributeError (attr)
 
     def __setattr__ (self, attr, value):
         raise AttributeError ('Message attributes are read only')
