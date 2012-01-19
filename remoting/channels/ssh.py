@@ -35,7 +35,7 @@ class SSHChannel (FileChannel):
         lr, rw = os.pipe ()
         rr, lw = os.pipe ()
         if os.fork ():
-            # parrent process
+            # parent process
             os.close (rr), os.close (rw)
         else:
             # child
@@ -68,23 +68,12 @@ from importlib import import_module
 
 def main ():
     remoting_name = "{remoting_name}"
-
     remoting = import_module (remoting_name)
-    channels = import_module (".channels", remoting_name)
     async = import_module (".async", remoting_name)
+    domains = import_module (".domains.ssh", remoting_name)
 
-    in_fd, out_fd = 0, 1
     with async.Core () as core:
-        channel = channels.FileChannel (core, in_fd, out_fd)
-
-        # TODO: Create domain
-        import time
-        @async.DummyAsync
-        def now (msg):
-            return msg.Result (time = time.time ())
-        channel.BindPort (100, now) 
-
-        channel.Start ()
+        domains.SSHRemoteDomain (core)
 
 if __name__ == "__main__":
     sys.stdout = sys.stderr
