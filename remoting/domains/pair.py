@@ -4,6 +4,7 @@ import types
 
 # local
 from .domain import *
+from ..bootstrap.cage import *
 
 # services
 from ..services.linker import *
@@ -25,11 +26,21 @@ class LocalDomain (Domain):
         importer = ImportService ()
         if push_main:
             main = sys.modules ['__main__']
-            if main is not None and getattr (main, '__file__', None) is not None:
+            if getattr (main, '__file__', None) is not None:
                 with open (main.__file__, 'rb') as stream:
                     source = stream.read ()
                 def push_main (channel):
-                    importer.PushModule ('_remote_main', source, main.__file__)
+                    # push module
+                    package = getattr (main, '__package__', None)
+                    if package is None:
+                        # main is a separate file
+                        importer.PushModule ('_remote_main', source, main.__file__)
+                    else:
+                        # main is a part of a package
+                        cage = CageBuilder ()
+                        cage.AddPath (os.path.dirname (main.__file__))
+                        linker.Call (cage_push, package, cage.ToBytes ())
+                    # create persistence map
                     module_persist (persist, '__main__')
                     linker.Call (module_persist, persist, '_remote_main')
                 channel.OnStart += push_main
@@ -64,4 +75,7 @@ def module_persist (persist, module_name):
         if isinstance (value, (type, types.FunctionType)):
             persist += value
 
+def cage_push (package, data):
+    sys.meta_path.insert (0, Cage (data))
+    sys.modules ["_remote_main"] = __import__ ('{0}.__main__'.format (package)).__main__
 # vim: nu ft=python columns=120 :

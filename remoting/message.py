@@ -81,7 +81,7 @@ class ErrorMessage (Message):
     def exc_info (self):
         tb_stream = io.StringIO () if sys.version_info [0] > 2 else io.BytesIO ()
         tb_stream.write ('\n`{0:-^79}\n'.format (' remote traceback '))
-        tb_stream.write (''.join (self.traceback))
+        tb_stream.write (''.join (self.traceback).rstrip ('\n'))
         return self.error_type, self.error_type (tb_stream.getvalue ()), None
 
 # vim: nu ft=python columns=120 :

@@ -94,7 +94,6 @@ class ImportService (Service):
 
     @DummyAsync
     def port_PUSH (self, request):
-
         if request.name not in sys.modules:
             module = self.load (request.name, request.source, request.file)
             if request.package is not None:
