@@ -89,9 +89,14 @@ class Channel (object):
             et, eo, tb = sys.exc_info ()
             for future in self.queue.values ():
                 future.ErrorSet (et, eo, tb)
+            self.queue.clear ()
             if et is not FutureCanceled:
                 raise
         finally:
+            for future in self.queue.values ():
+                future.ErrorRaise (ChannelError ('connection has been closed unexpectedly'))
+            self.queue.clear ()
+
             self.worker, self.wait = None, None
             self.OnStop ()
 
