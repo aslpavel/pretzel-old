@@ -11,13 +11,50 @@ from .domains.fork import *
 class ForkDomainTests (unittest.TestCase):
     def setUp (self):
         self.domain = ForkDomain (Core (), push_main = False)
-
-    def testCallMethod (self):
-        remote = self.domain.InstanceCreate (Remote, 10)
-        self.assertEqual (remote.ValueGet (), 10)
+        self.remote = self.domain.InstanceCreate (Remote, 10)
 
     def tearDown (self):
         self.domain.Dispose ()
+
+    def testCallMethod (self):
+        self.assertEqual (self.remote.ValueGet (), 10)
+
+    def testCallSpecialMethod (self):
+        self.assertEqual (len (self.remote), 10)
+
+    def testPropertyGet (self):
+        self.assertEqual (self.remote.value, 10)
+
+    def testPropertySet (self):
+        self.remote.value = 11
+        self.assertEqual (self.remote.ValueGet (), 11)
+
+    def testError (self):
+        with self.assertRaises (SomeError):
+            self.remote.Error ()
+
+    def testReferenctToLambda (self):
+        ctx = [0]
+        def inc ():
+            ctx [0] += 1
+        self.remote.Call (self.domain.ToReference (inc))
+        self.assertEqual (ctx [0], 1)
+
+    def testInvertReferenceToLamba (self):
+        incrementer = self.remote.ValueIncrementer (self.domain)
+        self.assertEqual (self.remote.value, 10)
+        incrementer ()
+        self.assertEqual (self.remote.value, 11)
+
+    def testCallFunction (self):
+        import os
+        remote_pid, local_pid = self.domain.Call (os.getpid), os.getpid ()
+        self.assertTrue (isinstance (remote_pid, int))
+        self.assertNotEqual (remote_pid, local_pid)
+
+    def testDomainPersistence (self):
+        self.assertNotEqual (self.domain.Call (GetId, self.domain),
+            id (self.domain))
 
 #-----------------------------------------------------------------------------#
 # Disposables                                                                 #
