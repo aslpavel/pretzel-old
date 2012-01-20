@@ -12,10 +12,12 @@ __all__ = ('ForkChannel',)
 #-----------------------------------------------------------------------------#
 class ForkChannel (FileChannel):
     def __init__ (self, core):
-        # create ssh connection
+        # create pipes
         lr, rw = os.pipe ()
         rr, lw = os.pipe ()
         payload_in, payload_out = os.pipe ()
+
+        # create child
         if os.fork ():
             # parent process
             os.close (rr), os.close (rw), os.close (payload_in)
