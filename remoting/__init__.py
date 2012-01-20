@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 from .domains.ssh import SSHDomain
+from .domains.fork import ForkDomain
 
-__all__ = ('SSHDomain',)
+__all__ = ('SSHDomain', 'ForkDomain')
+
+# information
 __author__ = 'Pavel Aslanov'
 __version__ = '1.0'
 
