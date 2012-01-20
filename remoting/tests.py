@@ -10,7 +10,7 @@ from .domains.fork import *
 #-----------------------------------------------------------------------------#
 class ForkDomainTests (unittest.TestCase):
     def setUp (self):
-        self.domain = ForkDomain (Core ())
+        self.domain = ForkDomain (Core (), push_main = False)
 
     def testCallMethod (self):
         remote = self.domain.InstanceCreate (Remote, 10)
