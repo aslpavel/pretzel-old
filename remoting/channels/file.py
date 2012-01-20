@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import io
-import errno
+import sys
 import struct
 import pickle
 
@@ -19,7 +19,7 @@ class FileChannel (PersistenceChannel):
         PersistenceChannel.__init__ (self, core)
 
         self.disposed = False
-        self.OnDispose += lambda: setattr (self, 'disposed', True)
+        self.OnStop += lambda: setattr (self, 'disposed', True)
         self.header = struct.Struct ('!III')
 
         # non blocking
@@ -45,17 +45,17 @@ class FileChannel (PersistenceChannel):
         if self.disposed:
             raise ChanneldError ('connection is closed')
 
-        # recv header
+        # receive header
         header = yield self.read (self.header.size)
-        if len (header) == 0:
+        if not len (header):
             AsyncReturn (None)
 
-        # recv body
+        # receive body
         size, port, uid = self.header.unpack (header)
         data = io.BytesIO ()
         while data.tell () < size:
             chunk = yield self.read (size - data.tell ())
-            if len (chunk) == 0:
+            if not len (chunk):
                 raise ChannelError ('connection has been closed unexpectedly')
             data.write (chunk)
 

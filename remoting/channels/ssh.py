@@ -49,13 +49,13 @@ class SSHChannel (FileChannel):
         FileChannel.__init__ (self, core, lr, lw) 
 
         # close descriptors if connection has been disposed
-        def on_dispose ():
+        def on_stop ():
             try:
                 os.close (lr)
                 os.close (lw)
             except OSError:
                 pass
-        self.OnDispose += on_dispose
+        self.OnStop += on_stop
 
 #-----------------------------------------------------------------------------#
 # Payload Pattern                                                             #
@@ -63,7 +63,7 @@ class SSHChannel (FileChannel):
 payload = r"""# -*- coding: utf-8 -*-
 {bootstrap}
 
-import io, os
+import io, os, sys
 from importlib import import_module
 
 def main ():

@@ -17,7 +17,7 @@ class Channel (object):
         self.queue, self.wait, self.worker = {}, None, None
         self.ports = BindPool ()
         self.core  = core
-        self.OnDispose = Event ()
+        self.OnStart, self.OnStop = Event (), Event ()
 
     def BindPort (self, port, handler):
         return self.ports.Bind (port, handler)
@@ -26,7 +26,8 @@ class Channel (object):
         if self.worker is not None:
            raise ChannelError ('channel has already been started')
         self.worker = self.worker_run ()
-        Fork (self.worker.Continue (self.dispose), 'channel')
+        self.OnStart (self)
+        Fork (self.worker, 'channel')
 
     def Stop (self):
         if self.worker is None:
@@ -62,6 +63,7 @@ class Channel (object):
     @Async
     def worker_run (self):
         """Process incoming messages"""
+        yield self.core.SleepUntil (0) # guaranteed interrupt
         try:
             while True:
                 self.wait = self.RecvMsg ()
@@ -91,6 +93,7 @@ class Channel (object):
                 raise
         finally:
             self.worker, self.wait = None, None
+            self.OnStop ()
 
     @Async
     def handle (self, handler, message_getter):
@@ -107,10 +110,6 @@ class Channel (object):
     def wait_uid (self, uid):
         while uid in self.queue:
             self.wait.Wait ()
-
-    def dispose (self, future):
-        self.OnDispose ()
-        return future.Result ()
 
     @Serialize
     def sendmsg (self, message):

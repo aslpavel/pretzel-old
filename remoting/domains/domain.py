@@ -19,11 +19,12 @@ class Domain (object):
             raise
 
     def __getattr__ (self, attr):
-        for service in self.services:
-            try:
-                return getattr (service, attr)
-            except  AttributeError:
-                pass
+        if attr [0].isupper ():
+            for service in self.services:
+                try:
+                    return getattr (service, attr)
+                except  AttributeError:
+                    pass
         raise AttributeError (attr)
 
     def Dispose (self):
