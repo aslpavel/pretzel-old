@@ -2,6 +2,8 @@
 from .domains.ssh import SSHDomain
 
 __all__ = ('SSHDomain',)
+__author__ = 'Pavel Aslanov'
+__version__ = '1.0'
 
 # load test protocol
 def load_tests (loader, tests, pattern):
