@@ -63,7 +63,6 @@ class Channel (object):
     @Async
     def worker_run (self):
         """Process incoming messages"""
-        yield self.core.SleepUntil (0) # guaranteed interrupt
         try:
             while True:
                 self.wait = self.RecvMsg ()

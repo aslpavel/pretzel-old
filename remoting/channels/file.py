@@ -4,6 +4,7 @@ import io
 import sys
 import struct
 import pickle
+import errno
 
 from ..async import *
 from ..util import *
@@ -83,26 +84,22 @@ class FileChannel (PersistenceChannel):
 
     @Async
     def write (self, data):
-        '''
         try:
             AsyncReturn (os.write (self.out_fd, data))
         except OSError as err:
             if err.errno != errno.EAGAIN:
                 raise
-        '''
 
         yield self.core.Poll (self.out_fd, self.core.WRITABLE)
         AsyncReturn (os.write (self.out_fd, data))
 
     @Async
     def read (self, size):
-        '''
         try:
             AsyncReturn (os.read (self.in_fd, size))
         except OSError as err:
             if err.errno != errno.EAGAIN:
                 raise
-        '''
 
         try:
             yield self.core.Poll (self.in_fd, self.core.READABLE)

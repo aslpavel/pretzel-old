@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
-from .domains.ssh import SSHDomain
-from .domains.fork import ForkDomain
+from . import async
+from .async import *
+__all__ = async.__all__
 
-__all__ = ('SSHDomain', 'ForkDomain')
+from .domains.ssh import *
+from .domains.fork import *
+__all__ += ('SSHDomain', 'ForkDomain')
 
 # information
 __author__ = 'Pavel Aslanov'

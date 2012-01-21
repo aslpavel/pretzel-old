@@ -40,10 +40,10 @@ class ForkDomainTests (unittest.TestCase):
         self.remote.Call (self.domain.ToReference (inc))
         self.assertEqual (ctx [0], 1)
 
-    def testInvertReferenceToLamba (self):
-        incrementer = self.remote.ValueIncrementer (self.domain)
+    def testInvertReferenceToLambda (self):
+        increment = self.remote.ValueIncrement (self.domain)
         self.assertEqual (self.remote.value, 10)
-        incrementer ()
+        increment ()
         self.assertEqual (self.remote.value, 11)
 
     def testCallFunction (self):
@@ -105,10 +105,10 @@ class Remote (object):
     def ValueGet (self):
         return self.value
 
-    def ValueIncrementer (self, domain):
-        def incrementer ():
+    def ValueIncrement (self, domain):
+        def increment ():
             self.value += 1
-        return domain.ToReference (incrementer)
+        return domain.ToReference (increment)
 
     def __len__ (self):
         return self.value
