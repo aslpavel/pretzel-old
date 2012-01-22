@@ -13,16 +13,15 @@ class Cage (object):
         name = name.replace ('.', '/')
         source = self.sources.get (name + '.py')
         if source is not None:
-            return self.CageLoader (name, source, name + '.py', None)
+            return self.CageLoader (source, name + '.py', None)
         source = self.sources.get (name + '/__init__.py')
         if source is not None:
-            return self.CageLoader (name, source, name + '/__init__.py', name)
+            return self.CageLoader (source, name + '/__init__.py', name)
         return None
 
     class CageLoader (object):
-        __slots__ = ('name', 'source', 'file', 'path')
-        def __init__ (self, name, source, file, path):
-            self.name = name
+        __slots__ = ('source', 'file', 'path')
+        def __init__ (self, source, file, path):
             self.source = source
             self.file = file
             self.path = path
@@ -43,6 +42,15 @@ class Cage (object):
             except Exception:
                 del sys.modules [name]
                 raise
+
+        def is_package (self, name):
+            return self.path is not None
+
+        def get_code (self, name):
+            return compile (zlib.decompress (self.source), self.file, 'exec')
+
+        def get_source (self, name):
+            return self.source
 
 #-----------------------------------------------------------------------------#
 # Cage Builder                                                                #

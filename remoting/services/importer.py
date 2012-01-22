@@ -62,6 +62,16 @@ class ImportService (Service):
         info = self.modules [name]
         return self.load (name, zlib.decompress (info.source), info.file, info.path)
 
+    def is_package (self, name):
+        return self.modules [name].path is not None
+
+    def get_code (self, name):
+        info = self.modules [name]
+        return compile (zlib.decompress (info.source), 'remote:{0}'.format (info.file), 'exec')
+
+    def get_source (self, name):
+        return self.modules [name].source
+
     @Delegate
     def PushModule (self, name, source, file, package = None):
         return self.channel.Request (PORT_IMPORT_PUSH, name = name, source = source,
