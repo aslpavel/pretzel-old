@@ -50,7 +50,8 @@ class Cage (object):
             return compile (zlib.decompress (self.source), self.file, 'exec')
 
         def get_source (self, name):
-            return self.source
+            source = zlib.decompress (self.source)
+            return source if isinstance (source, str) else source.decode ('utf-8')
 
 #-----------------------------------------------------------------------------#
 # Cage Builder                                                                #

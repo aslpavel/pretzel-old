@@ -70,7 +70,8 @@ class ImportService (Service):
         return compile (zlib.decompress (info.source), 'remote:{0}'.format (info.file), 'exec')
 
     def get_source (self, name):
-        return self.modules [name].source
+        source = zlib.decompress (self.modules [name].source)
+        return source if isinstance (source, str) else source.decode ('utf-8')
 
     @Delegate
     def PushModule (self, name, source, file, package = None):
