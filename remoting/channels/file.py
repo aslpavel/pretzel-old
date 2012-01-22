@@ -85,13 +85,14 @@ class FileChannel (PersistenceChannel):
     @Async
     def write (self, data):
         try:
-            AsyncReturn (os.write (self.out_fd, data))
+            data = data [os.write (self.out_fd, data):]
         except OSError as err:
             if err.errno != errno.EAGAIN:
                 raise
 
-        yield self.core.Poll (self.out_fd, self.core.WRITABLE)
-        AsyncReturn (os.write (self.out_fd, data))
+        while len (data):
+            yield self.core.Poll (self.out_fd, self.core.WRITABLE)
+            data = data [os.write (self.out_fd, data):]
 
     @Async
     def read (self, size):

@@ -27,14 +27,13 @@ class LocalDomain (Domain):
         if push_main:
             main = sys.modules ['__main__']
             if getattr (main, '__file__', None) is not None:
-                with open (main.__file__, 'rb') as stream:
-                    source = stream.read ()
                 def push_main (channel):
                     # push module
                     package = getattr (main, '__package__', None)
-                    if package is None:
+                    if package is None or len (package) == 0:
                         # main is a separate file
-                        importer.PushModule ('_remote_main', source, main.__file__)
+                        with open (main.__file__, 'rb') as stream:
+                            importer.PushModule ('_remote_main', stream.read (), main.__file__)
                     else:
                         # main is a part of a package
                         cage = CageBuilder ()
