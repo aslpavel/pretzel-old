@@ -35,7 +35,7 @@ class Domain (object):
         return self
 
     def __exit__ (self, et, eo, tb):
-        self.Disopose ()
+        self.Dispose ()
         return False
 
 # vim: nu ft=python columns=120 :

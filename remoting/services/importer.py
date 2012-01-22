@@ -56,8 +56,9 @@ class ImportService (Service):
 
     # Loader Interface
     def load_module (self, name):
-        if name in sys.modules:
-            return sys.modules [name]
+        module = sys.modules.get (name)
+        if module is not None:
+            return module
 
         info = self.modules [name]
         return self.load (name, zlib.decompress (info.source), info.file, info.path)

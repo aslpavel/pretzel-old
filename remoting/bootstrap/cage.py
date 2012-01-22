@@ -27,6 +27,10 @@ class Cage (object):
             self.path = path
 
         def load_module (self, name):
+            module = sys.modules.get (name)
+            if module is not None:
+                return module
+
             module = imp.new_module (name)
             module.__file__ = 'cage:{0}'.format (self.file)
             module.__loader__ = self
