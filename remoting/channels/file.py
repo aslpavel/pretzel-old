@@ -19,15 +19,14 @@ class FileChannel (PersistenceChannel):
     def __init__ (self, core, in_fd, out_fd):
         PersistenceChannel.__init__ (self, core)
 
-        self.disposed = False
-        self.OnStop += lambda: setattr (self, 'disposed', True)
-        self.header = struct.Struct ('!III')
-
         # non blocking
         self.in_fd, self.out_fd = in_fd, out_fd
         BlockingSet (in_fd, False)
         if in_fd != out_fd:
             BlockingSet (out_fd, False)
+
+        self.header = struct.Struct ('!III')
+        self.in_stream = io.open (self.in_fd, 'rb', buffering = 1 << 16, closefd = False)
 
         # Pickler
         class pickler_type (pickle.Pickler):
@@ -43,8 +42,8 @@ class FileChannel (PersistenceChannel):
 
     @Async
     def RecvMsg (self):
-        if self.disposed:
-            raise ChanneldError ('connection is closed')
+        if not self.IsRunning:
+            raise ChannelError ('connection is closed')
 
         # receive header
         header = yield self.read (self.header.size)
@@ -64,7 +63,7 @@ class FileChannel (PersistenceChannel):
         AsyncReturn ((port, uid, lambda: self.unpickler_type (data).load ()))
 
     def SendMsg (self, message):
-        if self.disposed:
+        if not self.IsRunning:
             try:
                 raise ChannelError ('connection is closed')
             except Exception: return FailedFuture (sys.exc_info ())
@@ -96,15 +95,13 @@ class FileChannel (PersistenceChannel):
 
     @Async
     def read (self, size):
-        try:
-            AsyncReturn (os.read (self.in_fd, size))
-        except OSError as err:
-            if err.errno != errno.EAGAIN:
-                raise
+        data = self.in_stream.read (size)
+        if data is not None:
+            AsyncReturn (data)
 
         try:
             yield self.core.Poll (self.in_fd, self.core.READABLE)
-            AsyncReturn (os.read (self.in_fd, size))
+            AsyncReturn (self.in_stream.read (size))
         except CoreHUPError:
             AsyncReturn (b'')
 

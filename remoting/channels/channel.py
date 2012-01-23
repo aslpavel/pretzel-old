@@ -17,20 +17,23 @@ class Channel (object):
         self.queue, self.wait, self.worker = {}, None, None
         self.ports = BindPool ()
         self.core  = core
+
         self.OnStart, self.OnStop = Event (), Event ()
+        self.IsRunning = False
 
     def BindPort (self, port, handler):
         return self.ports.Bind (port, handler)
 
     def Start (self):
-        if self.worker is not None:
-           raise ChannelError ('channel has already been started')
+        if self.IsRunning:
+           raise ChannelError ('worker is running')
+
         self.worker = self.worker_run ()
         self.OnStart (self)
         Fork (self.worker, 'channel')
 
     def Stop (self):
-        if self.worker is None:
+        if not self.IsRunning:
             return
         self.worker.Cancel ()
 
@@ -44,8 +47,8 @@ class Channel (object):
     @Async
     def Request (self, port, **attr):
         """Asynchronous request to remote server"""
-        if self.worker is None:
-            raise ChannelError ('channel not started or worker is dead')
+        if not self.IsRunning:
+            raise ChannelError ('worker is dead')
 
         # send message
         message = Message (port, **attr)
@@ -64,6 +67,7 @@ class Channel (object):
     def worker_run (self):
         """Process incoming messages"""
         try:
+            self.IsRunning = True
             while True:
                 self.wait = self.RecvMsg ()
                 message_info = yield self.wait
@@ -84,19 +88,20 @@ class Channel (object):
                         self.queue.pop (uid).ResultSet (message_getter)
                     elif port == PORT_ERROR:
                         self.queue.pop (uid).ErrorSet (*message_getter ().exc_info ())
-        except Exception:
-            et, eo, tb = sys.exc_info ()
-            for future in self.queue.values ():
-                future.ErrorSet (et, eo, tb)
-            self.queue.clear ()
-            if et is not FutureCanceled:
-                raise
+        except FutureCanceled:
+            pass
         finally:
-            for future in self.queue.values ():
-                future.ErrorRaise (ChannelError ('connection has been closed unexpectedly'))
-            self.queue.clear ()
+            # resolve queued futures
+            et, eo, tb = sys.exc_info ()
+            self.queue, queue = {}, self.queue
+            for future in queue.values ():
+                if et is None:
+                    future.ErrorRaise (ChannelError ('connection has been closed unexpectedly'))
+                else:
+                    future.ErrorSet (et, eo, tb)
 
-            self.worker, self.wait = None, None
+            # fire stop event
+            self.IsRunning = False
             self.OnStop ()
 
     @Async

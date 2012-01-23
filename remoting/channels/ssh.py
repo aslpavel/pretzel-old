@@ -47,11 +47,11 @@ class SSHChannel (FileChannel):
             
         FileChannel.__init__ (self, core, lr, lw) 
 
-        # close descriptors if connection has been disposed
         def on_stop ():
             try:
                 os.close (lr)
-                os.close (lw)
+                if lw != lr:
+                    os.close (lw)
             except OSError:
                 pass
         self.OnStop += on_stop
