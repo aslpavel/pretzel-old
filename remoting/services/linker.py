@@ -82,9 +82,25 @@ class LinkerService (Service):
         members ['__getattr__'] = getter
         members ['__setattr__'] = setter
 
-        # create reference
+        # desc
         desc, self.desc = self.desc, self.desc + 1
-        ref = (type ('{0}_ref'.format (type (target).__name__), (Reference,), members) \
+
+        # dispose
+        target_dispose = members.get ('__exit__')
+        def dispose (this, et, eo, tb):
+            # call targets dispose if any
+            result = None
+            if target_dispose is not None:
+                result = target_dispose (et, eo, tb)
+            # unlink target
+            self.local_d2r.pop (desc, None)
+            return result
+        members ['__exit__'] = dispose
+        if '__enter__' not in members:
+            members ['__enter__'] = lambda this: this
+
+        # create reference
+        ref = (type ('{0}_ref'.format (type (target).__name__), (Reference,), members)
             (REFERENCE_LOCAL, self, desc, target))
 
         # update mapping
@@ -131,7 +147,7 @@ class LinkerService (Service):
     def restore_remote (self, ref_type, ref_desc):
         info = yield self.channel.Request (PORT_LINKER_INFO, desc = ref_desc)
 
-        # create methods
+        # methods
         members = {}
         def method_factory (method_name):
             @Delegate
@@ -147,6 +163,7 @@ class LinkerService (Service):
         for method_name in info.methods:
             members [method_name] = method_factory (method_name)
 
+        # fields
         @Delegate
         def getter (this, name):
             return (self.channel.Request (PORT_LINKER_GET, desc = ref_desc, name = name)
@@ -156,6 +173,17 @@ class LinkerService (Service):
             return self.channel.Request (PORT_LINKER_SET, desc = ref_desc, name = name, value = value)
         members ['__getattr__'] = getter
         members ['__setattr__'] = setter
+
+        # dispose
+        ref_dispose = members ['__exit__']
+        def dispose (this, et, eo, tb):
+            # call reference dispose
+            result = ref_dispose (this, et, eo, tb)
+            # unlink reference
+            self.remote_d2r.pop (ref_desc, None)
+
+            return result
+        members ['__exit__'] = dispose
 
         ref = type ('%s_remote_ref' % info.name, (Reference, ), members) \
             (REFERENCE_REMOTE, self, ref_desc, None)
@@ -184,6 +212,7 @@ class LinkerService (Service):
 
     @DummyAsync
     def port_GET (self, request):
+        print (request.name)
         return request.Result (result = getattr (self.instance_get (request), request.name))
 
     @DummyAsync
@@ -199,7 +228,7 @@ class LinkerService (Service):
         ref = self.local_d2r.get (request.desc)
         if not ref:
             raise ValueError ('bad descriptor {0}'.format (request.desc))
-        return ref.ref_target
+        return ref
 
 #-----------------------------------------------------------------------------#
 # Reference                                                                   #
