@@ -29,6 +29,8 @@ class Channel (object):
            raise ChannelError ('worker is running')
 
         self.worker = self.worker_run ()
+        if self.worker.IsCompleted ():
+            return self.worker.Result ()
         self.OnStart (self)
         Fork (self.worker, 'channel')
 

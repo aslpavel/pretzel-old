@@ -208,6 +208,8 @@ REFERENCE_LOCAL = 0
 REFERENCE_REMOTE = 1
 
 class Reference (object):
+    __slots__ = ('ref_type', 'ref_desc', 'ref_linker', 'ref_target')
+
     def __init__ (self, type, linker, desc, target):
         object.__setattr__ (self, 'ref_type', type)
         object.__setattr__ (self, 'ref_desc', desc)
