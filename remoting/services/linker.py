@@ -212,7 +212,6 @@ class LinkerService (Service):
 
     @DummyAsync
     def port_GET (self, request):
-        print (request.name)
         return request.Result (result = getattr (self.instance_get (request), request.name))
 
     @DummyAsync
