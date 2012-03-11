@@ -1,3 +1,6 @@
 [submodule "async"]
 	path = async
 	url = git://github.com/aslpavel/async.git
+[submodule "udb"]
+	path = udb
+	url = git://github.com/aslpavel/udb.git

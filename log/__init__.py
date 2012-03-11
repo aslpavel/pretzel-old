@@ -1,23 +1,19 @@
 # -*- coding: utf-8 -*-
-from .async import *
-from .observer import *
-from .event import *
+from .string import *
+from .logger import *
 from .log import *
-from .udb import *
 
 #------------------------------------------------------------------------------#
 # Load Test Protocol                                                           #
 #------------------------------------------------------------------------------#
 def load_tests (loader, tests, pattern):
     from unittest import TestSuite
-
-    from . import async
-    from . import log
-    from . import udb
+    from . import tests
 
     suite = TestSuite ()
-    for test in (async, log, udb):
+    for test in (tests,):
         suite.addTests (loader.loadTestsFromModule (test))
 
     return suite
+
 # vim: nu ft=python columns=120 :
