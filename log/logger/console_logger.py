@@ -54,12 +54,15 @@ class ConsoleLogger (Observer):
         try:
             # first
             self.prefix_draw (event)
+            value = yield event.Message
 
             # update
-            value = yield event.Message
-            while value is not None:
+            while True:
                 self.prefix_draw (event)
-                value = yield String (event.Message, ' ', value)
+                current = yield String (event.Message, ' ', value)
+                if current is None:
+                    break
+                value = current
 
             # last
             self.prefix_draw (event)
