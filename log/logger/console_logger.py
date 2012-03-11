@@ -59,11 +59,11 @@ class ConsoleLogger (Observer):
             value = yield event.Message
             while value is not None:
                 self.prefix_draw (event)
-                value = yield String (event.Message, (' ',), value)
+                value = yield String (event.Message, ' ', value)
 
             # last
             self.prefix_draw (event)
-            yield String (event.Message, (' ',), value)
+            yield String (event.Message, ' ', value)
 
         except Exception as error:
             # error

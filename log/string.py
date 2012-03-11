@@ -5,49 +5,44 @@ __all__ = ('String',)
 # String                                                                       #
 #------------------------------------------------------------------------------#
 class String (object):
-    def __init__ (self, *chunks):
+    __slots__ = ('chunks', 'length')
+
+    def __init__ (self, *items):
         self.chunks = []
         self.length = 0
 
-        for chunk in chunks:
-            if isinstance (chunk, String):
-                self.chunks.extend (chunk.chunks)
-                self.length += len (chunk)
-            elif isinstance (chunk, tuple):
-                string, color = chunk
-                string = str (string)
-                self.chunks.append ((string, color))
-                self.length += len (string)
-            else:
-                self.chunks.append ((chunk, None))
-                self.length += len (chunk)
+        for item in items:
+            self.Append (item)
 
     #--------------------------------------------------------------------------#
-    # Modify                                                                   #
+    # Append                                                                   #
     #--------------------------------------------------------------------------#
-    def Append (self, string, *args, **keys):
-        if isinstance (string, String):
-            if args or keys:
-                string.Format (*args, **keys)
-
-            self.chunks.extend (string.chunks)
-            self.length += len (string)
+    def Append (self, other):
+        if isinstance (other, String):
+            self.chunks.extend (other.chunks)
+            self.length += other.length
+        elif isinstance (other, tuple):
+            self.chunks.append (other)
+            self.length += len (other [0])
         else:
-            string = str (string)
-            if args or keys:
-                string = string.format (*args, **keys)
+            self.chunks.append ((other, None))
+            self.length += len (other)
 
-            self.chunks.append ((string, None))
-            self.length += len (string)
+    def __iadd__ (self, other):
+        self.Append (other)
+        return self
 
+    #--------------------------------------------------------------------------#
+    # Format                                                                   #
+    #--------------------------------------------------------------------------#
     def Format (self, *args, **keys):
-        def format (pair):
-            string, color = pair
+        def format (chunk):
+            string, color = chunk
             return string.format (*args, **keys), color
         return String (*(map (format, self.chunks)))
 
     #--------------------------------------------------------------------------#
-    # String like behavior                                                     #
+    # Interfaces                                                               #
     #--------------------------------------------------------------------------#
     def __len__ (self):
         return self.length
@@ -56,8 +51,9 @@ class String (object):
         return iter (self.chunks)
 
     def __bool__ (self):
-        return bool (self.length)
+        return self.length > 0
 
     def __nonzero__ (self):
-        return bool (self.length)
+        return self.length > 0
+
 # vim: nu ft=python columns=120 :

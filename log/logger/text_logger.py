@@ -35,16 +35,18 @@ class TextLogger (Observer):
             self.prefix_draw (event)
             self.stream.write (prefix)
             self.write (event.Message)
+            self.stream.write ('\n')
+            self.stream.flush ()
 
         # progress
         elif event.type & EVENT_PROGRESS:
             if event.type & EVENT_BAR:
-                engine = self.ProgressBarEngine (event)
+                engine = self.ProgressEngine (event)
             elif event.type & EVENT_PENDING:
                 engine = self.PendingEngine (event)
             else:
                 engine = self.ProgressEngine (event)
-            event.Subscribe (ProgressObserver (self, engine))
+            event.Subscribe (ProgressObserver (self.stream, engine))
 
     #--------------------------------------------------------------------------#
     # Progress                                                                 #
@@ -53,65 +55,25 @@ class TextLogger (Observer):
         try:
             # first
             self.prefix_draw (event)
+            self.write (event.Message)
+            self.stream.write (' ... [BEGIN]\n')
+            yield
 
             # update
-            value = yield event.Message
-            while value is not None:
-                self.prefix_draw (event)
-                value = yield String (event.Message, (' ',), value)
+            while (yield):
+                pass
 
             # last
             self.prefix_draw (event)
-            yield String (event.Message, (' ',), value)
+            self.write (event.Message)
+            self.stream.write (' ... [END]\n')
+            yield
 
         except Exception as error:
             # error
             self.prefix_draw (event)
-            yield String (event.Message, (' {}:{}'.format (error.__class__.__name__, error), '11'))
-
-    #--------------------------------------------------------------------------#
-    # Progress Bar                                                             #
-    #--------------------------------------------------------------------------#
-    def ProgressBarEngine (self, event):
-        value = 0
-        try:
-            # first
-            self.bar_draw (0)
-            self.prefix_draw (event)
-
-            # update
-            value = yield event.Message
-            while value is not None:
-                self.bar_draw (value)
-                self.prefix_draw (event)
-                value = yield event.Message
-
-            # last
-            self.bar_draw (1)
-            self.prefix_draw (event)
-            yield event.Message
-
-        except Exception as error:
-            print ('test')
-            # error
-            self.bar_draw (value)
-            self.prefix_draw (event)
-            yield String (event.Message, (' {}:{}'.format (error.__class__.__name__, error), '11'))
-
-    bar_pattern = String (('[', '5'), ('{0}{1}', '15'), (']', '5'), ('{2:>3}%', '17'))
-    bar_size   = 23
-
-    @Cached
-    def bar_string (self, value):
-        filled = int (value / 100 * self.bar_size)
-        return self.bar_pattern.Format ('#' * filled, '-' * (self.bar_size - filled), value)
-
-    def bar_draw (self, value):
-        columns, rows = self.console.Size ()
-        bar = self.bar_string (int (value * 100))
-        self.console.MoveColumn (columns - len (bar) + 1)
-        self.console.Write (bar)
-        self.console.MoveColumn (0)
+            self.write (event.Message)
+            self.stream.write (' {}:{} [FAILED]\n'.format (error.__class__.__name__, error))
 
     #--------------------------------------------------------------------------#
     # Pending                                                                  #
@@ -119,32 +81,23 @@ class TextLogger (Observer):
     def PendingEngine (self, event):
         try:
             # busy
-            self.pending_draw ()
             self.prefix_draw (event)
-            yield event.Message
+            self.write (event.Message)
+            self.stream.write (' ... [BUSY]\n')
+            yield
 
             # done
-            self.pending_draw (True)
             self.prefix_draw (event)
-            yield event.Message
+            self.write (event.Message)
+            self.stream.write (' ... [DONE]\n')
+            yield
 
         except Exception as error:
             # failed
-            self.pending_draw (False)
             self.prefix_draw (event)
-            yield String (event.Message, (' {}:{}'.format (error.__class__.__name__, error), '11'))
-
-    pending_busy = String (('[', '5'), ('BUSY', '15'), (']', '5'))
-    pending_fail = String (('[', '5'), ('FAIL', '11'), (']', '5'))
-    pending_done = String (('[', '5'), ('DONE', '12'), (']', '5'))
-
-    def pending_draw (self, result = None):
-        status = self.pending_busy if result is None else \
-            self.pending_done if result else self.pending_fail
-        columns, rows = self.console.Size ()
-        self.console.MoveColumn (columns - len (status) + 1)
-        self.console.Write (status)
-        self.console.MoveColumn (0)
+            self.write (event.Message)
+            self.stream.write (' {}:{} [FAILED]\n'.format (error.__class__.__name__, error))
+            yield
 
     #--------------------------------------------------------------------------#
     # Common                                                                   #
@@ -163,7 +116,7 @@ class TextLogger (Observer):
     # Dispose                                                                  #
     #--------------------------------------------------------------------------#
     def Dispose (self):
-        pass
+        self.stream.flush ()
 
     def __enter__ (self):
         return self
@@ -176,27 +129,23 @@ class TextLogger (Observer):
 # Progress Observer
 #------------------------------------------------------------------------------#
 class ProgressObserver (Observer):
-    def __init__ (self, logger, engine):
+    def __init__ (self, stream, engine):
+        self.stream = stream
         self.engine = engine
-        self.logger = logger
 
         self.OnNext (None)
 
     def OnNext (self, value):
-        string = self.engine.send (value)
-        if string:
-            self.logger.write (string)
-        self.logger.stream.write ('\n')
+        self.engine.send (value)
+        self.stream.flush ()
 
     def OnError (self, error):
-        string = self.engine.throw (*error)
-        if string:
-            self.logger.write (string)
-        self.logger.stream.write ('\n')
+        self.engine.throw (*error)
         self.engine.close ()
+        self.stream.flush ()
 
     def OnCompleted (self):
         self.OnNext (None)
         self.engine.close ()
-
+        self.stream.flush ()
 # vim: nu ft=python columns=120 :
