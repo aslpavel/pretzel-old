@@ -3,6 +3,7 @@ import sys
 import operator
 
 from .disposable import *
+from ..async import *
 
 __all__ = ('Observable', 'Observer')
 #------------------------------------------------------------------------------#
@@ -90,6 +91,52 @@ class Observable (object):
             except Exception:
                 disposables.Dispose ()
                 raise
+
+        return AnonymousObservable (Subscribe)
+
+    #--------------------------------------------------------------------------#
+    # Smother                                                                  #
+    #--------------------------------------------------------------------------#
+    def Smother (self, delay, core):
+        """Smother observable
+        
+        Producue only last event within each delay time span
+        """
+        def Subscribe (observer):
+            context = Context (value = None, changed = False, running = False)
+
+            @Async
+            def timerTask ():
+                now = yield core.Sleep (0)
+                context.running = True
+                try:
+                    while True:
+                        now = yield core.SleepUntil (now + delay)
+                        if context.stopped:
+                            return
+                        if context.chagned:
+                            observer.OnNext (context.value)
+                            context.changed = False
+                finally:
+                    context.running = False
+
+            def onNext (value):
+                if not context.running:
+                    timerTask ()
+                context.value, context.changed = value, True
+
+            def onError (error):
+                context.running = False
+                observer.OnError (error)
+
+            def onCompleted ():
+                context.running = False
+                if context.changed:
+                    observer.OnNext (context.value)
+                observer.OnCompleted ()
+
+            return CompositeDisposable (lambda: setattr (context, 'running', False),
+                self.Subscribe (AnonymousObserver (onNext, onError, onCompleted)))
 
         return AnonymousObservable (Subscribe)
 
