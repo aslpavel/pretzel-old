@@ -89,18 +89,18 @@ class Channel (object):
                     if port == PORT_RESULT:
                         self.queue.pop (uid).ResultSet (message_getter)
                     elif port == PORT_ERROR:
-                        self.queue.pop (uid).ErrorSet (*message_getter ().exc_info ())
+                        self.queue.pop (uid).ErrorSet (message_getter ().exc_info ())
         except FutureCanceled:
             pass
         finally:
             # resolve queued futures
-            et, eo, tb = sys.exc_info ()
+            error = sys.exc_info ()
             self.queue, queue = {}, self.queue
             for future in queue.values ():
-                if et is None:
+                if error [0] is None:
                     future.ErrorRaise (ChannelError ('connection has been closed unexpectedly'))
                 else:
-                    future.ErrorSet (et, eo, tb)
+                    future.ErrorSet (error)
 
             # fire stop event
             self.IsRunning = False
