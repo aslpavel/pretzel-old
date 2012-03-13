@@ -107,7 +107,7 @@ class ConsoleLogger (Observer):
 
     @Cached
     def bar_string (self, value):
-        filled = int (value / 100 * self.bar_size)
+        filled = int (value / 100.0 * self.bar_size)
         return self.bar_pattern.Format ('#' * filled, '-' * (self.bar_size - filled), value)
 
     def bar_draw (self, value):
