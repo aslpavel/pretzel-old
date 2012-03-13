@@ -6,9 +6,9 @@ import struct
 import pickle
 import errno
 
-from ..async import *
-from ..util import *
 from .channel import *
+from ..util import *
+from ...async import *
 
 __all__ = ('FileChannel',)
 

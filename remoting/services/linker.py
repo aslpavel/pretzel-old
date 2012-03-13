@@ -2,7 +2,7 @@
 import inspect
 
 from .service import *
-from ..async import *
+from ...async import *
 
 __all__ = ('LinkerService',)
 

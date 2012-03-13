@@ -2,8 +2,8 @@
 import unittest
 
 from .util import *
-from .async import *
 from .domains.fork import *
+from ..async import *
 
 #-----------------------------------------------------------------------------#
 # Fork Domain                                                                 #

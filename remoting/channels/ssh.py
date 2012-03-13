@@ -68,7 +68,7 @@ from importlib import import_module
 def main ():
     remoting_name = "{remoting_name}"
     remoting = import_module (remoting_name)
-    async = import_module (".async", remoting_name)
+    async = import_module ("..async", remoting_name)
     domains = import_module (".domains.ssh", remoting_name)
 
     with async.Core () as core:

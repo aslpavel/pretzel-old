@@ -3,9 +3,9 @@ import sys
 import imp
 import zlib
 
-from ..async import *
-from ..util import *
 from .service import *
+from ..util import *
+from ...async import *
 
 __all__ = ('ImportService',)
 
