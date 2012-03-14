@@ -4,6 +4,7 @@ import operator
 
 from .log import *
 from ..observer import *
+from ..disposable import *
 
 #------------------------------------------------------------------------------#
 # Log Tests                                                                    #

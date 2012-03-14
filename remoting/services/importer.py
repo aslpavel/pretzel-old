@@ -6,6 +6,7 @@ import zlib
 from .service import *
 from ..util import *
 from ...async import *
+from ...disposable import *
 
 __all__ = ('ImportService',)
 

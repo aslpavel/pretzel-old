@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from ..observer import *
+from ..disposable import *
 
 __all__ = ('Log', 'EVENT_MESSAGE', 'EVENT_PROGRESS', 'EVENT_DEBUG', 'EVENT_INFO',
     'EVENT_WARN', 'EVENT_ERROR', 'EVENT_BAR', 'EVENT_PENDING',)

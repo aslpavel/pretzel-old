@@ -2,7 +2,7 @@
 import sys
 import operator
 
-from .disposable import *
+from ..disposable import *
 from ..async import *
 
 __all__ = ('Observable', 'Observer')

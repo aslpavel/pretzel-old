@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from ..util import *
+from ...disposable import *
 
 __all__ = ('Service', 'ServiceError')
 

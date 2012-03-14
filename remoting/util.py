@@ -2,86 +2,13 @@
 import sys, os
 import fcntl
 import traceback
+from ..disposable import *
 
-__all__ = ('Disposable', 'CompositeDisposable', 'Event', 'BindPool', 'BlockingSet', 'Fork',
-    'exec_', 'reraise')
-#-----------------------------------------------------------------------------#
-# Disposable                                                                  #
-#-----------------------------------------------------------------------------#
-class Disposable (object):
-    __slots__ = ('dispose')
-    def __init__ (self, dispose = None):
-        self.dispose = dispose
+__all__ = ('Event', 'BindPool', 'BlockingSet', 'Fork', 'exec_', 'reraise')
 
-    def __enter__ (self):
-        return self
-
-    def __exit__ (self, et, eo, tb):
-        if self.dispose is not None:
-            self.dispose ()
-            self.dispose = None
-        return False
-
-    def __bool__ (self):
-        return self.dispose is not None
-
-    def Dispose (self):
-        if self.dispose is not None:
-            self.dispose ()
-            self.dispose = None
-
-#-----------------------------------------------------------------------------#
-# Composite Disposable                                                        #
-#-----------------------------------------------------------------------------#
-class CompositeDisposable (object):
-    __slots__ = ('disposed', 'disposables')
-
-    def __init__ (self, *disposables):
-        self.disposables = set ()
-        try:
-            for disposable in disposables:
-                disposable.__enter__ ()
-                self.disposables.add (disposable)
-        except:
-            for disposable in disposables:
-                disposable.__exit__ (None, None, None)
-            raise
-        self.disposed = False
-
-    def __iadd__ (self, disposable):
-        disposable.__enter__ ()
-        if self.disposed:
-            disposable.__exit__ (None, None, None)
-        else:
-            self.disposables.add (disposable)
-        return self
-
-    def __isub__ (self, disposable):
-        self.disposables.remove (disposable)
-        disposable.__exit__ ()
-        return self
-
-    def __enter__ (self):
-        return self
-
-    def __exit__ (self, et, eo, tb):
-        self.Dispose ()
-        return False
-
-    def __bool__ (self):
-        return not self.disposed
-
-    def Dispose (self):
-        if self.disposed:
-            return
-        self.disposed = True
-        for disposable in self.disposables:
-            disposable.__exit__ (None, None, None)
-        self.disposables.clear ()
-
-#-----------------------------------------------------------------------------#
-# Event                                                                       #
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+# Event                                                                        #
+#------------------------------------------------------------------------------#
 class Event (object):
     """Simple Event implementation"""
     __slots__ = ('__handlers',)
@@ -101,9 +28,9 @@ class Event (object):
         self.__handlers.discard (handler)
         return self
 
-#-----------------------------------------------------------------------------#
-# Bind Pool                                                                   #
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+# Bind Pool                                                                    #
+#------------------------------------------------------------------------------#
 class BindPool (dict):
     """Bind key to value and return unbinder (Disposable)"""
 
@@ -113,9 +40,9 @@ class BindPool (dict):
         self [key] = value
         return Disposable (lambda : self.pop (key))
 
-#-----------------------------------------------------------------------------#
-# Blocking                                                                    #
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+# Blocking                                                                     #
+#------------------------------------------------------------------------------#
 def BlockingSet (fd, enabled = True):
     """Change blocking flag for descriptor"""
 
@@ -127,9 +54,9 @@ def BlockingSet (fd, enabled = True):
     fcntl.fcntl (fd, fcntl.F_SETFL, flags)
     return flags
 
-#-----------------------------------------------------------------------------#
-# Fork                                                                        #
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+# Fork                                                                         #
+#------------------------------------------------------------------------------#
 def Fork (future, tag = None):
     """Treat future as coroutine"""
     def finished (future):
@@ -142,9 +69,9 @@ def Fork (future, tag = None):
             raise
     return future.Continue (finished)
 
-#-----------------------------------------------------------------------------#
-# exec_ and reraise                                                           #
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+# exec_ and reraise                                                            #
+#------------------------------------------------------------------------------#
 if sys.version_info [0] > 2:
     import builtins
     exec_ = getattr (builtins, "exec")
