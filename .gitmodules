@@ -4,6 +4,3 @@
 [submodule "udb"]
 	path = udb
 	url = git://github.com/aslpavel/udb.git
-[submodule "remoting"]
-	path = remoting
-	url = git://github.com/aslpavel/remoting.git
