@@ -45,16 +45,7 @@ class SSHChannel (FileChannel):
             os.dup2 (rw, 1)
             os.execvp (ssh_exec, command)
             
-        FileChannel.__init__ (self, core, lr, lw) 
-
-        def on_stop ():
-            try:
-                os.close (lr)
-                if lw != lr:
-                    os.close (lw)
-            except OSError:
-                pass
-        self.OnStop += on_stop
+        FileChannel.__init__ (self, core, lr, lw, closefd = True)
 
 #-----------------------------------------------------------------------------#
 # Payload Pattern                                                             #

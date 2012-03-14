@@ -19,6 +19,6 @@ class ForkDomain (LocalDomain):
 #-----------------------------------------------------------------------------#
 class ForkRemoteDomain (RemoteDomain):
     def __init__ (self, core, rr, rw):
-        RemoteDomain.__init__ (self, FileChannel (core, rr, rw))
+        RemoteDomain.__init__ (self, FileChannel (core, rr, rw, closefd = True))
 
 # vim: nu ft=python columns=120 :

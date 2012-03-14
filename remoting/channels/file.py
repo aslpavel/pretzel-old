@@ -16,7 +16,7 @@ __all__ = ('FileChannel',)
 # File Channel                                                                #
 #-----------------------------------------------------------------------------#
 class FileChannel (PersistenceChannel):
-    def __init__ (self, core, in_fd, out_fd):
+    def __init__ (self, core, in_fd, out_fd, closefd = False):
         PersistenceChannel.__init__ (self, core)
 
         # non blocking
@@ -40,6 +40,16 @@ class FileChannel (PersistenceChannel):
                 return self.Restore (pid)
         self.unpickler_type = unpickler_type
 
+        # close descriptors on stop
+        if closefd:
+            def close_fd ():
+                os.close (in_fd)
+                if in_fd != out_fd: os.close (out_fd)
+            self.OnStop += close_fd
+
+    #--------------------------------------------------------------------------#
+    # Channel Interface                                                        #
+    #--------------------------------------------------------------------------#
     @Async
     def RecvMsg (self):
         if not self.IsRunning:
@@ -81,6 +91,9 @@ class FileChannel (PersistenceChannel):
 
         return self.write (stream.getvalue ())
 
+    #--------------------------------------------------------------------------#
+    # Private                                                                  #
+    #--------------------------------------------------------------------------#
     @Async
     def write (self, data):
         try:

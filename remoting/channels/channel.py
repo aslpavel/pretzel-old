@@ -7,12 +7,10 @@ from ...event import *
 from ...async import *
 
 __all__ = ('Channel', 'PersistenceChannel', 'ChannelError')
-
+#------------------------------------------------------------------------------#
+# Channel                                                                      #
+#------------------------------------------------------------------------------#
 class ChannelError (Exception): pass
-
-#-----------------------------------------------------------------------------#
-# Channel                                                                     #
-#-----------------------------------------------------------------------------#
 class Channel (object):
     def __init__ (self, core):
         self.queue, self.wait, self.worker = {}, None, None
@@ -22,9 +20,9 @@ class Channel (object):
         self.OnStart, self.OnStop = Event (), Event ()
         self.IsRunning = False
 
-    def BindPort (self, port, handler):
-        return self.ports.Bind (port, handler)
-
+    #--------------------------------------------------------------------------#
+    # Start | Stop                                                             #
+    #--------------------------------------------------------------------------#
     def Start (self):
         if self.IsRunning:
            raise ChannelError ('worker is running')
@@ -40,13 +38,9 @@ class Channel (object):
             return
         self.worker.Cancel ()
 
-    # abstract
-    def SendMsg (self, message):
-        raise NotImplementedError ()
-
-    def RecvMsg (self):
-        raise NotImplementedError ()
-
+    #--------------------------------------------------------------------------#
+    # Request                                                                  #
+    #--------------------------------------------------------------------------#
     @Async
     def Request (self, port, **attr):
         """Asynchronous request to remote server"""
@@ -57,7 +51,7 @@ class Channel (object):
         message = Message (port, **attr)
         yield self.sendmsg (message)
 
-        # register future 
+        # register future
         future = Future (lambda: self.wait_uid (message.uid))
         self.queue [message.uid] = future
 
@@ -66,6 +60,24 @@ class Channel (object):
 
         AsyncReturn (message_getter ())
 
+    #--------------------------------------------------------------------------#
+    # Port Interface                                                           #
+    #--------------------------------------------------------------------------#
+    def BindPort (self, port, handler):
+        return self.ports.Bind (port, handler)
+
+    #--------------------------------------------------------------------------#
+    # Channel Interface                                                        #
+    #--------------------------------------------------------------------------#
+    def SendMsg (self, message):
+        raise NotImplementedError ()
+
+    def RecvMsg (self):
+        raise NotImplementedError ()
+
+    #--------------------------------------------------------------------------#
+    # Private                                                                  #
+    #--------------------------------------------------------------------------#
     @Async
     def worker_run (self):
         """Process incoming messages"""
@@ -127,9 +139,9 @@ class Channel (object):
     def sendmsg (self, message):
         return self.SendMsg (message)
 
-#-----------------------------------------------------------------------------#
-# Persistence Channel                                                         #
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+# Persistence Channel                                                          #
+#------------------------------------------------------------------------------#
 class PersistenceChannel (Channel):
     def __init__ (self, core):
         self.persistence = BindPool ()
@@ -137,6 +149,9 @@ class PersistenceChannel (Channel):
 
         Channel.__init__ (self, core)
 
+    #--------------------------------------------------------------------------#
+    # Persistence Interface                                                    #
+    #--------------------------------------------------------------------------#
     def BindPersistence (self, slot, save, restore):
         return self.persistence.Bind (slot, (save, restore))
 

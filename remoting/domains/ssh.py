@@ -21,6 +21,6 @@ class SSHDomain (LocalDomain):
 #-----------------------------------------------------------------------------#
 class SSHRemoteDomain (RemoteDomain):
     def __init__ (self, core):
-        RemoteDomain.__init__ (self, FileChannel (core, 0, 1))
+        RemoteDomain.__init__ (self, FileChannel (core, 0, 1, closefd = True))
 
 # vim: nu ft=python columns=120 :

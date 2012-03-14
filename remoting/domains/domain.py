@@ -27,6 +27,9 @@ class Domain (object):
                     pass
         raise AttributeError (attr)
 
+    #--------------------------------------------------------------------------#
+    # Dispose                                                                  #
+    #--------------------------------------------------------------------------#
     def Dispose (self):
         self.disposable.Dispose ()
         self.channel.Stop ()

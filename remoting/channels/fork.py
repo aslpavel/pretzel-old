@@ -34,16 +34,7 @@ class ForkChannel (FileChannel):
         finally:
             os.close (payload_out)
 
-        FileChannel.__init__ (self, core, lr, lw)
-
-        def on_stop ():
-            try:
-                os.close (lr)
-                if lw != lr:
-                    os.close (lw)
-            except OSError:
-                pass
-        self.OnStop += on_stop
+        FileChannel.__init__ (self, core, lr, lw, closefd = True)
 
 #-----------------------------------------------------------------------------#
 # Payload Pattern                                                             #
