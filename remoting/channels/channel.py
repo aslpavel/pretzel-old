@@ -3,6 +3,7 @@ import sys
 
 from ..message import *
 from ..util import *
+from ...event import *
 from ...async import *
 
 __all__ = ('Channel', 'PersistenceChannel', 'ChannelError')
