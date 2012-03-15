@@ -6,7 +6,7 @@ import termios
 from contextlib import contextmanager
 
 from ..string import *
-from ...observer import *
+from ...disposable import *
 
 __all__ = ('Console', 'ConsoleError')
 #------------------------------------------------------------------------------#
