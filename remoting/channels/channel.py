@@ -85,10 +85,7 @@ class Channel (object):
             self.IsRunning = True
             while True:
                 self.wait = self.RecvMsg ()
-                message_info = yield self.wait
-                if message_info is None:
-                    break
-                port, uid, message_getter = message_info
+                port, uid, message_getter = yield self.wait
                 if port >= PORT_SYSTEM:
                     # incoming request
                     handler = self.ports.get (port)
@@ -103,8 +100,9 @@ class Channel (object):
                         self.queue.pop (uid).ResultSet (message_getter)
                     elif port == PORT_ERROR:
                         self.queue.pop (uid).ErrorSet (message_getter ().exc_info ())
-        except FutureCanceled:
-            pass
+
+        except CoreHUPError: pass
+        except FutureCanceled: pass
         finally:
             # resolve queued futures
             error = sys.exc_info ()

@@ -1,32 +1,24 @@
 # -*- coding: utf-8 -*-
-import os
 import io
-import sys
 import struct
 import pickle
-import errno
 
 from .channel import *
-from ..util import *
 from ...async import *
 
 __all__ = ('FileChannel',)
-
 #-----------------------------------------------------------------------------#
 # File Channel                                                                #
 #-----------------------------------------------------------------------------#
 class FileChannel (PersistenceChannel):
     def __init__ (self, core, in_fd, out_fd, closefd = False):
         PersistenceChannel.__init__ (self, core)
-
-        # non blocking
-        self.in_fd, self.out_fd = in_fd, out_fd
-        BlockingSet (in_fd, False)
-        if in_fd != out_fd:
-            BlockingSet (out_fd, False)
-
         self.header = struct.Struct ('!III')
-        self.in_stream = io.open (self.in_fd, 'rb', buffering = 1 << 16, closefd = False)
+
+        # create asynchronous files
+        self.in_file = core.AsyncFileCreate (in_fd, closefd = closefd)
+        self.out_file = core.AsyncFileCreate (out_fd, closefd = closefd) if in_fd != out_fd else self.in_file
+        self.OnStop += self.Dispose
 
         # Pickler
         class pickler_type (pickle.Pickler):
@@ -40,13 +32,6 @@ class FileChannel (PersistenceChannel):
                 return self.Restore (pid)
         self.unpickler_type = unpickler_type
 
-        # close descriptors on stop
-        if closefd:
-            def close_fd ():
-                os.close (in_fd)
-                if in_fd != out_fd: os.close (out_fd)
-            self.OnStop += close_fd
-
     #--------------------------------------------------------------------------#
     # Channel Interface                                                        #
     #--------------------------------------------------------------------------#
@@ -56,27 +41,18 @@ class FileChannel (PersistenceChannel):
             raise ChannelError ('connection is closed')
 
         # receive header
-        header = yield self.read (self.header.size)
-        if not len (header):
-            AsyncReturn (None)
+        header = yield self.in_file.ReadExactly (self.header.size)
 
         # receive body
         size, port, uid = self.header.unpack (header)
-        data = io.BytesIO ()
-        while data.tell () < size:
-            chunk = yield self.read (size - data.tell ())
-            if not len (chunk):
-                raise ChannelError ('connection has been closed unexpectedly')
-            data.write (chunk)
-
-        data.seek (0)
-        AsyncReturn ((port, uid, lambda: self.unpickler_type (data).load ()))
+        stream = io.BytesIO ()
+        self.in_file.ReadExactlyInto (size, stream)
+        stream.seek (0)
+        AsyncReturn ((port, uid, lambda: self.unpickler_type (stream).load ()))
 
     def SendMsg (self, message):
         if not self.IsRunning:
-            try:
-                raise ChannelError ('connection is closed')
-            except Exception: return FailedFuture (sys.exc_info ())
+            RaisedFuture (ChannelError ('Connection is closed'))
 
         stream = io.BytesIO ()
 
@@ -89,33 +65,19 @@ class FileChannel (PersistenceChannel):
         stream.seek (0)
         stream.write (self.header.pack (size, message.port, message.uid))
 
-        return self.write (stream.getvalue ())
+        return self.out_file.Write (stream.getvalue ())
 
     #--------------------------------------------------------------------------#
-    # Private                                                                  #
+    # Dispose                                                                  #
     #--------------------------------------------------------------------------#
-    @Async
-    def write (self, data):
-        try:
-            data = data [os.write (self.out_fd, data):]
-        except OSError as err:
-            if err.errno != errno.EAGAIN:
-                raise
+    def Dispose (self):
+        self.in_file.Dispose ()
+        self.out_file.Dispose ()
 
-        while len (data):
-            yield self.core.Poll (self.out_fd, self.core.WRITABLE)
-            data = data [os.write (self.out_fd, data):]
+    def __enter__ (self):
+        return self
 
-    @Async
-    def read (self, size):
-        data = self.in_stream.read (size)
-        if data is not None:
-            AsyncReturn (data)
-
-        try:
-            yield self.core.Poll (self.in_fd, self.core.READABLE)
-            AsyncReturn (self.in_stream.read (size))
-        except CoreHUPError:
-            AsyncReturn (b'')
-
+    def __exit__ (self, et, eo, tb):
+        self.Dispose ()
+        return False
 # vim: nu ft=python columns=120 :

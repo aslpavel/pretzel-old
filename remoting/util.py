@@ -4,7 +4,7 @@ import fcntl
 import traceback
 from ..disposable import *
 
-__all__ = ('BindPool', 'BlockingSet', 'Fork', 'exec_', 'reraise')
+__all__ = ('BindPool', 'Fork', 'exec_', 'reraise')
 
 #------------------------------------------------------------------------------#
 # Bind Pool                                                                    #
@@ -17,20 +17,6 @@ class BindPool (dict):
             raise ValueError ('\'{0}\' has already been bound'.format (key))
         self [key] = value
         return Disposable (lambda : self.pop (key))
-
-#------------------------------------------------------------------------------#
-# Blocking                                                                     #
-#------------------------------------------------------------------------------#
-def BlockingSet (fd, enabled = True):
-    """Change blocking flag for descriptor"""
-
-    flags = fcntl.fcntl (fd, fcntl.F_GETFL)
-    if enabled:
-        flags &= ~os.O_NONBLOCK
-    else:
-        flags |= os.O_NONBLOCK
-    fcntl.fcntl (fd, fcntl.F_SETFL, flags)
-    return flags
 
 #------------------------------------------------------------------------------#
 # Fork                                                                         #
