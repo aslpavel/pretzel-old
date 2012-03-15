@@ -1,13 +1,28 @@
 # -*- coding: utf-8 -*-
-import sys, os
-import imp, pickle, zlib
+import sys
+import os
+import io
+import imp
+import zlib
+import struct
 
+__all__ = ('Cage', 'CageBuilder')
 #-----------------------------------------------------------------------------#
 # Cage                                                                        #
 #-----------------------------------------------------------------------------#
+header_struct = struct.Struct ('!II')
+
 class Cage (object):
     def __init__ (self, data):
-        self.sources = pickle.loads (data)
+        sources = {}
+        data = io.BytesIO (data)
+        while True:
+            header = data.read (header_struct.size)
+            if not header: break
+            header = header_struct.unpack (header)
+            path = data.read (header [0])
+            sources [path.decode ('utf-8')] = data.read (header [1])
+        self.sources = sources
 
     def find_module (self, name, path = None):
         name = name.replace ('.', '/')
@@ -61,6 +76,7 @@ class Cage (object):
 # Cage Builder                                                                #
 #-----------------------------------------------------------------------------#
 class CageBuilder (object):
+
     def __init__ (self):
         self.files = {}
 
@@ -80,8 +96,12 @@ class CageBuilder (object):
                     self.files [fullpath] = zlib.compress (stream.read (), 9)
 
     def ToBytes (self):
-        return pickle.dumps (self.files)
-
+        data = io.BytesIO ()
+        for path, source in self.files.items ():
+            data.write (header_struct.pack (len (path), len (source)))
+            data.write (path.encode ('utf-8'))
+            data.write (source)
+        return data.getvalue ()
 #-----------------------------------------------------------------------------#
 # Compatibility                                                               #
 #-----------------------------------------------------------------------------#
