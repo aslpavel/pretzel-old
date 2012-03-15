@@ -9,7 +9,7 @@ class Event (object):
     __slots__ = ('handlers',)
 
     def __init__ (self):
-        self.handlers = set ()
+        self.handlers = []
 
     def __call__ (self, *args, **keys):
         """Fire event"""
@@ -21,7 +21,7 @@ class Event (object):
     #--------------------------------------------------------------------------#
     def Add (self, handler):
         """Add handler"""
-        self.handlers.add (handler)
+        self.handlers.append (handler)
 
     def __iadd__ (self, handler):
         self.Add (handler)
@@ -32,7 +32,7 @@ class Event (object):
     #--------------------------------------------------------------------------#
     def Remove (self, handler):
         """Remove handler"""
-        self.handlers.discard (handler)
+        self.handlers.remove (handler)
 
     def __isub__ (self, handler):
         self.Remove (handler)

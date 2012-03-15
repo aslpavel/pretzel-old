@@ -18,7 +18,10 @@ class FileChannel (PersistenceChannel):
         # create asynchronous files
         self.in_file = core.AsyncFileCreate (in_fd, closefd = closefd)
         self.out_file = core.AsyncFileCreate (out_fd, closefd = closefd) if in_fd != out_fd else self.in_file
-        self.OnStop += self.Dispose
+        def close_files ():
+            self.in_file.Dispose ()
+            self.out_file.Dispose ()
+        self.OnStop += close_files
 
         # Pickler
         class pickler_type (pickle.Pickler):
@@ -67,17 +70,4 @@ class FileChannel (PersistenceChannel):
 
         return self.out_file.Write (stream.getvalue ())
 
-    #--------------------------------------------------------------------------#
-    # Dispose                                                                  #
-    #--------------------------------------------------------------------------#
-    def Dispose (self):
-        self.in_file.Dispose ()
-        self.out_file.Dispose ()
-
-    def __enter__ (self):
-        return self
-
-    def __exit__ (self, et, eo, tb):
-        self.Dispose ()
-        return False
 # vim: nu ft=python columns=120 :

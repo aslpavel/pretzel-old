@@ -18,7 +18,8 @@ class ForkChannel (FileChannel):
         payload_in, payload_out = os.pipe ()
 
         # create child
-        if os.fork ():
+        self.pid = os.fork ()
+        if self.pid:
             # parent process
             os.close (rr), os.close (rw), os.close (payload_in)
         else:
@@ -35,6 +36,9 @@ class ForkChannel (FileChannel):
             os.close (payload_out)
 
         FileChannel.__init__ (self, core, lr, lw, closefd = True)
+
+        # wait for child
+        self.OnStop += lambda: os.waitpid (self.pid, 0)
 
 #-----------------------------------------------------------------------------#
 # Payload Pattern                                                             #

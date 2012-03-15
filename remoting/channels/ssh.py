@@ -33,7 +33,8 @@ class SSHChannel (FileChannel):
         # create ssh connection
         lr, rw = os.pipe ()
         rr, lw = os.pipe ()
-        if os.fork ():
+        self.pid = os.fork ()
+        if self.pid:
             # parent process
             os.close (rr), os.close (rw)
         else:
@@ -46,6 +47,9 @@ class SSHChannel (FileChannel):
             os.execvp (ssh_exec, command)
             
         FileChannel.__init__ (self, core, lr, lw, closefd = True)
+
+        # wait for child
+        self.OnStop += lambda: os.waitpid (self.pid, 0)
 
 #-----------------------------------------------------------------------------#
 # Payload Pattern                                                             #
