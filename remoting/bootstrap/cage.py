@@ -7,9 +7,9 @@ import zlib
 import struct
 
 __all__ = ('Cage', 'CageBuilder')
-#-----------------------------------------------------------------------------#
-# Cage                                                                        #
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+# Cage                                                                         #
+#------------------------------------------------------------------------------#
 header_struct = struct.Struct ('!II')
 
 class Cage (object):
@@ -55,7 +55,7 @@ class Cage (object):
             sys.modules [name] = module
             try:
                 code = compile (zlib.decompress (self.source), self.file, 'exec')
-                exec_ (code, module.__dict__)
+                Exec (code, module.__dict__)
 
                 return module
             except Exception:
@@ -72,9 +72,9 @@ class Cage (object):
             source = zlib.decompress (self.source)
             return source if isinstance (source, str) else source.decode ('utf-8')
 
-#-----------------------------------------------------------------------------#
-# Cage Builder                                                                #
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+# Cage Builder                                                                 #
+#------------------------------------------------------------------------------#
 class CageBuilder (object):
 
     def __init__ (self):
@@ -102,20 +102,21 @@ class CageBuilder (object):
             data.write (path.encode ('utf-8'))
             data.write (source)
         return data.getvalue ()
-#-----------------------------------------------------------------------------#
-# Compatibility                                                               #
-#-----------------------------------------------------------------------------#
+
+#------------------------------------------------------------------------------#
+# Exec and Raise                                                               #
+#------------------------------------------------------------------------------#
 if sys.version_info [0] > 2:
     import builtins
-    exec_ = getattr (builtins, "exec")
+    Exec = getattr (builtins, "exec")
     del builtins
 
-    def reraise (tp, value, tb=None):
+    def Raise (tp, value, tb=None):
         if value.__traceback__ is not tb:
             raise value.with_traceback (tb)
         raise value
 else:
-    def exec_ (code, globs=None, locs=None):
+    def Exec (code, globs=None, locs=None):
         """Execute code in a namespace."""
         if globs is None:
             frame = sys._getframe (1)
@@ -127,7 +128,7 @@ else:
             locs = globs
         exec ("""exec code in globs, locs""")
 
-    exec_ ("""def reraise (tp, value, tb=None):
+    Exec ("""def Raise (tp, value, tb=None):
         raise tp, value, tb""")
 
 # vim: nu ft=python columns=120 :

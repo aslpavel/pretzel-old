@@ -13,7 +13,7 @@ class Event (object):
 
     def __call__ (self, *args, **keys):
         """Fire event"""
-        for handler in self.handlers:
+        for handler in tuple (self.handlers):
             handler (*args, **keys)
 
     #--------------------------------------------------------------------------#

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import sys
 import types
 
@@ -27,7 +28,7 @@ class LocalDomain (Domain):
         if push_main:
             main = sys.modules ['__main__']
             if getattr (main, '__file__', None) is not None:
-                def push_main (channel):
+                def push_main ():
                     # push module
                     package = getattr (main, '__package__', None)
                     if package is None or len (package) == 0:

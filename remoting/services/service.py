@@ -3,17 +3,19 @@ from ...event import *
 from ...disposable import *
 
 __all__ = ('Service', 'ServiceError')
-
 #-----------------------------------------------------------------------------#
 # Service                                                                     #
 #-----------------------------------------------------------------------------#
+class ServiceError (Exception): pass
 class Service (object):
     def __init__ (self, ports = None, persistence = None):
         self.channel = None
         self.ports = [] if ports is None else ports
         self.persistence = [] if persistence is None else persistence
 
-        self.OnAttach, self.OnDetach = Event (), Event ()
+        # events
+        self.OnAttach = Event ()
+        self.OnDetach = Event ()
 
     def Attach (self, channel):
         if self.channel is not None:
@@ -35,6 +37,4 @@ class Service (object):
         except Exception:
             disposable.Dispose ()
             raise
-
-class ServiceError (Exception): pass
 # vim: nu ft=python columns=120 :

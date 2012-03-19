@@ -4,12 +4,11 @@ import imp
 import zlib
 
 from .service import *
-from ..util import *
+from ..utils.compat import *
 from ...async import *
 from ...disposable import *
 
 __all__ = ('ImportService',)
-
 #-----------------------------------------------------------------------------#
 # Ports                                                                       #
 #-----------------------------------------------------------------------------#
@@ -127,7 +126,7 @@ class ImportService (Service):
         sys.modules [name] = module
         try:
             code = compile (source, module.__file__, 'exec')
-            exec_ (code, module.__dict__)
+            Exec (code, module.__dict__)
 
             return module
         except Exception:

@@ -40,22 +40,19 @@ class FileChannel (PersistenceChannel):
     #--------------------------------------------------------------------------#
     @Async
     def RecvMsg (self):
-        if not self.IsRunning:
-            raise ChannelError ('connection is closed')
-
         # receive header
         header = yield self.in_file.ReadExactly (self.header.size)
 
         # receive body
         size, port, uid = self.header.unpack (header)
         stream = io.BytesIO ()
-        self.in_file.ReadExactlyInto (size, stream)
+        yield self.in_file.ReadExactlyInto (size, stream)
         stream.seek (0)
         AsyncReturn ((port, uid, lambda: self.unpickler_type (stream).load ()))
 
     def SendMsg (self, message):
-        if not self.IsRunning:
-            RaisedFuture (ChannelError ('Connection is closed'))
+        if not self.recv_worker:
+            return RaisedFuture (ChannelError ('Connection is closed'))
 
         stream = io.BytesIO ()
 
@@ -68,6 +65,6 @@ class FileChannel (PersistenceChannel):
         stream.seek (0)
         stream.write (self.header.pack (size, message.port, message.uid))
 
-        return self.out_file.Write (stream.getvalue ())
+        self.out_file.WriteNoWait (stream.getvalue ())
 
 # vim: nu ft=python columns=120 :

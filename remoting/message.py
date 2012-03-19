@@ -4,6 +4,7 @@ import io
 import itertools
 import traceback
 
+__all__ = ('Message', 'PORT_RESULT', 'PORT_ERROR', 'PORT_SYSTEM')
 #-----------------------------------------------------------------------------#
 # Ports                                                                       #
 #-----------------------------------------------------------------------------#
@@ -22,7 +23,9 @@ class Message (object):
         object.__setattr__ (self, 'port', port)
         object.__setattr__ (self, 'attr', attr)
 
-    # accessors
+    #--------------------------------------------------------------------------#
+    # Attributes                                                               #
+    #--------------------------------------------------------------------------#
     def __getattr__ (self, attr):
         try: return self.attr [attr]
         except KeyError:
@@ -32,7 +35,9 @@ class Message (object):
     def __setattr__ (self, attr, value):
         raise AttributeError ('Message attributes are read only')
 
-    # pickle
+    #--------------------------------------------------------------------------#
+    # Save | Restore                                                           #
+    #--------------------------------------------------------------------------#
     def __setstate__ (self, state):
         port, uid, attr =  state
         object.__setattr__ (self, 'uid', uid)
@@ -42,12 +47,14 @@ class Message (object):
     def __getstate__  (self):
         return self.port, self.uid, self.attr
 
-    # response
+    #--------------------------------------------------------------------------#
+    # Create Response                                                          #
+    #--------------------------------------------------------------------------#
     def Result (self, **attr):
         return ResponseMessage (self, **attr)
 
-    def Error (self, et, eo, tb):
-        return ErrorMessage (self, et, eo, tb)
+    def Error (self, error):
+        return ErrorMessage (self, *error)
 
     def Raise (self, error):
         try: raise error

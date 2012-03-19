@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 import sys
+import os
 
 from ..message import *
-from ..util import *
-from ...event import *
 from ...async import *
+
+from ..utils.bind_pool import *
+from ..utils.worker import *
+from ..utils.wait_queue import *
 
 __all__ = ('Channel', 'PersistenceChannel', 'ChannelError')
 #------------------------------------------------------------------------------#
@@ -13,52 +16,43 @@ __all__ = ('Channel', 'PersistenceChannel', 'ChannelError')
 class ChannelError (Exception): pass
 class Channel (object):
     def __init__ (self, core):
-        self.queue, self.wait, self.worker = {}, None, None
-        self.ports = BindPool ()
         self.core  = core
+        self.ports = BindPool ()
+        self.yield_queue = WaitQueue (lambda: core.SleepUntil (0))
 
-        self.OnStart, self.OnStop = Event (), Event ()
-        self.IsRunning = False
+        # receive
+        self.recv_queue = {}
+        self.recv_future = None
+        self.recv_worker = Worker (self.recv_main)
+
+        # events
+        self.OnStop = self.recv_worker.OnStop
+        self.OnStart = self.recv_worker.OnStart
 
     #--------------------------------------------------------------------------#
-    # Start | Stop                                                             #
+    # Run                                                                      #
     #--------------------------------------------------------------------------#
-    def Start (self):
-        if self.IsRunning:
-           raise ChannelError ('worker is running')
-
-        self.worker = self.worker_run ()
-        if self.worker.IsCompleted ():
-            return self.worker.Result ()
-        self.OnStart (self)
-        Fork (self.worker, 'channel')
-
-    def Stop (self):
-        if not self.IsRunning:
-            return
-        self.worker.Cancel ()
+    def Run (self):
+        return self.recv_worker.Run ()
 
     #--------------------------------------------------------------------------#
     # Request                                                                  #
     #--------------------------------------------------------------------------#
     @Async
     def Request (self, port, **attr):
-        """Asynchronous request to remote server"""
-        if not self.IsRunning:
-            raise ChannelError ('worker is dead')
+        if not self.recv_worker:
+            raise ChannelError ('Receive worker is dead')
 
-        # send message
+        # message
         message = Message (port, **attr)
-        yield self.sendmsg (message)
+        self.SendMsg (message)
 
-        # register future
-        future = Future (lambda: self.wait_uid (message.uid))
-        self.queue [message.uid] = future
+        # future
+        future = Future (lambda: self.recv_wait (message.uid))
+        self.recv_queue [message.uid] = future
 
-        message_getter = yield future
-        yield self.core.SleepUntil (0) # guaranteed interrupt
-
-        AsyncReturn (message_getter ())
+        getter = yield future
+        AsyncReturn (getter ())
 
     #--------------------------------------------------------------------------#
     # Port Interface                                                           #
@@ -79,7 +73,7 @@ class Channel (object):
     # Dispose                                                                  #
     #--------------------------------------------------------------------------#
     def Dispose (self):
-        self.Stop ()
+        self.recv_worker.Dispose ()
 
     def __enter__ (self):
         return self
@@ -92,63 +86,54 @@ class Channel (object):
     # Private                                                                  #
     #--------------------------------------------------------------------------#
     @Async
-    def worker_run (self):
-        """Process incoming messages"""
+    def recv_main (self):
         try:
-            self.IsRunning = True
             while True:
-                self.wait = self.RecvMsg ()
-                port, uid, message_getter = yield self.wait
+                self.recv_future = self.RecvMsg ()
+                port, uid, getter = yield self.recv_future
                 if port >= PORT_SYSTEM:
-                    # incoming request
                     handler = self.ports.get (port)
                     if handler is None:
-                        sys.stderr.write (':: error: unbound port {0}\n'.format (port))
+                        sys.stderr.write (':: error: unbound port {0}\n'.format (port), file = sys.stderr)
                         continue
 
-                    Fork (self.handle (handler, message_getter), 'handle')
+                    self.yield_queue.Enqueue (self.handle_request, handler, getter)
                 else:
-                    # system message
+                    future = self.recv_queue.pop (uid)
                     if port == PORT_RESULT:
-                        self.queue.pop (uid).ResultSet (message_getter)
+                        self.yield_queue.Enqueue (future.ResultSet, getter)
                     elif port == PORT_ERROR:
-                        self.queue.pop (uid).ErrorSet (message_getter ().exc_info ())
+                        self.yield_queue.Enqueue (lambda: future.ErrorSet (getter ().exc_info ()))
 
         except CoreHUPError: pass
         except FutureCanceled: pass
         finally:
             # resolve queued futures
             error = sys.exc_info ()
-            self.queue, queue = {}, self.queue
-            for future in queue.values ():
+            self.recv_queue, recv_queue = None, self.recv_queue
+            for future in recv_queue.values ():
                 if error [0] is None:
                     future.ErrorRaise (ChannelError ('connection has been closed unexpectedly'))
                 else:
                     future.ErrorSet (error)
 
-            # fire stop event
-            self.IsRunning = False
-            self.OnStop ()
-
     @Async
-    def handle (self, handler, message_getter):
-        yield self.core.SleepUntil (0) # guaranteed interrupt
-
-        message, error = message_getter (), None
+    def handle_request (self, handler, getter):
+        message = getter ()
         try:
-            result = yield handler (message)
+            self.SendMsg ((yield handler (message)))
         except Exception:
             error = sys.exc_info ()
+            self.SendMsg (message.Error (error))
+            raise
 
-        yield self.sendmsg (result if error is None else message.Error (*error))
-
-    def wait_uid (self, uid):
-        while uid in self.queue:
-            self.wait.Wait ()
-
-    @Serialize
-    def sendmsg (self, message):
-        return self.SendMsg (message)
+    #--------------------------------------------------------------------------#
+    # Wait Uid                                                                 #
+    #--------------------------------------------------------------------------#
+    def recv_wait (self, uid):
+        while uid in self.recv_queue:
+            self.recv_future.Wait ()
+        self.yield_queue.Future.Wait ()
 
 #------------------------------------------------------------------------------#
 # Persistence Channel                                                          #
