@@ -55,10 +55,6 @@ def main ():
     async = import_module ("..async", remoting_name)
     domains = import_module (".domains.fork", remoting_name)
 
-    # DEBUG
-    tb = import_module (".utils.tb_on_signal", remoting_name)
-    tb.listen ()
-
     with async.Core () as core:
         domains.ForkRemoteDomain (core, {rr}, {rw})
 
