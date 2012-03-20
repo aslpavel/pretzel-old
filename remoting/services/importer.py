@@ -22,14 +22,18 @@ class ImportService (Service):
     """Import module from remote client
 
     Client implementation that providers PEP302 Finder and Loader
+    Arguments:
+        insert_path: add this finder to meta_path
+        override:    override default import machinery
     """
-    def __init__ (self, insert_path = False):
+    def __init__ (self, insert_path = False, override = False):
         Service.__init__ (self, [
             (PORT_IMPORT_LOAD, self.port_LOAD),
             (PORT_IMPORT_PUSH, self.port_PUSH)
         ])
 
         self.modules = {}
+        self.override = override
 
         def on_attach (channel):
             if insert_path:
@@ -42,8 +46,16 @@ class ImportService (Service):
                 sys.meta_path.remove (self)
         self.OnDetach += on_detach
 
-    # Finder Interface
+    #--------------------------------------------------------------------------#
+    # Finder Interface                                                         #
+    #--------------------------------------------------------------------------#
     def find_module (self, name, path = None):
+        if not self.override:
+            try:
+                imp.find_module (name.split ('.') [-1], path)
+                return
+            except ImportError: pass
+
         if name not in self.modules:
             response = self.channel.Request (PORT_IMPORT_LOAD, name = name, path = path)
             response.Wait ()
@@ -54,7 +66,9 @@ class ImportService (Service):
 
         return self
 
-    # Loader Interface
+    #--------------------------------------------------------------------------#
+    # Loader Interface                                                         #
+    #--------------------------------------------------------------------------#
     def load_module (self, name):
         module = sys.modules.get (name)
         if module is not None:
@@ -74,12 +88,17 @@ class ImportService (Service):
         source = zlib.decompress (self.modules [name].source)
         return source if isinstance (source, str) else source.decode ('utf-8')
 
+    #--------------------------------------------------------------------------#
+    # Service Methods                                                          #
+    #--------------------------------------------------------------------------#
     @Delegate
     def PushModule (self, name, source, file, package = None):
         return self.channel.Request (PORT_IMPORT_PUSH, name = name, source = source,
             file = file, package = package)
 
-    # PORTS
+    #--------------------------------------------------------------------------#
+    # Ports Handlers                                                           #
+    #--------------------------------------------------------------------------#
     @DummyAsync
     def port_LOAD (self, request):
         module_name = request.name.split ('.') [-1]
@@ -115,6 +134,9 @@ class ImportService (Service):
 
             return request.Result ()
 
+    #--------------------------------------------------------------------------#
+    # Private                                                                  #
+    #--------------------------------------------------------------------------#
     def load (self, name, source, file, path = None):
         """Load module by it's source and name"""
         module = imp.new_module (name)

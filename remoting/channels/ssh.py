@@ -47,13 +47,16 @@ class SSHChannel (FileChannel):
         if self.pid:
             os.close (rr), os.close (rw)
         else:
-            # child
-            os.close (lr), os.close (lw)
-            sys.stdin.close ()
-            os.dup2 (rr, 0)
-            sys.stdout.close ()
-            os.dup2 (rw, 1)
-            os.execvp (self.command [0], self.command)
+            try:
+                # child
+                os.close (lr), os.close (lw)
+                sys.stdin.close ()
+                os.dup2 (rr, 0)
+                sys.stdout.close ()
+                os.dup2 (rw, 1)
+                os.execvp (self.command [0], self.command)
+            finally:
+                sys.exit (1)
 
         # set descriptors
         self.in_fd, self.out_fd = lr, lw

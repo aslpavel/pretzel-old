@@ -59,11 +59,7 @@ class RemoteDomain (Domain):
         for target in (self, channel, channel.core):
             persist += target
 
-        Domain.__init__ (self, channel, [
-            LinkerService (),
-            ImportService (insert_path = True),
-            persist,
-        ], run = run)
+        Domain.__init__ (self, channel, [LinkerService (), ImportService (insert_path = True), persist], run = run)
 
 #-----------------------------------------------------------------------------#
 # Helpers                                                                     #

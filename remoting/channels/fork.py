@@ -28,10 +28,13 @@ class ForkChannel (FileChannel):
             # parent process
             os.close (rr), os.close (rw), os.close (payload_in)
         else:
-            # child
-            os.close (lr), os.close (lw), os.close (payload_out)
-            os.dup2 (payload_in, 0)
-            os.execvp (sys.executable, [sys.executable, '-'])
+            try:
+                # child
+                os.close (lr), os.close (lw), os.close (payload_out)
+                os.dup2 (payload_in, 0)
+                os.execvp (sys.executable, [sys.executable, '-'])
+            finally:
+                sys.exit (1)
 
         # send payload
         try:

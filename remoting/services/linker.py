@@ -57,6 +57,9 @@ class LinkerService (Service):
             self.remote_d2r.clear ()
         self.OnDetach += detach
 
+    #--------------------------------------------------------------------------#
+    # Service Methods                                                          #
+    #--------------------------------------------------------------------------#
     def ToReference (self, target):
         """Create reference to target"""
         if self.channel is None:
@@ -117,7 +120,9 @@ class LinkerService (Service):
         return (self.channel.Request (PORT_LINKER_CALL, func = func, args = args, keys = keys)
             .ContinueWithFunction (lambda msg: msg.result))
 
-    # PERSISTENCE
+    #--------------------------------------------------------------------------#
+    # Persistence                                                              #
+    #--------------------------------------------------------------------------#
     def save_Reference (self, ref):
         if isinstance (ref, Reference):
             return ref.ref_type, ref.ref_desc
@@ -192,7 +197,9 @@ class LinkerService (Service):
 
         AsyncReturn (ref)
 
-    # PORTS
+    #--------------------------------------------------------------------------#
+    # Ports Handler                                                            #
+    #--------------------------------------------------------------------------#
     @DummyAsync
     def port_CREATE (self, msg):
         return msg.Result (reference = self.ToReference (msg.type (*msg.args, **msg.keys)))
@@ -222,6 +229,9 @@ class LinkerService (Service):
     def port_CALL (self, request):
         return request.Result (result = request.func (*request.args, **request.keys))
 
+    #--------------------------------------------------------------------------#
+    # Private                                                                  #
+    #--------------------------------------------------------------------------#
     def instance_get (self, request):
         ref = self.local_d2r.get (request.desc)
         if not ref:
