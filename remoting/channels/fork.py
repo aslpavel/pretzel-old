@@ -5,13 +5,18 @@ import os
 from ..bootstrap import *
 from .file import *
 from .. import __name__ as remoting_name
+from ...async import *
 
 __all__ = ('ForkChannel',)
 #-----------------------------------------------------------------------------#
 # Fork Channel                                                                #
 #-----------------------------------------------------------------------------#
 class ForkChannel (FileChannel):
-    def __init__ (self, core):
+    #--------------------------------------------------------------------------#
+    # Run                                                                      #
+    #--------------------------------------------------------------------------#
+    @Async
+    def Run (self):
         # create pipes
         lr, rw = os.pipe ()
         rr, lw = os.pipe ()
@@ -35,7 +40,11 @@ class ForkChannel (FileChannel):
         finally:
             os.close (payload_out)
 
-        FileChannel.__init__ (self, core, lr, lw, closefd = True)
+        # set descriptors
+        self.in_fd, self.out_fd = lr, lw
+        self.closefd = True
+
+        yield FileChannel.Run (self)
 
         # wait for child
         self.OnStop += lambda: os.waitpid (self.pid, 0)

@@ -1,21 +1,33 @@
 # -*- coding: utf-8 -*-
 from ..utils.fork import *
 from ...disposable import *
+from ...async import *
 
 __all__ = ('Domain',)
 #------------------------------------------------------------------------------#
 # Domain                                                                       #
 #------------------------------------------------------------------------------#
 class Domain (object):
-    def __init__ (self, channel, services, run = True):
+    def __init__ (self, channel, services, run = None):
         self.channel = channel
         self.services = services
-        self.disposable  = CompositeDisposable (channel)
+        self.disposable  = Disposable ()
+
+        if True if run is None else run:
+            Fork (self.Run (), 'domain')
+
+    #--------------------------------------------------------------------------#
+    # Run                                                                      #
+    #--------------------------------------------------------------------------#
+    @Async
+    def Run (self):
+        self.disposable.Dispose ()
+        self.disposable  = CompositeDisposable (self.channel)
         try:
             for service in self.services:
-                self.disposable += service.Attach (channel)
-            if run:
-                Fork (self.channel.Run (), 'channel')
+                self.disposable += service.Attach (self.channel)
+
+            yield self.channel.Run ()
         except Exception:
             self.disposable.Dispose ()
             raise
@@ -31,12 +43,6 @@ class Domain (object):
                 except  AttributeError:
                     pass
         raise AttributeError (attr)
-
-    #--------------------------------------------------------------------------#
-    # Run                                                                      #
-    #--------------------------------------------------------------------------#
-    def Run (self):
-        return self.channel.Run ()
 
     #--------------------------------------------------------------------------#
     # Dispose                                                                  #

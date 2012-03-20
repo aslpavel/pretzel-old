@@ -11,17 +11,14 @@ __all__ = ('FileChannel',)
 # File Channel                                                                #
 #-----------------------------------------------------------------------------#
 class FileChannel (PersistenceChannel):
-    def __init__ (self, core, in_fd, out_fd, closefd = False):
+    def __init__ (self, core, in_fd = None, out_fd = None, closefd = None):
         PersistenceChannel.__init__ (self, core)
         self.header = struct.Struct ('!III')
 
-        # create asynchronous files
-        self.in_file = core.AsyncFileCreate (in_fd, closefd = closefd)
-        self.out_file = core.AsyncFileCreate (out_fd, closefd = closefd) if in_fd != out_fd else self.in_file
-        def close_files ():
-            self.in_file.Dispose ()
-            self.out_file.Dispose ()
-        self.OnStop += close_files
+        # descriptors
+        self.in_fd = in_fd
+        self.out_fd = out_fd
+        self.closefd = closefd if closefd is not None else False
 
         # Pickler
         class pickler_type (pickle.Pickler):
@@ -34,6 +31,27 @@ class FileChannel (PersistenceChannel):
             def persistent_load (this, pid):
                 return self.Restore (pid)
         self.unpickler_type = unpickler_type
+
+    #--------------------------------------------------------------------------#
+    # Run                                                                      #
+    #--------------------------------------------------------------------------#
+    @Async
+    def Run (self):
+        if self.in_fd is None or self.out_fd is None:
+            raise ValueError ('Either in or out descriptor is not set')
+
+        # create asynchronous files
+        self.in_file = self.core.AsyncFileCreate (self.in_fd, closefd = self.closefd)
+        self.out_file = self.core.AsyncFileCreate (self.out_fd, closefd = self.closefd) \
+            if self.in_fd != self.out_fd else self.in_file
+
+        # close files on stop
+        def close_files ():
+            self.in_file.Dispose ()
+            self.out_file.Dispose ()
+        self.OnStop += close_files
+
+        yield PersistenceChannel.Run (self)
 
     #--------------------------------------------------------------------------#
     # Channel Interface                                                        #

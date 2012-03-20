@@ -17,13 +17,16 @@ __all__ = ('LocalDomain', 'RemoteDomain')
 # Local Domain                                                                 #
 #------------------------------------------------------------------------------#
 class LocalDomain (Domain):
-    def __init__ (self, channel, push_main = True):
+    def __init__ (self, channel, push_main = True, run = None):
+        # persist
         persist = PersistService ()
         for target in (self, channel, channel.core):
             persist += target
 
+        # linker
         linker = LinkerService ()
 
+        # import
         importer = ImportService ()
         if push_main:
             main = sys.modules ['__main__']
@@ -45,13 +48,13 @@ class LocalDomain (Domain):
                     linker.Call (module_persist, persist, '_remote_main')
                 channel.OnStart += push_main
 
-        Domain.__init__ (self, channel, [linker, importer, persist])
+        Domain.__init__ (self, channel, [linker, importer, persist], run = run)
 
 #------------------------------------------------------------------------------#
 # Remote Domain                                                                #
 #------------------------------------------------------------------------------#
 class RemoteDomain (Domain):
-    def __init__ (self, channel):
+    def __init__ (self, channel, run = None):
         persist = PersistService ()
         for target in (self, channel, channel.core):
             persist += target
@@ -59,8 +62,8 @@ class RemoteDomain (Domain):
         Domain.__init__ (self, channel, [
             LinkerService (),
             ImportService (insert_path = True),
-            persist
-        ])
+            persist,
+        ], run = run)
 
 #-----------------------------------------------------------------------------#
 # Helpers                                                                     #

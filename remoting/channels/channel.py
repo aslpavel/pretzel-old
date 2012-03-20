@@ -41,7 +41,7 @@ class Channel (object):
     @Async
     def Request (self, port, **attr):
         if not self.recv_worker:
-            raise ChannelError ('Receive worker is dead')
+            raise ChannelError ('Receive worker is not running')
 
         # message
         message = Message (port, **attr)
