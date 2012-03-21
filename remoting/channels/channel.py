@@ -135,8 +135,9 @@ class Channel (object):
     # Wait Uid                                                                 #
     #--------------------------------------------------------------------------#
     def recv_wait (self, uid):
-        while uid in self.recv_queue:
-            self.recv_future.Wait ()
+        if self.recv_queue is not None:
+            while uid in self.recv_queue:
+                self.recv_future.Wait ()
         self.yield_queue.Future.Wait ()
 
 #------------------------------------------------------------------------------#

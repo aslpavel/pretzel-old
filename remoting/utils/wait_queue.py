@@ -8,6 +8,7 @@ __all__ = ('WaitQueue',)
 class WaitQueue (object):
     def __init__ (self, wait):
         self.wait = wait
+        self.wait_future = SucceededFuture ()
         self.waiting = False
         self.queue = []
 

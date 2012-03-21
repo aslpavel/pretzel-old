@@ -33,7 +33,15 @@ class LocalDomain (Domain):
 
         Domain.__init__ (self, channel, [self.linker, self.importer, self.persist], run = run)
 
+    #--------------------------------------------------------------------------#
+    # Push Main                                                                #
+    #--------------------------------------------------------------------------#
     def PushMain (self):
+        """Push Main
+
+        Push current __main__ module to remote domain if it has not been yet,
+        and create persistent mapping between local and remote __main__ modules
+        """
         if not self.channel.IsRunning:
             raise DomainError ('channel is not running')
 
@@ -84,6 +92,8 @@ def module_persist (persist, module_name):
             persist += value
 
 def cage_push (package_name, data):
+    if sys.modules.get ('_remote_main') is not None:
+        return
     sys.meta_path.insert (0, Cage (data))
     sys.modules ['_remote_main'] = import_module ('{}.__main__'.format (package_name))
 # vim: nu ft=python columns=120 :
