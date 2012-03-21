@@ -24,6 +24,9 @@ class PersistService (Service):
         self.i2t, self.t2i = {}, {}
         self.Add (self)
 
+    #--------------------------------------------------------------------------#
+    # Service's Methods                                                        #
+    #--------------------------------------------------------------------------#
     def Add (self, target):
         if target is None:
             raise ValueError ('None can not be added as persistent')
@@ -35,6 +38,9 @@ class PersistService (Service):
         self.Add (target)
         return self
 
+    #--------------------------------------------------------------------------#
+    # Persistence                                                              #
+    #--------------------------------------------------------------------------#
     def save_OBJ (self, target):
         if target.__hash__ is not None and not isinstance (target, tuple):
             return self.t2i.get (target)

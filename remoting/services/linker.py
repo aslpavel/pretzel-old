@@ -20,7 +20,6 @@ PERSISTENCE_LINKER = 1
 # Linker                                                                      #
 #-----------------------------------------------------------------------------#
 class LinkerError (ServiceError): pass
-
 class LinkerService (Service):
     def __init__ (self):
         self.local_d2r, self.remote_d2r = {}, {}
@@ -58,7 +57,7 @@ class LinkerService (Service):
         self.OnDetach += detach
 
     #--------------------------------------------------------------------------#
-    # Service Methods                                                          #
+    # Service's Methods                                                        #
     #--------------------------------------------------------------------------#
     def ToReference (self, target):
         """Create reference to target"""
@@ -113,12 +112,12 @@ class LinkerService (Service):
     @Delegate
     def InstanceCreate (self, type, *args, **keys):
         return self.channel.Request (PORT_LINKER_CREATE, type = type,
-            args = args, keys = keys).ContinueWithFunction (lambda msg: msg.reference)
+            args = args, keys = keys).ContinueWithFunction (lambda response: response.reference)
 
     @Delegate
     def Call (self, func, *args, **keys):
         return (self.channel.Request (PORT_LINKER_CALL, func = func, args = args, keys = keys)
-            .ContinueWithFunction (lambda msg: msg.result))
+            .ContinueWithFunction (lambda response: response.result))
 
     #--------------------------------------------------------------------------#
     # Persistence                                                              #
@@ -161,7 +160,7 @@ class LinkerService (Service):
                     name = method_name,
                     args = args,
                     keys = keys)
-                        .ContinueWithFunction (lambda msg: msg.result))
+                        .ContinueWithFunction (lambda response: response.result))
             return method
 
         for method_name in info.methods:
@@ -171,7 +170,7 @@ class LinkerService (Service):
         @Delegate
         def getter (this, name):
             return (self.channel.Request (PORT_LINKER_GET, desc = ref_desc, name = name)
-                .ContinueWithFunction (lambda msg: msg.result))
+                .ContinueWithFunction (lambda response: response.result))
         @Delegate
         def setter (this, name, value):
             return self.channel.Request (PORT_LINKER_SET, desc = ref_desc, name = name, value = value)
@@ -198,23 +197,23 @@ class LinkerService (Service):
         AsyncReturn (ref)
 
     #--------------------------------------------------------------------------#
-    # Ports Handler                                                            #
+    # Ports Handlers                                                           #
     #--------------------------------------------------------------------------#
     @DummyAsync
-    def port_CREATE (self, msg):
-        return msg.Result (reference = self.ToReference (msg.type (*msg.args, **msg.keys)))
+    def port_CREATE (self, request):
+        return request.Result (reference = self.ToReference (request.type (*request.args, **request.keys)))
 
     @DummyAsync
-    def port_INFO (self, msg):
-        instance = self.instance_get (msg)
+    def port_INFO (self, request):
+        instance = self.instance_get (request)
         methods = [name for name, method in inspect.getmembers (instance)
             if hasattr (method, '__call__')
             if name not in self.method_skip]
-        return msg.Result (methods = methods, name = type (instance).__name__)
+        return request.Result (methods = methods, name = type (instance).__name__)
 
     @DummyAsync
-    def port_METHOD (self, msg):
-        return msg.Result (result = getattr (self.instance_get (msg), msg.name) (*msg.args, **msg.keys))
+    def port_METHOD (self, request):
+        return request.Result (result = getattr (self.instance_get (request), request.name) (*request.args, **request.keys))
 
     @DummyAsync
     def port_GET (self, request):

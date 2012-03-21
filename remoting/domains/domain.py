@@ -3,10 +3,11 @@ from ..utils.fork import *
 from ...disposable import *
 from ...async import *
 
-__all__ = ('Domain',)
+__all__ = ('Domain', 'DomainError')
 #------------------------------------------------------------------------------#
 # Domain                                                                       #
 #------------------------------------------------------------------------------#
+class DomainError (Exception): pass
 class Domain (object):
     def __init__ (self, channel, services, run = None):
         self.channel = channel

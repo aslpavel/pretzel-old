@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .fork import *
 from ...async import *
 from ...event import *
 
@@ -12,10 +13,11 @@ class Worker (object):
     RUNNING    = 2
     TERMINATED = 4
 
-    def __init__ (self, task_main):
+    def __init__ (self, task_main, name = None):
         self.task_main = task_main
         self.task_copier = None
         self.state = self.STOPPED
+        self.name = name if name is not None else 'unnamed'
 
         self.OnStart = Event ()
         self.OnStop  = Event ()
@@ -27,7 +29,7 @@ class Worker (object):
     def Run (self):
         if not (self.state & self.STOPPED):
             raise WorkerError ('Worker is {}'.format ('running' if self.state & self.RUNNING else 'terminated'))
-        self.task ()
+        Fork (self.task (), self.name)
 
     #--------------------------------------------------------------------------#
     # Future                                                                   #
@@ -63,6 +65,12 @@ class Worker (object):
     @property
     def IsTerminated (self):
         return self.state & self.STOPPED
+
+    @property
+    def StateString (self):
+        return ('stopped'    if self.state & self.STOPPED else
+                'running'    if self.state & self.RUNNING else
+                'terminated' if self.state & self.TERMINATED else 'undefined')
 
     def __bool__ (self):
         return bool (self.state & self.RUNNING)

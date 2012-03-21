@@ -89,7 +89,7 @@ class ImportService (Service):
         return source if isinstance (source, str) else source.decode ('utf-8')
 
     #--------------------------------------------------------------------------#
-    # Service Methods                                                          #
+    # Service's Methods                                                        #
     #--------------------------------------------------------------------------#
     @Delegate
     def PushModule (self, name, source, file, package = None):

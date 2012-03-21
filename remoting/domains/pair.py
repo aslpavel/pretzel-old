@@ -2,6 +2,7 @@
 import os
 import sys
 import types
+from importlib import import_module
 
 # local
 from .domain import *
@@ -18,48 +19,56 @@ __all__ = ('LocalDomain', 'RemoteDomain')
 #------------------------------------------------------------------------------#
 class LocalDomain (Domain):
     def __init__ (self, channel, push_main = True, run = None):
+        self.persist  = PersistService ()
+        self.linker   = LinkerService ()
+        self.importer = ImportService ()
+
         # persist
-        persist = PersistService ()
         for target in (self, channel, channel.core):
-            persist += target
+            self.persist += target
 
-        # linker
-        linker = LinkerService ()
-
-        # import
-        importer = ImportService ()
+        # push main
         if push_main:
-            main = sys.modules ['__main__']
-            if getattr (main, '__file__', None) is not None:
-                def push_main ():
-                    # push module
-                    package = getattr (main, '__package__', None)
-                    if package is None or len (package) == 0:
-                        # main is a separate file
-                        with open (main.__file__, 'rb') as stream:
-                            importer.PushModule ('_remote_main', stream.read (), main.__file__)
-                    else:
-                        # main is a part of a package
-                        cage = CageBuilder ()
-                        cage.AddPath (os.path.dirname (main.__file__))
-                        linker.Call (cage_push, package, cage.ToBytes ())
-                    # create persistence map
-                    module_persist (persist, '__main__')
-                    linker.Call (module_persist, persist, '_remote_main')
-                channel.OnStart += push_main
+            channel.OnStart += self.PushMain
 
-        Domain.__init__ (self, channel, [linker, importer, persist], run = run)
+        Domain.__init__ (self, channel, [self.linker, self.importer, self.persist], run = run)
+
+    def PushMain (self):
+        if not self.channel.IsRunning:
+            raise DomainError ('channel is not running')
+
+        main = sys.modules ['__main__']
+        if getattr (main, '__file__', None) is None:
+            raise DomainError ('__main__ file cannot be determined')
+
+        # push main
+        package_name = getattr (main, '__package__', None)
+        if package_name is None or len (package_name) == 0:
+            with open (main.__file__, 'rb') as stream:
+                self.importer.PushModule ('_remote_main', stream.read (), main.__file__)
+        else:
+            # __main__ is a part of a package
+            package = sys.modules [package_name]
+            cage = CageBuilder ()
+            cage.AddPath (os.path.dirname (package.__file__))
+            self.linker.Call (cage_push, package_name, cage.ToBytes ())
+
+        # persistence
+        module_persist (self.persist, '__main__')
+        self.linker.Call (module_persist, self.persist, '_remote_main')
 
 #------------------------------------------------------------------------------#
 # Remote Domain                                                                #
 #------------------------------------------------------------------------------#
 class RemoteDomain (Domain):
     def __init__ (self, channel, run = None):
-        persist = PersistService ()
+        self.persist = PersistService ()
         for target in (self, channel, channel.core):
-            persist += target
+            self.persist += target
+        self.linker = LinkerService ()
+        self.importer = ImportService (insert_path = True)
 
-        Domain.__init__ (self, channel, [LinkerService (), ImportService (insert_path = True), persist], run = run)
+        Domain.__init__ (self, channel, [self.linker, self.importer, self.persist], run = run)
 
 #-----------------------------------------------------------------------------#
 # Helpers                                                                     #
@@ -74,7 +83,7 @@ def module_persist (persist, module_name):
         if isinstance (value, (type, types.FunctionType)):
             persist += value
 
-def cage_push (package, data):
+def cage_push (package_name, data):
     sys.meta_path.insert (0, Cage (data))
-    sys.modules ["_remote_main"] = __import__ ('{0}.__main__'.format (package)).__main__
+    sys.modules ['_remote_main'] = import_module ('{}.__main__'.format (package_name))
 # vim: nu ft=python columns=120 :

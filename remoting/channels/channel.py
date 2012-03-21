@@ -23,7 +23,7 @@ class Channel (object):
         # receive
         self.recv_queue = {}
         self.recv_future = None
-        self.recv_worker = Worker (self.recv_main)
+        self.recv_worker = Worker (self.recv_main, 'receive worker')
 
         # events
         self.OnStop = self.recv_worker.OnStop
@@ -35,13 +35,17 @@ class Channel (object):
     def Run (self):
         return self.recv_worker.Run ()
 
+    @property
+    def IsRunning (self):
+        return bool (self.recv_worker)
+
     #--------------------------------------------------------------------------#
     # Request                                                                  #
     #--------------------------------------------------------------------------#
     @Async
     def Request (self, port, **attr):
         if not self.recv_worker:
-            raise ChannelError ('Receive worker is not running')
+            raise ChannelError ('Receive worker is {}'.format (self.recv_worker.StateString))
 
         # message
         message = Message (port, **attr)

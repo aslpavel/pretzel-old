@@ -5,6 +5,7 @@ import io
 import imp
 import zlib
 import struct
+import binascii
 
 __all__ = ('Cage', 'CageBuilder')
 #------------------------------------------------------------------------------#
@@ -71,6 +72,15 @@ class Cage (object):
         def get_source (self, name):
             source = zlib.decompress (self.source)
             return source if isinstance (source, str) else source.decode ('utf-8')
+
+        #--------------------------------------------------------------------------#
+        # Equality                                                                 #
+        #--------------------------------------------------------------------------#
+        def __hash__ (self):
+            return binascii.crc32 (self.source)
+
+        def __eq__ (self, other):
+            return self.source == other.source
 
 #------------------------------------------------------------------------------#
 # Cage Builder                                                                 #
