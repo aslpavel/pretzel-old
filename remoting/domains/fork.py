@@ -2,7 +2,6 @@
 from .pair import *
 from ..channels.fork import *
 from ..channels.file import *
-from ..utils.fork import *
 
 __all__ = ('ForkDomain', )
 #-----------------------------------------------------------------------------#
@@ -17,6 +16,11 @@ class ForkDomain (LocalDomain):
 #-----------------------------------------------------------------------------#
 class ForkRemoteDomain (RemoteDomain):
     def __init__ (self, core, rr, rw):
-        RemoteDomain.__init__ (self, FileChannel (core, rr, rw, closefd = True), run = True)
+        # create channel
+        channel = FileChannel (core)
+        channel.in_file = core.AsyncFileCreate (rr, closefd = True)
+        channel.out_file = core.AsyncFileCreate (rw, closefd = True)
+
+        RemoteDomain.__init__ (self, channel, run = True)
 
 # vim: nu ft=python columns=120 :

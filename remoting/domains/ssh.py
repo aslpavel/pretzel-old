@@ -2,7 +2,6 @@
 from .pair import *
 from ..channels.ssh import *
 from ..channels.file import *
-from ..utils.fork import *
 
 __all__ = ('SSHDomain', )
 #-----------------------------------------------------------------------------#
@@ -19,6 +18,11 @@ class SSHDomain (LocalDomain):
 #-----------------------------------------------------------------------------#
 class SSHRemoteDomain (RemoteDomain):
     def __init__ (self, core):
-        RemoteDomain.__init__ (self, FileChannel (core, 0, 1), run = True)
+        # create channel
+        channel = FileChannel (core)
+        channel.in_file = core.AsyncFileCreate (0, closefd = True)
+        channel.out_file = core.AsyncFileCreate (1, closefd = True)
+
+        RemoteDomain.__init__ (self, channel, run = True)
 
 # vim: nu ft=python columns=120 :

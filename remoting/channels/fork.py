@@ -43,9 +43,9 @@ class ForkChannel (FileChannel):
         finally:
             os.close (payload_out)
 
-        # set descriptors
-        self.in_fd, self.out_fd = lr, lw
-        self.closefd = True
+        # set files
+        self.in_file = self.core.AsyncFileCreate (lr, closefd = True)
+        self.out_file = self.core.AsyncFileCreate (lw, closefd = True)
 
         yield FileChannel.Run (self)
 

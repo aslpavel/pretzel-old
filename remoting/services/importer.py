@@ -132,7 +132,7 @@ class ImportService (Service):
                 sys.modules [request.package].__dict__ [request.name] = module
                 module.__package__ = request.package
 
-            return request.Result ()
+        return request.Result ()
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #

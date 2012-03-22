@@ -18,7 +18,7 @@ class Domain (object):
             Fork (self.Run (), 'domain')
 
     #--------------------------------------------------------------------------#
-    # Run                                                                      #
+    # Task Interface                                                           #
     #--------------------------------------------------------------------------#
     @Async
     def Run (self):
@@ -33,10 +33,21 @@ class Domain (object):
             self.disposable.Dispose ()
             raise
 
+    @property
+    def IsRunning (self):
+        return self.channel.IsRunning
+
+    @property
+    def Task (self):
+        return self.channel.Task
+
     #--------------------------------------------------------------------------#
     # Attribute                                                                #
     #--------------------------------------------------------------------------#
     def __getattr__ (self, attr):
+        if not self.channel.IsRunning:
+            raise DomainError ('channel is not running')
+
         if attr [0].isupper ():
             for service in self.services:
                 try:

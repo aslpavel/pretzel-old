@@ -15,6 +15,8 @@ header_struct = struct.Struct ('!II')
 
 class Cage (object):
     def __init__ (self, data):
+        self.data = data
+
         sources = {}
         data = io.BytesIO (data)
         while True:
@@ -34,6 +36,15 @@ class Cage (object):
         if source is not None:
             return self.CageLoader (source, name + '/__init__.py', name)
         return None
+
+    #--------------------------------------------------------------------------#
+    # Equality                                                                 #
+    #--------------------------------------------------------------------------#
+    def __hash__ (self):
+        return binascii.crc32 (self.data)
+
+    def __eq__ (self, other):
+        return self.data == other.data
 
     class CageLoader (object):
         __slots__ = ('source', 'file', 'path')
@@ -73,15 +84,6 @@ class Cage (object):
             source = zlib.decompress (self.source)
             return source if isinstance (source, str) else source.decode ('utf-8')
 
-        #--------------------------------------------------------------------------#
-        # Equality                                                                 #
-        #--------------------------------------------------------------------------#
-        def __hash__ (self):
-            return binascii.crc32 (self.source)
-
-        def __eq__ (self, other):
-            return self.source == other.source
-
 #------------------------------------------------------------------------------#
 # Cage Builder                                                                 #
 #------------------------------------------------------------------------------#
@@ -91,7 +93,7 @@ class CageBuilder (object):
         self.files = {}
 
     def Add (self, path, data):
-        self.files [path] = data
+        self.files [path] = zlip.compress (data, 9)
 
     def AddPath (self, path):
         path = path.rstrip ('/')

@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-from .domains.ssh import *
-from .domains.fork import *
+from .domains.ssh import SSHDomain
+from .domains.fork import ForkDomain
+from .domains.daemon import DaemonDomain
 
-__all__ = ('SSHDomain', 'ForkDomain')
+__all__ = ('SSHDomain', 'ForkDomain', 'DaemonDomain')
 #------------------------------------------------------------------------------#
 # Load Test Protocol                                                           #
 #------------------------------------------------------------------------------#

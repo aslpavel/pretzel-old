@@ -30,7 +30,7 @@ class Channel (object):
         self.OnStart = self.recv_worker.OnStart
 
     #--------------------------------------------------------------------------#
-    # Run                                                                      #
+    # Task Interface                                                           #
     #--------------------------------------------------------------------------#
     def Run (self):
         return self.recv_worker.Run ()
@@ -38,6 +38,10 @@ class Channel (object):
     @property
     def IsRunning (self):
         return bool (self.recv_worker)
+
+    @property
+    def Task (self):
+        return self.recv_worker.Task
 
     #--------------------------------------------------------------------------#
     # Request                                                                  #
@@ -114,7 +118,7 @@ class Channel (object):
         finally:
             # resolve queued futures
             error = sys.exc_info ()
-            self.recv_queue, recv_queue = None, self.recv_queue
+            self.recv_queue, recv_queue = {}, self.recv_queue
             for future in recv_queue.values ():
                 if error [0] is None:
                     future.ErrorRaise (ChannelError ('connection has been closed unexpectedly'))
@@ -135,9 +139,8 @@ class Channel (object):
     # Wait Uid                                                                 #
     #--------------------------------------------------------------------------#
     def recv_wait (self, uid):
-        if self.recv_queue is not None:
-            while uid in self.recv_queue:
-                self.recv_future.Wait ()
+        while uid in self.recv_queue:
+            self.recv_future.Wait ()
         self.yield_queue.Future.Wait ()
 
 #------------------------------------------------------------------------------#

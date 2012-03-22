@@ -28,7 +28,7 @@ class Worker (object):
     @DummyAsync
     def Run (self):
         if not (self.state & self.STOPPED):
-            raise WorkerError ('Worker is {}'.format ('running' if self.state & self.RUNNING else 'terminated'))
+            raise WorkerError ('Worker is {}'.format (self.StateString))
         Fork (self.task (), self.name)
 
     #--------------------------------------------------------------------------#
@@ -56,7 +56,7 @@ class Worker (object):
     #--------------------------------------------------------------------------#
     def Running (self):
         if self.state & self.RUNNING:
-            raise WorkerError ('Worker is {}'.format ('stopped' if self.state & self.STOPPED else 'terminated'))
+            raise WorkerError ('Worker is {}'.format (self.StateString))
 
     @property
     def IsRunning (self):

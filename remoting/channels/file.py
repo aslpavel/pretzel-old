@@ -11,14 +11,13 @@ __all__ = ('FileChannel',)
 # File Channel                                                                #
 #-----------------------------------------------------------------------------#
 class FileChannel (PersistenceChannel):
-    def __init__ (self, core, in_fd = None, out_fd = None, closefd = None):
+    def __init__ (self, core):
         PersistenceChannel.__init__ (self, core)
         self.header = struct.Struct ('!III')
 
-        # descriptors
-        self.in_fd = in_fd
-        self.out_fd = out_fd
-        self.closefd = closefd if closefd is not None else False
+        # files
+        self.in_file = None
+        self.out_file = None
 
         # Pickler
         class pickler_type (pickle.Pickler):
@@ -37,13 +36,8 @@ class FileChannel (PersistenceChannel):
     #--------------------------------------------------------------------------#
     @Async
     def Run (self):
-        if self.in_fd is None or self.out_fd is None:
-            raise ValueError ('Either in or out descriptor is not set')
-
-        # create asynchronous files
-        self.in_file = self.core.AsyncFileCreate (self.in_fd, closefd = self.closefd)
-        self.out_file = self.core.AsyncFileCreate (self.out_fd, closefd = self.closefd) \
-            if self.in_fd != self.out_fd else self.in_file
+        if self.in_file is None or self.out_file is None:
+            raise ValueError ('Either in or out file is not set')
 
         # close files on stop
         def close_files ():
