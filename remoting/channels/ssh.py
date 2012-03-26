@@ -4,6 +4,7 @@ import os
 
 from ..bootstrap import *
 from .file import *
+from .channel import *
 from .. import __name__ as remoting_name
 from ...async import *
 
@@ -34,10 +35,10 @@ class SSHChannel (FileChannel):
         FileChannel.__init__ (self, core)
 
     #--------------------------------------------------------------------------#
-    # Run                                                                      #
+    # Run Implementation                                                       #
     #--------------------------------------------------------------------------#
     @Async
-    def Run (self):
+    def run (self):
         # create ssh connection
         lr, rw = os.pipe ()
         rr, lw = os.pipe ()
@@ -62,7 +63,7 @@ class SSHChannel (FileChannel):
         self.in_file = self.core.AsyncFileCreate (lr, closefd = True)
         self.out_file = self.core.AsyncFileCreate (lw, closefd = True)
 
-        yield FileChannel.Run (self)
+        yield FileChannel.run (self)
 
         # wait for child
         self.OnStop += lambda: os.waitpid (self.pid, 0)

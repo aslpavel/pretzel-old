@@ -4,6 +4,7 @@ import os
 
 from ..bootstrap import *
 from .file import *
+from .channel import *
 from .. import __name__ as remoting_name
 from ...async import *
 
@@ -13,10 +14,10 @@ __all__ = ('ForkChannel',)
 #-----------------------------------------------------------------------------#
 class ForkChannel (FileChannel):
     #--------------------------------------------------------------------------#
-    # Run                                                                      #
+    # Run Implementation                                                       #
     #--------------------------------------------------------------------------#
     @Async
-    def Run (self):
+    def run (self):
         # create pipes
         lr, rw = os.pipe ()
         rr, lw = os.pipe ()
@@ -47,7 +48,7 @@ class ForkChannel (FileChannel):
         self.in_file = self.core.AsyncFileCreate (lr, closefd = True)
         self.out_file = self.core.AsyncFileCreate (lw, closefd = True)
 
-        yield FileChannel.Run (self)
+        yield FileChannel.run (self)
 
         # wait for child
         self.OnStop += lambda: os.waitpid (self.pid, 0)

@@ -1,10 +1,8 @@
 #! /usr/bin/python
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-import sys
 import time
 import itertools
-import traceback
 
 from . import *
 from ..log import *
@@ -61,38 +59,36 @@ class Benchmark (object):
     # Private                                                                  #
     #--------------------------------------------------------------------------#
     def result_append (self, future):
-        try:
+        error = future.Error ()
+        if error is None:
             self.results.append (future.Result ())
-        except Exception:
-            traceback.print_exc ()
-        finally:
             if len (self.results) == Count:
                 self.stopped = time.time ()
                 self.future.ResultSet (self)
+        else:
+            self.stopped = time.time ()
+            self.future.ErrorSet (error)
 
 #------------------------------------------------------------------------------#
-# Benchmakr Run                                                                #
+# Benchmark Run                                                                #
 #------------------------------------------------------------------------------#
 @Async
 def benchmark_run (domain, log):
     started = time.time ()
-    try:
-        with log.Pending ('Domain Start'):
-            yield domain.Run ()
-        instance = domain.InstanceCreate (Remote)
+    with log.Pending ('Domain Start'):
+        yield domain.Run ()
+    instance = domain.InstanceCreate (Remote)
 
-        with log.Pending ('Method'):
-            method_bench = yield Benchmark (lambda: instance.Method.Async ()).Run ()
-            assert method_bench.Results == list (range (Count))
+    with log.Pending ('Method'):
+        method_bench = yield Benchmark (lambda: instance.Method.Async ()).Run ()
+        if method_bench.Results != list (range (Count)):
+            raise ValueError ('Method benchmark failed')
 
-        with log.Pending ('Function'):
-            func_bench = yield Benchmark (lambda: domain.Call.Async (RemoteFunction)).Run ()
-            assert func_bench.Results == [1,] * Count
-        stopped = time.time ()
-
-    except Exception:
-        traceback.print_exc ()
-        return
+    with log.Pending ('Function'):
+        func_bench = yield Benchmark (lambda: domain.Call.Async (RemoteFunction)).Run ()
+        if func_bench.Results != [1,] * Count:
+            raise ValueError ('Function benchmark failed')
+    stopped = time.time ()
 
     # output result
     log.Info ('Count:{0} Elapsed:{1:.1f}s'.format (Count, stopped - started))

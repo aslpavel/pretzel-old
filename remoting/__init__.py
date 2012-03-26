@@ -2,8 +2,9 @@
 from .domains.ssh import SSHDomain
 from .domains.fork import ForkDomain
 from .domains.daemon import DaemonDomain
+from .utils.fork import *
 
-__all__ = ('SSHDomain', 'ForkDomain', 'DaemonDomain')
+__all__ = ('SSHDomain', 'ForkDomain', 'DaemonDomain', 'Fork')
 #------------------------------------------------------------------------------#
 # Load Test Protocol                                                           #
 #------------------------------------------------------------------------------#

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import sys
-import os
 
 from ..message import *
 from ...async import *
@@ -17,6 +16,7 @@ class ChannelError (Exception): pass
 class Channel (object):
     def __init__ (self, core):
         self.core  = core
+        self.runned = False
         self.ports = BindPool ()
         self.yield_queue = WaitQueue (lambda: core.SleepUntil (0))
 
@@ -32,8 +32,12 @@ class Channel (object):
     #--------------------------------------------------------------------------#
     # Task Interface                                                           #
     #--------------------------------------------------------------------------#
+    @Async
     def Run (self):
-        return self.recv_worker.Run ()
+        if self.runned:
+            raise ChannelError ('Channel has already been run')
+        self.runned = True
+        yield self.run ()
 
     @property
     def IsRunning (self):
@@ -53,14 +57,13 @@ class Channel (object):
 
         # message
         message = Message (port, **attr)
-        self.SendMsg (message)
+        yield self.SendMsg (message)
 
         # future
         future = Future (lambda: self.recv_wait (message.uid))
         self.recv_queue [message.uid] = future
 
-        getter = yield future
-        AsyncReturn (getter ())
+        AsyncReturn ((yield future) ())
 
     #--------------------------------------------------------------------------#
     # Port Interface                                                           #
@@ -102,7 +105,7 @@ class Channel (object):
                 if port >= PORT_SYSTEM:
                     handler = self.ports.get (port)
                     if handler is None:
-                        sys.stderr.write (':: error: unbound port {0}\n'.format (port), file = sys.stderr)
+                        sys.stderr.write (':: error: unbound port {0}\n'.format (port))
                         continue
 
                     self.yield_queue.Enqueue (self.handle_request, handler, getter)
@@ -121,7 +124,7 @@ class Channel (object):
             self.recv_queue, recv_queue = {}, self.recv_queue
             for future in recv_queue.values ():
                 if error [0] is None:
-                    future.ErrorRaise (ChannelError ('connection has been closed unexpectedly'))
+                    future.ErrorRaise (ChannelError ('Connection has been closed unexpectedly'))
                 else:
                     future.ErrorSet (error)
 
@@ -129,11 +132,17 @@ class Channel (object):
     def handle_request (self, handler, getter):
         message = getter ()
         try:
-            self.SendMsg ((yield handler (message)))
+            yield self.SendMsg ((yield handler (message)))
+            return
         except Exception:
             error = sys.exc_info ()
-            self.SendMsg (message.Error (error))
-            raise
+
+        yield self.SendMsg (message.Error (error))
+
+
+    def run (self):
+        """Run implementation"""
+        return self.recv_worker.Run ()
 
     #--------------------------------------------------------------------------#
     # Wait Uid                                                                 #

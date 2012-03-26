@@ -6,6 +6,7 @@ import errno
 import binascii
 
 from .file import *
+from .channel import *
 from ..domains.pair import *
 from ..bootstrap import *
 from ..utils.worker import *
@@ -25,10 +26,10 @@ class DaemonChannel (FileChannel):
         self.OnCreate = Event ()
 
     #--------------------------------------------------------------------------#
-    # Run                                                                      #
+    # Run Implementation                                                       #
     #--------------------------------------------------------------------------#
     @Async
-    def Run (self):
+    def run (self):
         try:
             # try to connect
             yield self.connect ()
@@ -83,9 +84,11 @@ class DaemonChannel (FileChannel):
         try:
             yield sock.Connect (self.path)
 
+            # set files
             self.in_file = self.out_file = sock
-            yield FileChannel.Run (self)
 
+            # run channel
+            yield FileChannel.run (self)
         except Exception:
             sock.Dispose ()
             raise
@@ -110,6 +113,10 @@ class Daemon (Worker):
     def Domains (self):
         return self.domains
 
+    @property
+    def Path (self):
+        return self.path
+
     #--------------------------------------------------------------------------#
     # Main                                                                     #
     #--------------------------------------------------------------------------#
@@ -130,7 +137,7 @@ class Daemon (Worker):
 
             # create new domain
             channel = FileChannel (self.core)
-            channel.in_file = channel.out_file = sock
+            channel.in_file = channel.out_file = client
             domain = RemoteDomain (channel, run = True)
 
             # keep domain set

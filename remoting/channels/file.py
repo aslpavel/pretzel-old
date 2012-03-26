@@ -2,6 +2,7 @@
 import io
 import struct
 import pickle
+import binascii
 
 from .channel import *
 from ...async import *
@@ -13,7 +14,7 @@ __all__ = ('FileChannel',)
 class FileChannel (PersistenceChannel):
     def __init__ (self, core):
         PersistenceChannel.__init__ (self, core)
-        self.header = struct.Struct ('!III')
+        self.header = struct.Struct ('!IIII')
 
         # files
         self.in_file = None
@@ -32,10 +33,10 @@ class FileChannel (PersistenceChannel):
         self.unpickler_type = unpickler_type
 
     #--------------------------------------------------------------------------#
-    # Run                                                                      #
+    # Run Implementation                                                       #
     #--------------------------------------------------------------------------#
     @Async
-    def Run (self):
+    def run (self):
         if self.in_file is None or self.out_file is None:
             raise ValueError ('Either in or out file is not set')
 
@@ -45,7 +46,7 @@ class FileChannel (PersistenceChannel):
             self.out_file.Dispose ()
         self.OnStop += close_files
 
-        yield PersistenceChannel.Run (self)
+        yield PersistenceChannel.run (self)
 
     #--------------------------------------------------------------------------#
     # Channel Interface                                                        #
@@ -54,29 +55,28 @@ class FileChannel (PersistenceChannel):
     def RecvMsg (self):
         # receive header
         header = yield self.in_file.ReadExactly (self.header.size)
+        size, port, uid, checksum = self.header.unpack (header)
 
         # receive body
-        size, port, uid = self.header.unpack (header)
         stream = io.BytesIO ()
         yield self.in_file.ReadExactlyInto (size, stream)
+        if (binascii.crc32 (stream.getvalue ()) & 0xffffffff) != checksum:
+            raise ChannelError ('Checksum error')
         stream.seek (0)
+
         AsyncReturn ((port, uid, lambda: self.unpickler_type (stream).load ()))
 
+    @DummyAsync
     def SendMsg (self, message):
         if not self.recv_worker:
-            return RaisedFuture (ChannelError ('Connection is closed'))
+            raise ChannelError ('Connection is closed')
 
+        # message dump
         stream = io.BytesIO ()
-
-        # data
-        stream.seek (self.header.size)
         self.pickler_type (stream, -1).dump (message)
+        data  = stream.getvalue ()
+        header = self.header.pack (len (data), message.port, message.uid, binascii.crc32 (data) & 0xffffffff)
 
-        # header
-        size = stream.tell () - self.header.size
-        stream.seek (0)
-        stream.write (self.header.pack (size, message.port, message.uid))
-
-        self.out_file.WriteNoWait (stream.getvalue ())
+        self.out_file.WriteNoWait (header + data)
 
 # vim: nu ft=python columns=120 :
