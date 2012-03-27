@@ -7,7 +7,9 @@ __all__ = ('Config', 'FileConfig', 'SackConfig')
 # Config Node                                                                  #
 #------------------------------------------------------------------------------#
 class ConfigNode (object):
-    __slots__ = ('Target', 'Root')
+    __slots__ = ('Root', 'Target')
+    special_names = set ('Root', 'Target', 'Location', 'Sack',)
+
     def __init__ (self, root, target):
         self.Target = target
         self.Root   = root
@@ -55,8 +57,8 @@ class ConfigDict (ConfigNode):
     # Dictionary                                                               #
     #--------------------------------------------------------------------------#
     def __getattr__ (self, attr):
-        if attr [0].isupper ():
-            raise AttributeError ('Config path can not be started with capital')
+        if attr in self.special_names:
+            raise AttributeError ('Config path can not use special names')
        
         try:
             return self.Target [attr]
@@ -65,12 +67,12 @@ class ConfigDict (ConfigNode):
         raise AttributeError (attr)
 
     def __setattr__ (self, attr, value):
-        if attr [0].isupper ():
+        if attr in self.special_names:
             try:
                 object.__setattr__ (self, attr, value)
                 return
             except AttributeError: pass
-            raise AttributeError ('Config path can not be started with capital')
+            raise AttributeError ('Config path can not use special names')
 
         self.Target [attr] = self.ToNode (value)
 
