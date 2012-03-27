@@ -15,7 +15,7 @@ class ConfigNode (object):
     def ToNode (self, value):
         if isinstance (value, dict):
             return ConfigDict (self.Root, value)
-        if isinstance (value, list):
+        if isinstance (value, (list, tuple)):
             return ConfigList (self.Root, value)
         return value
 
@@ -177,7 +177,7 @@ class SackConfig (Config):
         return self.Sack.Cell [self.Location]
 
     def SaveState (self, state):
-        self.Sack.Cell [self.Loaction] = state
+        self.Sack.Cell [self.Location] = state
         self.Sack.Flush ()
 
 #------------------------------------------------------------------------------#
