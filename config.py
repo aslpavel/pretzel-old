@@ -20,6 +20,15 @@ class ConfigNode (object):
         return value
 
     #--------------------------------------------------------------------------#
+    # Common                                                                   #
+    #--------------------------------------------------------------------------#
+    def __len__ (self):
+        return len (self.Target)
+
+    def __iter__ (self):
+        return iter (self.Target)
+
+    #--------------------------------------------------------------------------#
     # Context Interface                                                        #
     #--------------------------------------------------------------------------#
     def Flush (self):
@@ -71,8 +80,14 @@ class ConfigDict (ConfigNode):
     def __contains__ (self, attr):
         return attr in self.Target
 
-    def __len__ (self):
-        return len (self.Target)
+    def Keys (self):
+        return self.Target.keys ()
+
+    def Values (self):
+        return self.Target.values ()
+
+    def Items (self):
+        return self.Target.items ()
 
     #--------------------------------------------------------------------------#
     # Config Node Interface`                                                   #
@@ -102,9 +117,6 @@ class ConfigList (ConfigNode):
 
     def __delitem__ (self, index):
         del self.Target [index]
-
-    def __len__ (self):
-        return len (self.Target)
 
     def Append (self, value):
         self.Target.append (self.ToNode (value))
