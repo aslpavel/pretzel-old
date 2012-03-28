@@ -69,11 +69,11 @@ class Application (object):
             except Exception:
                 error_stream = stream_type ()
                 traceback.print_exc (file = error_stream)
-
                 self.log.Error (String (('UNNAMED' if name is None else name, '17'), ' has terminated with error:'))
                 error_stream.seek (0)
                 for line in error_stream:
                     self.log.Error (line.rstrip ('\n'))
+                raise
 
             finally:
                 if critical:
