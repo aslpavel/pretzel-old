@@ -1,0 +1,104 @@
+# -*- coding: utf-8 -*-
+import sys
+import io
+import traceback
+
+from . import async
+from .async import *
+from .async import future
+from .log import *
+from .disposable import *
+
+__all__ = async.__all__ + ('Application',)
+#------------------------------------------------------------------------------#
+# Application                                                                  #
+#------------------------------------------------------------------------------#
+class Application (object):
+    def __init__ (self, main, name = None, run = True, log_file = None):
+        self.main   = main
+        self.name   = main.__name__ if name is None else name
+        self.log_file = log_file
+        self.runned = False
+
+        self.core = Core ()
+        self.logger, self.log = None, None
+
+        if run:
+            self.Run ()
+
+    #--------------------------------------------------------------------------#
+    # Run                                                                      #
+    #--------------------------------------------------------------------------#
+    def Run (self):
+        """Run Application"""
+        if self.runned:
+            raise RuntimeError ('Application has already been run')
+        self.runned = True
+
+        # create log and logger
+        self.log = Log (self.name)
+        self.logger = CompositeLogger (LoggerCreate ())
+        try:
+            with CompositeDisposable (self.logger) as disposable:
+                # subscribe logger
+                disposable.Add (self.log.Subscribe (self.logger))
+
+                # open log file
+                if self.log_file:
+                    try:
+                        self.Logger.Subscribe (TextLogger (open (self.log_file, 'a+')))
+                    except IOError as error:
+                        self.log.Error ('Failed to open log file \'{}\': {}'.format (self.log_file, error.strerror))
+
+                # run main
+                main_result = self.main (self)
+                if isinstance (main_result, future.BaseFuture):
+                    self.Watch (main_result, name = self.name, critical = True)
+
+                # run core
+                self.core.Run ()
+        finally:
+            self.logger, self.log = None, None
+
+    def Watch (self, future, name = None, critical = False):
+        """Watch for future"""
+        def watch_continuation (future):
+            try:
+                return future.Result ()
+
+            except Exception:
+                error_stream = stream_type ()
+                traceback.print_exc (file = error_stream)
+
+                self.log.Error ('{} has terminated with error:'.format ('UNNAMED' if name is None else name))
+                error_stream.seek (0)
+                for line in error_stream:
+                    self.log.Error (line.rstrip ('\n'))
+
+            finally:
+                if critical:
+                    sys.exit (1)
+
+        return future.Continue (watch_continuation)
+
+    #--------------------------------------------------------------------------#
+    # Properties                                                               #
+    #--------------------------------------------------------------------------#
+    @property
+    def Name (self):
+        return self.name
+
+    @property
+    def Log (self):
+        return self.log
+
+    @property
+    def Logger (self):
+        return self.logger
+
+    @property
+    def Core (self):
+        return self.core
+
+stream_type = io.BytesIO if sys.version_info [0] < 3 else io.StringIO
+# vim: nu ft=python columns=120 :

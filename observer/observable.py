@@ -153,5 +153,20 @@ class Observer (object):
     def OnCompleted (self):
         raise NotImplementedError ()
 
+    def ToSafe (self):
+        def onNext (value):
+            try: self.OnNext (value)
+            except Exception: pass
+
+        def onError (error):
+            try: self.OnError (error)
+            except Exception: pass
+
+        def onCompleted ():
+            try: self.OnCompleted ()
+            except Exception: pass
+
+        return AnonymousObserver (onNext, onError, onCompleted)
+
 from .utils import *
 # vim: nu ft=python columns=120 :

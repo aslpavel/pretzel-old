@@ -3,8 +3,9 @@ import sys
 
 from .console_logger import *
 from .text_logger import *
+from .composite_logger import *
 
-__all__ = ('ConsoleLogger', 'TextLogger', 'LoggerCreate')
+__all__ = ('ConsoleLogger', 'TextLogger', 'LoggerCreate', 'CompositeLogger')
 #------------------------------------------------------------------------------#
 # Logger Create                                                                #
 #------------------------------------------------------------------------------#

@@ -3,7 +3,7 @@ from .string import *
 from .log import *
 from .logger import *
 
-__all__ = ('Log', 'ConsoleLogger', 'TextLogger', 'LoggerCreate', 'String')
+__all__ = ('Log', 'ConsoleLogger', 'TextLogger', 'LoggerCreate', 'CompositeLogger', 'String')
 #------------------------------------------------------------------------------#
 # Load Test Protocol                                                           #
 #------------------------------------------------------------------------------#

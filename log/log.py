@@ -57,6 +57,7 @@ class Log (Observable):
     # Observable Interface                                                     #
     #--------------------------------------------------------------------------#
     def Subscribe (self, observer):
+        observer = observer.ToSafe ()
         self.observables.add (observer)
         return Disposable (lambda: self.observables.discard (observer))
 
@@ -113,6 +114,7 @@ class ProgressEvent (MessageEvent, Observable):
     # Observable Interface                                                     #
     #--------------------------------------------------------------------------#
     def Subscribe (self, observer):
+        observer = observer.ToSafe ()
         if self.observables is None:
             if self.error is None:
                 observer.OnCompleted ()

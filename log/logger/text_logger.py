@@ -2,7 +2,6 @@
 import sys
 
 from ..log import *
-from ..utils import *
 from ..string import *
 
 from ...observer import *
