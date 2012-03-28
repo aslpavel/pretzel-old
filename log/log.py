@@ -155,13 +155,13 @@ class ProgressEvent (MessageEvent, Observable):
     def __exit__ (self, et, eo, tb):
         if self.observables is not None:
             observables, self.observables = self.observables, None
-            if et is None:
-                while observables:
-                    observables.pop ().OnCompleted ()
-            else:
+            if issubclass (et, Exception):
                 self.error = (et, eo, tb)
                 while observables:
                     observables.pop ().OnError (self.error)
+            else:
+                while observables:
+                    observables.pop ().OnCompleted ()
         return False
 
 #------------------------------------------------------------------------------#
