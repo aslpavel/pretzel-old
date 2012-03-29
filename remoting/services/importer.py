@@ -37,7 +37,7 @@ class ImportService (Service):
 
         def on_attach (channel):
             if insert_path:
-                sys.meta_path.insert (0, self)
+                sys.meta_path.append (self)
         self.OnAttach += on_attach
 
         def on_detach (channel):
@@ -93,7 +93,7 @@ class ImportService (Service):
     #--------------------------------------------------------------------------#
     @Delegate
     def PushModule (self, name, source, file, package = None):
-        return self.channel.Request (PORT_IMPORT_PUSH, name = name, source = source,
+        return self.channel.Request (PORT_IMPORT_PUSH, name = name, source = zlib.compress (source),
             file = file, package = package)
 
     #--------------------------------------------------------------------------#
@@ -126,11 +126,12 @@ class ImportService (Service):
     @DummyAsync
     def port_PUSH (self, request):
         if request.name not in sys.modules:
-            module = self.load (request.name, request.source, request.file)
+            module = self.load (request.name, zlib.decompress (request.source), request.file)
             if request.package is not None:
                 __import__ (request.package)
                 sys.modules [request.package].__dict__ [request.name] = module
                 module.__package__ = request.package
+            self.modules [request.name] = request
 
         return request.Result ()
 

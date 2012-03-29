@@ -93,6 +93,6 @@ def module_persist (persist, module_name):
 def cage_push (package_name, data):
     if sys.modules.get ('_remote_main') is not None:
         return
-    sys.meta_path.insert (0, Cage (data))
+    sys.meta_path.append (Cage (data))
     sys.modules ['_remote_main'] = import_module ('{}.__main__'.format (package_name))
 # vim: nu ft=python columns=120 :

@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 import sys
 
-from .console_logger import *
 from .text_logger import *
 from .composite_logger import *
+try:
+    from .console_logger import *
+except ImportError:
+    ConsoleLogger = TextLogger
 
 __all__ = ('ConsoleLogger', 'TextLogger', 'LoggerCreate', 'CompositeLogger')
 #------------------------------------------------------------------------------#
