@@ -66,12 +66,13 @@ class ConsoleLogger (Observer):
 
             # last
             self.prefix_draw (event)
-            yield String (event.Message, ' ', value)
+            yield String (('[{}] '.format (event.ElapsedString), '5'), event.Message, ' ', value)
 
         except Exception as error:
             # error
             self.prefix_draw (event)
-            yield String (event.Message, (' {}:{}'.format (error.__class__.__name__, error), '11'))
+            yield String (('[{}] '.format (event.ElapsedString), '5'),
+                event.Message, (' {}:{}'.format (error.__class__.__name__, error), '11'))
 
     #--------------------------------------------------------------------------#
     # Progress Bar                                                             #
@@ -93,14 +94,14 @@ class ConsoleLogger (Observer):
             # last
             self.bar_draw (1)
             self.prefix_draw (event)
-            yield event.Message
+            yield String (('[{}] '.format (event.ElapsedString), '5'), event.Message)
 
         except Exception as error:
-            print ('test')
             # error
             self.bar_draw (value)
             self.prefix_draw (event)
-            yield String (event.Message, (' {}:{}'.format (error.__class__.__name__, error), '11'))
+            yield String (('[{}] '.format (event.ElapsedString), '5'),
+                event.Message, (' {}:{}'.format (error.__class__.__name__, error), '11'))
 
     bar_pattern = String (('[', '5'), ('{0}{1}', '15'), (']', '5'), ('{2:>3}%', '17'))
     bar_size   = 23
@@ -130,13 +131,14 @@ class ConsoleLogger (Observer):
             # done
             self.pending_draw (True)
             self.prefix_draw (event)
-            yield event.Message
+            yield String (('[{}] '.format (event.ElapsedString), '5'), event.Message)
 
         except Exception as error:
             # failed
             self.pending_draw (False)
             self.prefix_draw (event)
-            yield String (event.Message, (' {}:{}'.format (error.__class__.__name__, error), '11'))
+            yield String (('[{}] '.format (event.ElapsedString), '5'),
+                event.Message, (' {}:{}'.format (error.__class__.__name__, error), '11'))
 
     pending_busy = String (('[', '5'), ('BUSY', '15'), (']', '5'))
     pending_fail = String (('[', '5'), ('FAIL', '11'), (']', '5'))

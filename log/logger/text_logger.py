@@ -64,6 +64,7 @@ class TextLogger (Observer):
 
             # last
             self.prefix_draw (event)
+            self.write ('[{}] '.format (event.ElapsedString))
             self.write (event.Message)
             self.stream.write (' ... [END]\n')
             yield
@@ -71,6 +72,7 @@ class TextLogger (Observer):
         except Exception as error:
             # error
             self.prefix_draw (event)
+            self.write ('[{}] '.format (event.ElapsedString))
             self.write (event.Message)
             self.stream.write (' {}:{} [FAILED]\n'.format (error.__class__.__name__, error))
 
@@ -87,6 +89,7 @@ class TextLogger (Observer):
 
             # done
             self.prefix_draw (event)
+            self.write ('[{}] '.format (event.ElapsedString))
             self.write (event.Message)
             self.stream.write (' ... [DONE]\n')
             yield
@@ -94,6 +97,7 @@ class TextLogger (Observer):
         except Exception as error:
             # failed
             self.prefix_draw (event)
+            self.write ('[{}] '.format (event.ElapsedString))
             self.write (event.Message)
             self.stream.write (' {}:{} [FAILED]\n'.format (error.__class__.__name__, error))
             yield

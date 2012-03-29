@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import time
 from ..observer import *
 from ..disposable import *
 
@@ -102,11 +103,12 @@ class MessageEvent (Observable):
 # Progress Event                                                               #
 #------------------------------------------------------------------------------#
 class ProgressEvent (MessageEvent, Observable):
-    __slots__ = ('log', 'message', 'type',  'observables', 'value', 'error')
+    __slots__ = ('log', 'message', 'type',  'observables', 'value', 'error', 'begin_time', 'end_time')
 
     def __init__ (self, log, message, type = 0):
         MessageEvent.__init__ (self, log, message, EVENT_PROGRESS | type)
 
+        self.begin_time, self.end_time = None, None
         self.error, self.value = None, None
         self.observables = set ()
 
@@ -147,15 +149,36 @@ class ProgressEvent (MessageEvent, Observable):
         self (value)
 
     #--------------------------------------------------------------------------#
+    # Elapsed                                                                  #
+    #--------------------------------------------------------------------------#
+    @property
+    def Elapsed (self):
+        if self.begin_time is None or self.end_time is None:
+            return None
+        return self.end_time - self.begin_time
+
+    @property
+    def ElapsedString (self):
+        seconds = self.Elapsed
+        if seconds is None:
+            return None
+
+        hours,   seconds = divmod (seconds, 3600)
+        minutes, seconds = divmod (seconds, 60)
+        return  '{:0>2.0f}:{:0>2.0f}:{:0>4.2f}'.format (hours, minutes, seconds)
+
+    #--------------------------------------------------------------------------#
     # Context                                                                  #
     #--------------------------------------------------------------------------#
     def __enter__ (self):
+        self.begin_time = time.time ()
         return self
 
     def __exit__ (self, et, eo, tb):
+        self.end_time = time.time ()
         if self.observables is not None:
             observables, self.observables = self.observables, None
-            if issubclass (et, Exception):
+            if isinstance (eo, Exception):
                 self.error = (et, eo, tb)
                 while observables:
                     observables.pop ().OnError (self.error)
