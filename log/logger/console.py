@@ -42,9 +42,16 @@ class Console (object):
     def Write (self, string):
         if isinstance (string, String):
             for string, color in string:
+                newline = string.find ('\n')
                 self.ColorSave (color)
-                self.stream.write (string)
-                self.ColorRestore ()
+                if newline < 0:
+                    self.stream.write (string)
+                    self.ColorRestore ()
+                else:
+                    self.stream.write (string [:newline])
+                    self.stream.write ('...')
+                    self.ColorRestore ()
+                    break
         else:
             self.stream.write (string)
         return len (string)
