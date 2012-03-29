@@ -66,7 +66,10 @@ class SSHChannel (FileChannel):
         yield FileChannel.run (self)
 
         # wait for child
-        self.OnStop += lambda: os.waitpid (self.pid, 0)
+        @DummyAsync
+        def wait_child ():
+            os.waitpid (self.pid, 0)
+        self.OnStop += wait_child
 
 #------------------------------------------------------------------------------#
 # Payload Pattern                                                              #

@@ -108,13 +108,13 @@ class Channel (object):
                         sys.stderr.write (':: error: unbound port {0}\n'.format (port))
                         continue
 
-                    self.yield_queue.Enqueue (self.handle_request, handler, getter)
+                    self.yield_queue.Enqueue (self.handle_request, handler, uid, getter)
                 else:
                     future = self.recv_queue.pop (uid)
                     if port == PORT_RESULT:
                         self.yield_queue.Enqueue (future.ResultSet, getter)
                     elif port == PORT_ERROR:
-                        self.yield_queue.Enqueue (lambda: future.ErrorSet (getter ().exc_info ()))
+                        self.yield_queue.Enqueue (self.handle_error, future, getter)
 
         except CoreHUPError: pass
         except FutureCanceled: pass
@@ -128,26 +128,32 @@ class Channel (object):
                 else:
                     future.ErrorSet (error)
 
+    #--------------------------------------------------------------------------#
+    # Handlers                                                                 #
+    #--------------------------------------------------------------------------#
+    def handle_error (self, future, getter):
+        try: future.ErrorSet (getter ().exc_info ())
+        except Exception:
+            future.ErrorSet (sys.exc_info ())
+
     @Async
-    def handle_request (self, handler, getter):
-        message = getter ()
+    def handle_request (self, handler, uid, getter):
         try:
-            yield self.SendMsg ((yield handler (message)))
+            yield self.SendMsg ((yield handler (getter ())))
             return
         except Exception:
             error = sys.exc_info ()
+        yield self.SendMsg (ErrorMessage (uid, *error))
 
-        yield self.SendMsg (message.Error (error))
-
-
+    #--------------------------------------------------------------------------#
+    # Private                                                                  #
+    #--------------------------------------------------------------------------#
     def run (self):
         """Run implementation"""
         return self.recv_worker.Run ()
 
-    #--------------------------------------------------------------------------#
-    # Wait Uid                                                                 #
-    #--------------------------------------------------------------------------#
     def recv_wait (self, uid):
+        """Wait for specified uid"""
         while uid in self.recv_queue:
             self.recv_future.Wait ()
         self.yield_queue.Future.Wait ()

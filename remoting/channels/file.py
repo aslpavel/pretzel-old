@@ -41,6 +41,7 @@ class FileChannel (PersistenceChannel):
             raise ValueError ('Either in or out file is not set')
 
         # close files on stop
+        @DummyAsync
         def close_files ():
             self.in_file.Dispose ()
             self.out_file.Dispose ()

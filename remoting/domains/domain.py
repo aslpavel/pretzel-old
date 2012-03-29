@@ -24,14 +24,18 @@ class Domain (object):
     def Run (self):
         self.disposable.Dispose ()
         self.disposable  = CompositeDisposable (self.channel)
+        failed = False
         try:
             for service in self.services:
                 self.disposable += service.Attach (self.channel)
 
             yield self.channel.Run ()
         except Exception:
-            self.disposable.Dispose ()
+            failed = True
             raise
+        finally:
+            if failed:
+                self.disposable.Dispose ()
 
     @property
     def IsRunning (self):

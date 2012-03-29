@@ -19,16 +19,23 @@ class Worker (object):
         self.state = self.STOPPED
         self.name = name if name is not None else 'unnamed'
 
-        self.OnStart = Event ()
-        self.OnStop  = Event ()
+        self.OnStart = AsyncEvent ()
+        self.OnStop  = AsyncEvent ()
 
     #--------------------------------------------------------------------------#
     # Run                                                                      #
     #--------------------------------------------------------------------------#
-    @DummyAsync
+    @Async
     def Run (self):
         if not (self.state & self.STOPPED):
             raise WorkerError ('Worker is {}'.format (self.StateString))
+
+        # start task main
+        self.state = self.RUNNING
+        self.task_copier = FutureCopier (self.task_main ())
+        yield self.OnStart ()
+
+        # start task
         Fork (self.task (), self.name)
 
     #--------------------------------------------------------------------------#
@@ -42,14 +49,10 @@ class Worker (object):
 
     @Async
     def task (self):
-        try:
-            self.state = self.RUNNING
-            self.task_copier = FutureCopier (self.task_main ())
-            self.OnStart ()
-            yield self.task_copier.Copy ()
+        try: yield self.task_copier.Copy ()
         finally:
             self.state = self.TERMINATED
-            self.OnStop ()
+            yield self.OnStop ()
 
     #--------------------------------------------------------------------------#
     # State                                                                    #

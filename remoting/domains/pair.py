@@ -4,14 +4,12 @@ import sys
 import types
 from importlib import import_module
 
-# local
 from .domain import *
 from ..bootstrap.cage import *
-
-# services
 from ..services.linker import *
 from ..services.importer import *
 from ..services.persist import *
+from ...async import *
 
 __all__ = ('LocalDomain', 'RemoteDomain')
 #------------------------------------------------------------------------------#
@@ -36,6 +34,7 @@ class LocalDomain (Domain):
     #--------------------------------------------------------------------------#
     # Push Main                                                                #
     #--------------------------------------------------------------------------#
+    @Async
     def PushMain (self):
         """Push Main
 
@@ -53,17 +52,17 @@ class LocalDomain (Domain):
         package_name = getattr (main, '__package__', None)
         if package_name is None or len (package_name) == 0:
             with open (main.__file__, 'rb') as stream:
-                self.importer.PushModule ('_remote_main', stream.read (), main.__file__)
+                yield self.importer.PushModule.Async ('_remote_main', stream.read (), main.__file__)
         else:
             # __main__ is a part of a package
             package = sys.modules [package_name]
             cage = CageBuilder ()
             cage.AddPath (os.path.dirname (package.__file__))
-            self.linker.Call (cage_push, package_name, cage.ToBytes ())
+            yield self.linker.Call.Async (cage_push, package_name, cage.ToBytes ())
 
         # persistence
         module_persist (self.persist, '__main__')
-        self.linker.Call (module_persist, self.persist, '_remote_main')
+        yield self.linker.Call.Async (module_persist, self.persist, '_remote_main')
 
 #------------------------------------------------------------------------------#
 # Remote Domain                                                                #

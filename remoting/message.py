@@ -4,7 +4,7 @@ import io
 import itertools
 import traceback
 
-__all__ = ('Message', 'PORT_RESULT', 'PORT_ERROR', 'PORT_SYSTEM')
+__all__ = ('Message', 'ErrorMessage', 'PORT_RESULT', 'PORT_ERROR', 'PORT_SYSTEM')
 #-----------------------------------------------------------------------------#
 # Ports                                                                       #
 #-----------------------------------------------------------------------------#
@@ -51,10 +51,10 @@ class Message (object):
     # Create Response                                                          #
     #--------------------------------------------------------------------------#
     def Result (self, **attr):
-        return ResponseMessage (self, **attr)
+        return ResponseMessage (self.uid, **attr)
 
     def Error (self, error):
-        return ErrorMessage (self, *error)
+        return ErrorMessage (self.uid, *error)
 
     def Raise (self, error):
         try: raise error
@@ -74,9 +74,9 @@ class Message (object):
 #-----------------------------------------------------------------------------#
 class ResponseMessage (Message):
     __slots__ = Message.__slots__
-    def __init__ (self, _source, **attr):
+    def __init__ (self, uid, **attr):
         object.__setattr__ (self, 'port', PORT_RESULT)
-        object.__setattr__ (self, 'uid', _source.uid)
+        object.__setattr__ (self, 'uid', uid)
         object.__setattr__ (self, 'attr', attr)
 
 #-----------------------------------------------------------------------------#
@@ -84,9 +84,9 @@ class ResponseMessage (Message):
 #-----------------------------------------------------------------------------#
 class ErrorMessage (Message):
     __slots__ = Message.__slots__
-    def __init__ (self, _source, et, eo, tb):
+    def __init__ (self, uid, et, eo, tb):
         object.__setattr__ (self, 'port', PORT_ERROR)
-        object.__setattr__ (self, 'uid', _source.uid)
+        object.__setattr__ (self, 'uid', uid)
         object.__setattr__ (self, 'attr', {
             'error_type' : et,
             'error'      : eo,
