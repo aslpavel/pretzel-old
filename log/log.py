@@ -165,7 +165,7 @@ class ProgressEvent (MessageEvent, Observable):
 
         hours,   seconds = divmod (seconds, 3600)
         minutes, seconds = divmod (seconds, 60)
-        return  '{:0>2.0f}:{:0>2.0f}:{:0>4.2f}'.format (hours, minutes, seconds)
+        return  '{:0>2.0f}:{:0>2.0f}:{:0>4.1f}'.format (hours, minutes, seconds)
 
     #--------------------------------------------------------------------------#
     # Context                                                                  #
