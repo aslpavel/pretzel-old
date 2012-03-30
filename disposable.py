@@ -2,9 +2,45 @@
 
 __all__ = ('Disposable', 'MutableDisposable', 'CompositeDisposable')
 #------------------------------------------------------------------------------#
+# Base Disposable                                                              #
+#------------------------------------------------------------------------------#
+class BaseDisposable (object):
+    __slots__ = tuple ()
+    #--------------------------------------------------------------------------#
+    # Call                                                                     #
+    #--------------------------------------------------------------------------#
+    def __call__ (self):
+        self.Dispose ()
+
+    #--------------------------------------------------------------------------#
+    # Dispose                                                                  #
+    #--------------------------------------------------------------------------#
+    def Dispose (self):
+        raise NotImplementedError ()
+
+    def __enter__ (self):
+        return self
+
+    def __exit__ (self, et, eo, tb):
+        self.Dispose ()
+        return False
+
+    #--------------------------------------------------------------------------#
+    # Status                                                                   #
+    #--------------------------------------------------------------------------#
+    def IsDisposed (self):
+        raise NotImplementedError ()
+
+    def __bool__ (self):
+        return self.IsDisposed ()
+
+    def __nonzero__(self):
+        return self.IsDisposed ()
+
+#------------------------------------------------------------------------------#
 # Disposable                                                                   #
 #------------------------------------------------------------------------------#
-class Disposable (object):
+class Disposable (BaseDisposable):
     __slots__ = ('dispose',)
     def __init__ (self, dispose = None):
         self.dispose = dispose
@@ -17,26 +53,16 @@ class Disposable (object):
             self.dispose, dispose = None, self.dispose
             dispose ()
 
-    def __enter__ (self):
-        return self
-
-    def __exit__ (self, et, eo, tb):
-        self.Dispose ()
-        return False
-
     #--------------------------------------------------------------------------#
     # Status                                                                   #
     #--------------------------------------------------------------------------#
-    def __bool__ (self):
-        return self.dispose is None
-
-    def __nonzero__ (self):
+    def IsDisposed (self):
         return self.dispose is None
 
 #------------------------------------------------------------------------------#
 # Mutable Disposable                                                           #
 #------------------------------------------------------------------------------#
-class MutableDisposable (object):
+class MutableDisposable (BaseDisposable):
     __slots__ = ('disposable', 'disposed')
 
     def __init__ (self, disposable = None):
@@ -45,6 +71,9 @@ class MutableDisposable (object):
         if disposable is not None:
             disposable.__enter__ ()
 
+    #--------------------------------------------------------------------------#
+    # Replace                                                                  #
+    #--------------------------------------------------------------------------#
     def Replace (self, disposable = None):
         if disposable is not None:
             disposable.__enter__ ()
@@ -61,43 +90,43 @@ class MutableDisposable (object):
     def Dispose (self):
         if self.disposed:
             return
-
         self.disposed = True
+
         if self.disposable is not None:
             self.disposable.__exit__ (None, None, None)
 
-    def __enter__ (self):
-        return self
+    #--------------------------------------------------------------------------#
+    # Status                                                                   #
+    #--------------------------------------------------------------------------#
+    def IsDisposed (self):
+        return self.disposed
 
-    def __exit__ (self, et, eo, tb):
-        self.Dispose ()
-        return False
 #------------------------------------------------------------------------------#
 # Composite Disposable                                                         #
 #------------------------------------------------------------------------------#
-class CompositeDisposable (object):
+class CompositeDisposable (BaseDisposable):
     __slots__ = ('disposed', 'disposables')
 
     def __init__ (self, *disposables):
         self.disposed = False
-        self.disposables = set ()
+        self.disposables = []
         try:
             for disposable in disposables:
                 disposable.__enter__ ()
-                self.disposables.add (disposable)
+                self.disposables.append (disposable)
         except Exception:
             self.Dispose ()
             raise
 
     #--------------------------------------------------------------------------#
-    # Add|Remove Disposable                                                    #
+    # Add|Remove                                                               #
     #--------------------------------------------------------------------------#
     def Add (self, disposable):
         disposable.__enter__ ()
         if self.disposed:
             disposable.__exit__ (None, None, None)
         else:
-            self.disposables.add (disposable)
+            self.disposables.append (disposable)
 
     def __iadd__  (self, disposable):
         self.Add (disposable)
@@ -119,22 +148,12 @@ class CompositeDisposable (object):
             self.disposed = True
             for disposable in self.disposables:
                 disposable.__exit__ (None, None, None)
-            self.disposables.clear ()
-
-    def __enter__ (self):
-        return self
-
-    def __exit__ (self, et, eo, tb):
-        self.Dispose ()
-        return False
+            del self.disposables [:]
 
     #--------------------------------------------------------------------------#
     # Status                                                                   #
     #--------------------------------------------------------------------------#
-    def __bool__ (self):
-        return self.disposed
-
-    def __nonzero__ (self):
+    def IsDisposed (self):
         return self.disposed
 
     def __len__ (self):

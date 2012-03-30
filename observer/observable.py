@@ -100,7 +100,7 @@ class Observable (object):
     def Smother (self, delay, core):
         """Smother observable
         
-        Producue only last event within each delay time span
+        Produce only last event within each delay time span
         """
         def Subscribe (observer):
             context = Context (value = None, changed = False, running = False)

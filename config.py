@@ -188,6 +188,9 @@ class SackConfig (Config):
 class FileConfig (Config):
     __slots__ = Config.__slots__
 
+    #--------------------------------------------------------------------------#
+    # Properties                                                               #
+    #--------------------------------------------------------------------------#
     @property
     def File (self):
         return self.Location
