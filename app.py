@@ -14,7 +14,15 @@ __all__ = async.__all__ + ('Application',)
 # Application                                                                  #
 #------------------------------------------------------------------------------#
 class Application (object):
-    def __init__ (self, main, name = None, run = True, log_file = None):
+    def __init__ (self, main, name = None, run = True, log_file = None, console = None):
+        """Application Object
+
+        Options:
+            name:     application name
+            run:      run application immediately
+            log_file: use log file
+            console:  try to use console logger first
+        """
         self.main   = main
         self.name   = main.__name__ if name is None else name
         self.log_file = log_file
@@ -23,6 +31,7 @@ class Application (object):
         self.core   = Core ()
         self.log    = Log (name)
         self.logger = None
+        self.console = True if console is None else console
 
         if run:
             self.Run ()
@@ -37,7 +46,7 @@ class Application (object):
         self.runned = True
 
         # create log and logger
-        self.logger = CompositeLogger (LoggerCreate ())
+        self.logger = CompositeLogger (LoggerCreate () if self.console else TextLogger ())
         try:
             with CompositeDisposable (self.logger) as disposable:
                 # subscribe logger
