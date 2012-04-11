@@ -8,7 +8,7 @@ __all__ = ('Context', 'AnonymousObserver', 'AnonymousObservable',)
 #------------------------------------------------------------------------------#
 class Context (object):
     def __init__ (self, **keys):
-        for attr, value in keys:
+        for attr, value in keys.items ():
             object.__setattr__ (self, attr, value)
 
     def __setattr__ (self, attr, value):
