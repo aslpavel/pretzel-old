@@ -57,13 +57,9 @@ class ConfigDict (ConfigNode):
     # Dictionary                                                               #
     #--------------------------------------------------------------------------#
     def __getattr__ (self, attr):
-        if attr in self.special_names:
-            raise AttributeError ('Config path can not use special names')
-       
         try:
-            return self.Target [attr]
+            return self [attr]
         except KeyError: pass
-
         raise AttributeError (attr)
 
     def __setattr__ (self, attr, value):
@@ -79,6 +75,14 @@ class ConfigDict (ConfigNode):
     def __delattr__ (self, attr):
         del self.Target [attr]
 
+    def __getitem__ (self, item):
+        if item in self.special_names:
+            raise AttributeError ('Config path can not use special names')
+        return self.Target [item]
+
+    __setitem__ = __setattr__
+    __delitem__ = __delattr__
+
     def __contains__ (self, attr):
         return attr in self.Target
 
@@ -90,6 +94,12 @@ class ConfigDict (ConfigNode):
 
     def Items (self):
         return self.Target.items ()
+
+    def Get (self, item, default):
+        try:
+            return self [item]
+        except KeyError: pass
+        return default
 
     #--------------------------------------------------------------------------#
     # Config Node Interface`                                                   #
