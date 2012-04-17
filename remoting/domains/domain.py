@@ -15,7 +15,7 @@ class Domain (object):
         self.disposable  = Disposable ()
 
         if True if run is None else run:
-            Fork (self.Run (), 'domain')
+            self.Run ().Wait ()
 
     #--------------------------------------------------------------------------#
     # Task Interface                                                           #

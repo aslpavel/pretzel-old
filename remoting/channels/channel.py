@@ -3,6 +3,8 @@ import sys
 
 from ..message import *
 from ...async import *
+from ...async.wait import *
+from ...async.cancel import *
 
 from ..utils.bind_pool import *
 from ..utils.worker import *
@@ -22,7 +24,7 @@ class Channel (object):
 
         # receive
         self.recv_queue = {}
-        self.recv_future = None
+        self.recv_wait = MutableWait ()
         self.recv_worker = Worker (self.recv_main, 'receive worker')
 
         # events
@@ -59,8 +61,18 @@ class Channel (object):
         message = Message (port, **attr)
         yield self.SendMsg (message)
 
+        # cancel
+        def cancel ():
+            if not future.IsCompleted ():
+                self.recv_queue.pop (uid, None)
+                future.ErrorRaise (FutureCanceled ())
+
         # future
-        future = Future (lambda: self.recv_wait (message.uid))
+        future = MutableFuture ()
+        future.wait.Replace (self.recv_wait)
+        future.cancel.Replace (Cancel (cancel))
+
+        # enqueue
         self.recv_queue [message.uid] = future
 
         AsyncReturn ((yield future) ())
@@ -100,8 +112,9 @@ class Channel (object):
     def recv_main (self):
         try:
             while True:
-                self.recv_future = self.RecvMsg ()
-                port, uid, getter = yield self.recv_future
+                future = self.RecvMsg ()
+                self.recv_wait.Replace (future.Wait)
+                port, uid, getter = yield future
                 if port >= PORT_SYSTEM:
                     handler = self.ports.get (port)
                     if handler is None:
@@ -111,10 +124,14 @@ class Channel (object):
                     self.yield_queue.Enqueue (self.handle_request, handler, uid, getter)
                 else:
                     future = self.recv_queue.pop (uid)
+                    future.cancel.Replace ()
+
                     if port == PORT_RESULT:
                         self.yield_queue.Enqueue (future.ResultSet, getter)
                     elif port == PORT_ERROR:
                         self.yield_queue.Enqueue (self.handle_error, future, getter)
+
+                    future.wait.Replace (self.yield_queue.Future.Wait)
 
         except CoreHUPError: pass
         except FutureCanceled: pass
@@ -151,12 +168,6 @@ class Channel (object):
     def run (self):
         """Run implementation"""
         return self.recv_worker.Run ()
-
-    def recv_wait (self, uid):
-        """Wait for specified uid"""
-        while uid in self.recv_queue:
-            self.recv_future.Wait ()
-        self.yield_queue.Future.Wait ()
 
 #------------------------------------------------------------------------------#
 # Persistence Channel                                                          #
