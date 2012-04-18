@@ -8,8 +8,8 @@ __all__ = ('ForkDomain', )
 # Local Fork Domain                                                           #
 #-----------------------------------------------------------------------------#
 class ForkDomain (LocalDomain):
-    def __init__ (self, core, push_main = True, run = None):
-        LocalDomain.__init__ (self, ForkChannel (core), push_main = push_main, run = run)
+    def __init__ (self, core, push_main = True, run = None, command = None):
+        LocalDomain.__init__ (self, ForkChannel (core, command), push_main = push_main, run = run)
 
 #-----------------------------------------------------------------------------#
 # Remote Fork Domain                                                          #
