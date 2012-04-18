@@ -13,6 +13,10 @@ __all__ = ('ForkChannel',)
 # Fork Channel                                                                #
 #-----------------------------------------------------------------------------#
 class ForkChannel (FileChannel):
+    def __init__ (self, core, command = None):
+        self.command = [sys.executable, '-'] if command is None else command
+        FileChannel.__init__ (self, core)
+
     #--------------------------------------------------------------------------#
     # Run Implementation                                                       #
     #--------------------------------------------------------------------------#
@@ -33,7 +37,7 @@ class ForkChannel (FileChannel):
                 # child
                 os.close (lr), os.close (lw), os.close (payload_out)
                 os.dup2 (payload_in, 0)
-                os.execvp (sys.executable, [sys.executable, '-'])
+                os.execvp (self.command [0], self.command)
             finally:
                 sys.exit (1)
 
