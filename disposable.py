@@ -146,7 +146,7 @@ class CompositeDisposable (BaseDisposable):
     def Dispose (self):
         if not self.disposed:
             self.disposed = True
-            for disposable in self.disposables:
+            for disposable in reversed (self.disposables):
                 disposable.__exit__ (None, None, None)
             del self.disposables [:]
 
