@@ -211,9 +211,12 @@ class LinkerService (Service):
             if name not in self.method_skip]
         return request.Result (methods = methods, name = type (instance).__name__)
 
-    @DummyAsync
+    @Async
     def port_METHOD (self, request):
-        return request.Result (result = getattr (self.instance_get (request), request.name) (*request.args, **request.keys))
+        result = getattr (self.instance_get (request), request.name) (*request.args, **request.keys)
+        if isinstance (result, BaseFuture):
+            yield result
+        AsyncReturn (request.Result (result = result))
 
     @DummyAsync
     def port_GET (self, request):
@@ -224,9 +227,12 @@ class LinkerService (Service):
         setattr (self.instance_get (request), request.name, request.value)
         return request.Result ()
 
-    @DummyAsync
+    @Async
     def port_CALL (self, request):
-        return request.Result (result = request.func (*request.args, **request.keys))
+        result = request.func (*request.args, **request.keys)
+        if isinstance (result, BaseFuture):
+            result = yield result
+        AsyncReturn (request.Result (result = result))
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
