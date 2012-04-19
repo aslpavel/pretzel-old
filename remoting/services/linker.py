@@ -110,14 +110,16 @@ class LinkerService (Service):
         return ref
 
     @Delegate
+    @Async
     def InstanceCreate (self, type, *args, **keys):
-        return self.channel.Request (PORT_LINKER_CREATE, type = type,
-            args = args, keys = keys).ContinueWithFunction (lambda response: response.reference)
+        response = yield self.channel.Request (PORT_LINKER_CREATE, type = type, args = args, keys = keys)
+        AsyncReturn (response.result)
 
     @Delegate
+    @Async
     def Call (self, func, *args, **keys):
-        return (self.channel.Request (PORT_LINKER_CALL, func = func, args = args, keys = keys)
-            .ContinueWithFunction (lambda response: response.result))
+        response = yield self.channel.Request (PORT_LINKER_CALL, func = func, args = args, keys = keys)
+        AsyncReturn (response.result)
 
     #--------------------------------------------------------------------------#
     # Persistence                                                              #
@@ -201,7 +203,7 @@ class LinkerService (Service):
     #--------------------------------------------------------------------------#
     @DummyAsync
     def port_CREATE (self, request):
-        return request.Result (reference = self.ToReference (request.type (*request.args, **request.keys)))
+        return request.Result (result = self.ToReference (request.type (*request.args, **request.keys)))
 
     @DummyAsync
     def port_INFO (self, request):
@@ -215,7 +217,7 @@ class LinkerService (Service):
     def port_METHOD (self, request):
         result = getattr (self.instance_get (request), request.name) (*request.args, **request.keys)
         if isinstance (result, BaseFuture):
-            yield result
+            result = yield result
         AsyncReturn (request.Result (result = result))
 
     @DummyAsync
@@ -243,9 +245,9 @@ class LinkerService (Service):
             raise ValueError ('bad descriptor {0}'.format (request.desc))
         return ref
 
-#-----------------------------------------------------------------------------#
-# Reference                                                                   #
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+# Reference                                                                    #
+#------------------------------------------------------------------------------#
 REFERENCE_LOCAL = 0
 REFERENCE_REMOTE = 1
 
@@ -257,4 +259,5 @@ class Reference (object):
         object.__setattr__ (self, 'ref_desc', desc)
         object.__setattr__ (self, 'ref_linker', linker)
         object.__setattr__ (self, 'ref_target', target)
+
 # vim: nu ft=python columns=120 :
