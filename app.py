@@ -4,9 +4,8 @@ import io
 import traceback
 
 from . import async
-from .async import *
-from .async import future
 from .log import *
+from .async import *
 from .disposable import *
 
 __all__ = async.__all__ + ('Application',)
@@ -63,6 +62,7 @@ class Application (object):
                 main_result = self.main (self)
                 if isinstance (main_result, future.BaseFuture):
                     self.Watch (main_result, name = self.name, critical = True)
+                    disposable.Add (Disposable (lambda: main_result.Cancel ()))
 
                 # run core
                 self.core.Run ()

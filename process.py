@@ -28,7 +28,7 @@ class Process (object):
         ri, li = os.pipe ()
         lo, ro = os.pipe ()
         lalive, ralive = os.pipe ()
-        
+
         self.pid = os.fork ()
         if self.pid:
             # parent
@@ -110,19 +110,20 @@ def ProcessCall (core, command, input = None, check = None, buffer_size = None):
     with Process (core, command, check) as proc:
         # input
         if input is not None:
-            yield proc.Stdin.Write (input)
-        proc.Stdin.Close ()
+            proc.Stdin.Write (input).Continue (lambda future: proc.Stdin.Close ())
+        else:
+            proc.Stdin.Close ()
 
         # output
         try:
-            stdout = io.BytesIO ()
+            output = io.BytesIO ()
             while True:
-                stdout.write ((yield proc.Stdout.Read (buffer_size)))
+                output.write ((yield proc.Stdout.Read (buffer_size)))
         except CoreHUPError: pass
 
         # return
         yield proc.Result
-        AsyncReturn (stdout.getvalue ())
+        AsyncReturn (output.getvalue ())
 
 #------------------------------------------------------------------------------#
 # Defaults                                                                     #
