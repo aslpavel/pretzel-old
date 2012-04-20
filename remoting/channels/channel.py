@@ -64,7 +64,7 @@ class Channel (object):
         # cancel
         def cancel ():
             if not future.IsCompleted ():
-                self.recv_queue.pop (uid, None)
+                self.recv_queue.pop (message.uid, None)
                 future.ErrorRaise (FutureCanceled ())
 
         # future
