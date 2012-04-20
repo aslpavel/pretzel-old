@@ -60,7 +60,7 @@ class Application (object):
 
                 # run main
                 main_result = self.main (self)
-                if isinstance (main_result, future.BaseFuture):
+                if isinstance (main_result, BaseFuture):
                     self.Watch (main_result, name = self.name, critical = True)
                     disposable.Add (Disposable (lambda: main_result.Cancel ()))
 
