@@ -12,9 +12,10 @@ __all__ = ('Process', 'ProcessCall', 'ProcessError')
 #------------------------------------------------------------------------------#
 class ProcessError (Exception): pass
 class Process (object):
-    def __init__ (self, core, command, check = None, buffer_size = None):
+    def __init__ (self, core, command, environ = None, check = None, buffer_size = None):
         self.core    = core
         self.command = command
+        self.environ = environ
         self.buffer_size = default_buffer_size if buffer_size is None else buffer_size
         self.check   = True if check is None else check
         self.dispose = CompositeDisposable ()
@@ -34,8 +35,8 @@ class Process (object):
             # parent
             os.close (ri); os.close (ro); os.close (ralive)
 
-            self.stdin  = self.core.AsyncFileCreate (li); self.dispose += self.stdin
-            self.stdout = self.core.AsyncFileCreate (lo); self.dispose += self.stdout
+            self.stdin  = self.core.AsyncFileCreate (li, self.buffer_size); self.dispose += self.stdin
+            self.stdout = self.core.AsyncFileCreate (lo, self.buffer_size); self.dispose += self.stdout
             self.result = self.result_worker (lalive);    self.dispose += self.result
         else:
             # child
@@ -43,7 +44,10 @@ class Process (object):
                 os.close (lalive)
                 os.close (li); os.dup2 (ri, 0) # standard input
                 os.close (lo); os.dup2 (ro, 1) # standard output
-                os.execvp (self.command [0], self.command)
+                if self.environ is None:
+                    os.execvp (self.command [0], self.command)
+                else:
+                    os.execvpe (self.command [0], self.command, self.environ)
             finally:
                 os.kill (os.getpid (), signal.SIGKILL)
 
@@ -104,10 +108,10 @@ class Process (object):
 # Call Process                                                                 #
 #------------------------------------------------------------------------------#
 @Async
-def ProcessCall (core, command, input = None, check = None, buffer_size = None):
+def ProcessCall (core, command, input = None, environ = None, check = None, buffer_size = None):
     buffer_size = default_buffer_size if buffer_size is None else buffer_size
 
-    with Process (core, command, check) as proc:
+    with Process (core, command, environ, check, buffer_size) as proc:
         # input
         if input is not None:
             proc.Stdin.Write (input).Continue (lambda future: proc.Stdin.Close ())
