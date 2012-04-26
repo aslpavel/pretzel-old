@@ -92,7 +92,7 @@ class Process (object):
             yield self.core.Poll (fd, self.core.READABLE)
         except CoreHUPError: pass
         except Exception:
-            os.kill (self.pid, signal.SIGKILL)
+            os.kill (self.pid, signal.SIGTERM)
             os.waitpid (self.pid, 0)
             raise
         finally:
