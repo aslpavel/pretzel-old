@@ -89,13 +89,10 @@ class LinkerService (Service):
         # dispose
         target_dispose = members.get ('__exit__')
         def dispose (this, et, eo, tb):
-            # call targets dispose if any
-            result = None
             if target_dispose is not None:
                 result = target_dispose (et, eo, tb)
-            # unlink target
             self.local_d2r.pop (desc, None)
-            return result
+            return False
         members ['__exit__'] = dispose
         if '__enter__' not in members:
             members ['__enter__'] = lambda this: this
@@ -180,18 +177,16 @@ class LinkerService (Service):
         members ['__setattr__'] = setter
 
         # dispose
-        ref_dispose = members ['__exit__']
+        ref_dispose = members.get ('__exit__', None)
         def dispose (this, et, eo, tb):
-            # call reference dispose
-            result = ref_dispose (this, et, eo, tb)
-            # unlink reference
+            if ref_dispose:
+                ref_dispose (this, et, eo, tb)
             self.remote_d2r.pop (ref_desc, None)
-
-            return result
+            return False
         members ['__exit__'] = dispose
 
-        ref = type ('%s_remote_ref' % info.name, (Reference, ), members) \
-            (REFERENCE_REMOTE, self, ref_desc, None)
+        # create reference
+        ref = type ('%s_remote_ref' % info.name, (Reference, ), members) (REFERENCE_REMOTE, self, ref_desc, None)
 
         # update cache
         self.remote_d2r [ref_desc] = ref
