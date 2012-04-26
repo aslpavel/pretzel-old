@@ -38,14 +38,8 @@ class Cage (object):
         return None
 
     #--------------------------------------------------------------------------#
-    # Equality                                                                 #
+    # Loader                                                                   #
     #--------------------------------------------------------------------------#
-    def __hash__ (self):
-        return binascii.crc32 (self.data)
-
-    def __eq__ (self, other):
-        return self.data == other.data
-
     class CageLoader (object):
         __slots__ = ('source', 'file', 'path')
         def __init__ (self, source, file, path):

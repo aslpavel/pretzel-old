@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from ..utils.fork import *
 from ...disposable import *
 from ...async import *
 
@@ -15,7 +14,7 @@ class Domain (object):
         self.disposable  = Disposable ()
 
         if True if run is None else run:
-            self.Run ().Wait ()
+            ~self.Run ()
 
     #--------------------------------------------------------------------------#
     # Task Interface                                                           #
@@ -24,40 +23,35 @@ class Domain (object):
     def Run (self):
         self.disposable.Dispose ()
         self.disposable  = CompositeDisposable (self.channel)
-        failed = False
+        error = False
         try:
             for service in self.services:
                 self.disposable += service.Attach (self.channel)
 
             yield self.channel.Run ()
         except Exception:
-            failed = True
+            error = True
             raise
         finally:
-            if failed:
+            if error:
                 self.disposable.Dispose ()
 
     @property
     def IsRunning (self):
         return self.channel.IsRunning
 
-    @property
-    def Task (self):
-        return self.channel.Task
-
     #--------------------------------------------------------------------------#
     # Attribute                                                                #
     #--------------------------------------------------------------------------#
     def __getattr__ (self, attr):
         if not self.channel.IsRunning:
-            raise DomainError ('channel is not running')
+            raise DomainError ('Channel is not running')
 
         if attr [0].isupper ():
             for service in self.services:
                 try:
                     return getattr (service, attr)
-                except  AttributeError:
-                    pass
+                except AttributeError: pass
         raise AttributeError (attr)
 
     #--------------------------------------------------------------------------#

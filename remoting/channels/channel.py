@@ -5,9 +5,9 @@ from ..message import *
 from ...async import *
 from ...async.wait import *
 from ...async.cancel import *
+from ...event import *
 
 from ..utils.bind_pool import *
-from ..utils.worker import *
 from ..utils.wait_queue import *
 
 __all__ = ('Channel', 'PersistenceChannel', 'ChannelError')
@@ -18,44 +18,38 @@ class ChannelError (Exception): pass
 class Channel (object):
     def __init__ (self, core):
         self.core  = core
-        self.runned = False
         self.ports = BindPool ()
         self.yield_queue = WaitQueue (lambda: core.SleepUntil (0))
 
         # receive
-        self.recv_queue = {}
-        self.recv_wait = MutableWait ()
-        self.recv_worker = Worker (self.recv_main, 'receive worker')
+        self.recv_queue  = {}
+        self.recv_wait   = MutableWait ()
+        self.recv_worker = None
 
         # events
-        self.OnStop = self.recv_worker.OnStop
-        self.OnStart = self.recv_worker.OnStart
+        self.OnStart = AsyncEvent ()
+        self.OnStop  = AsyncEvent ()
 
     #--------------------------------------------------------------------------#
-    # Task Interface                                                           #
+    # Run                                                                      #
     #--------------------------------------------------------------------------#
     @Async
     def Run (self):
-        if self.runned:
+        if self.recv_worker is not None:
             raise ChannelError ('Channel has already been run')
-        self.runned = True
         yield self.run ()
 
     @property
     def IsRunning (self):
-        return bool (self.recv_worker)
-
-    @property
-    def Task (self):
-        return self.recv_worker.Task
+        return self.recv_worker is not None and not self.recv_worker.IsCompleted ()
 
     #--------------------------------------------------------------------------#
     # Request                                                                  #
     #--------------------------------------------------------------------------#
     @Async
     def Request (self, port, **attr):
-        if not self.recv_worker:
-            raise ChannelError ('Receive worker is {}'.format (self.recv_worker.StateString))
+        if not self.IsRunning:
+            raise ChannelError ('Channel is not running')
 
         # message
         message = Message (port, **attr)
@@ -145,6 +139,9 @@ class Channel (object):
                 else:
                     future.ErrorSet (error)
 
+            # fire stop
+            yield self.OnStop ()
+
     #--------------------------------------------------------------------------#
     # Handlers                                                                 #
     #--------------------------------------------------------------------------#
@@ -165,9 +162,15 @@ class Channel (object):
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
+    @Async
     def run (self):
-        """Run implementation"""
-        return self.recv_worker.Run ()
+        self.recv_worker = self.recv_main ()
+        if self.recv_worker.IsCompleted ():
+            self.recv_worker.Result ()
+            raise ChannelError ('Receive worker has terminated immediately')
+
+        # fire start
+        yield self.OnStart ()
 
 #------------------------------------------------------------------------------#
 # Persistence Channel                                                          #

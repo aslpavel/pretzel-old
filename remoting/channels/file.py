@@ -69,9 +69,6 @@ class FileChannel (PersistenceChannel):
 
     @DummyAsync
     def SendMsg (self, message):
-        if not self.recv_worker:
-            raise ChannelError ('Connection is closed')
-
         # message dump
         stream = io.BytesIO ()
         self.pickler_type (stream, -1).dump (message)

@@ -9,7 +9,6 @@ from .file import *
 from .channel import *
 from ..domains.pair import *
 from ..bootstrap import *
-from ..utils.worker import *
 from .. import __name__ as remoting_name
 from ...async import *
 from ...event import *
@@ -96,15 +95,19 @@ class DaemonChannel (FileChannel):
 #------------------------------------------------------------------------------#
 # Daemon                                                                       #
 #------------------------------------------------------------------------------#
-class Daemon (Worker):
+class Daemon (object):
     def __init__ (self, core, path, ready, backlog = 10):
-        Worker.__init__ (self, self.daemon_main, 'daemon worker')
-
         self.core = core
         self.path = path
         self.ready = ready
         self.backlog = backlog
         self.domains = set ()
+
+    #--------------------------------------------------------------------------#
+    # Run                                                                      #
+    #--------------------------------------------------------------------------#
+    def Run (self):
+        return self.daemon_main ()
 
     #--------------------------------------------------------------------------#
     # Properties                                                               #
