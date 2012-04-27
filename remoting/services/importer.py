@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 import sys
 import imp
+import pkgutil
 import zlib
+import time
 
 from .service import *
 from ..utils.compat import *
 from ...async import *
-from ...disposable import *
 
 __all__ = ('ImportService',)
 #-----------------------------------------------------------------------------#
@@ -32,8 +33,10 @@ class ImportService (Service):
             (PORT_IMPORT_PUSH, self.port_PUSH)
         ])
 
-        self.modules = {}
+        self.infos    = {}
+        self.locked   = False
         self.override = override
+        self.tag      = '{}{}'.format (id (self), time.time ())
 
         def on_attach (channel):
             if insert_path:
@@ -41,7 +44,7 @@ class ImportService (Service):
         self.OnAttach += on_attach
 
         def on_detach (channel):
-            self.modules.clear ()
+            self.infos.clear ()
             if insert_path:
                 sys.meta_path.remove (self)
         self.OnDetach += on_detach
@@ -50,20 +53,33 @@ class ImportService (Service):
     # Finder Interface                                                         #
     #--------------------------------------------------------------------------#
     def find_module (self, name, path = None):
+        if path and self.tag not in path:
+            # inside package but it is imported with different loader
+            return
+
+        if name in self.infos:
+            # previously found
+            return self
+
+        if not self.IsAttached:
+            raise ImportError ('Import service is detached')
+
         if not self.override:
+            # try to fined localy first
             try:
-                imp.find_module (name.split ('.') [-1], path)
-                return
-            except ImportError: pass
+                if not self.locked:
+                    self.locked = True
+                    loader = pkgutil.get_loader (name)
+                    if loader is not None:
+                        return loader
+            finally:
+                self.locked = False
 
-        if name not in self.modules:
-            response = self.channel.Request (PORT_IMPORT_LOAD, name = name, path = path)
-            response.Wait ()
-            try:
-                self.modules [name] = response.Result ()
-            except ImportError:
-                return None
+        info = ~self.channel.Request (PORT_IMPORT_LOAD, name = name, path = path)
+        if info.source is None:
+            return
 
+        self.infos [name] = info
         return self
 
     #--------------------------------------------------------------------------#
@@ -74,77 +90,66 @@ class ImportService (Service):
         if module is not None:
             return module
 
-        info = self.modules [name]
-        return self.load (name, zlib.decompress (info.source), info.file, info.path)
+        info = self.info (name)
+        return self.load (name, zlib.decompress (info.source), info.file, info.is_package)
 
+    # data
+    def get_data (self, path):
+        raise NotImplementedError ()
+
+    # introspect
     def is_package (self, name):
-        return self.modules [name].path is not None
+        return self.info (name).is_package
 
     def get_code (self, name):
-        info = self.modules [name]
-        return compile (zlib.decompress (info.source), 'remote:{0}'.format (info.file), 'exec')
+        info = self.info (name)
+        return compile (zlib.decompress (info.source), info.file, 'exec')
 
     def get_source (self, name):
-        source = zlib.decompress (self.modules [name].source)
-        return source if isinstance (source, str) else source.decode ('utf-8')
+        return zlib.decompress (self.info (name).source).decode ('utf-8')
 
     #--------------------------------------------------------------------------#
     # Service's Methods                                                        #
     #--------------------------------------------------------------------------#
     @Delegate
-    def PushModule (self, name, source, file, package = None):
+    def PushModule (self, name, source, file):
         return self.channel.Request (PORT_IMPORT_PUSH, name = name, source = zlib.compress (source),
-            file = file, package = package)
+            file = file, is_package = False)
 
     #--------------------------------------------------------------------------#
     # Ports Handlers                                                           #
     #--------------------------------------------------------------------------#
     @DummyAsync
     def port_LOAD (self, request):
-        module_name = request.name.split ('.') [-1]
-        path = None
-        with CompositeDisposable () as disposable:
-            stream, file, desc = imp.find_module (module_name, request.path)
-            if stream is not None:
-                disposable += stream
+        loader = pkgutil.get_loader (request.name)
+        if (loader is None or                    # loader is not found
+            not hasattr (loader, 'get_source')): # get_source is not available
+                return request.Result (source = None)
 
-            # package
-            if desc [2] == imp.PKG_DIRECTORY:
-                path = file
-                stream, file, desc = imp.find_module ('__init__', [path])
-                if stream is not None:
-                    disposable += stream
+        source = loader.get_source (request.name)
+        if source is None:
+            return request.Result (source = None)
 
-            # module
-            if desc [2] != imp.PY_SOURCE:
-                raise ImportError ('{0}: only source python files are subject to remote import'
-                    .format (request.name))
-
-            return request.Result (source = zlib.compress (stream.read ().encode ('utf-8')),
-                file = file, path = path)
+        return request.Result (source = zlib.compress (source.encode ('utf-8')),
+            is_package = loader.is_package (request.name), file = '<ImportService \'{}\'>'.format (request.name))
 
     @DummyAsync
     def port_PUSH (self, request):
         if request.name not in sys.modules:
-            module = self.load (request.name, zlib.decompress (request.source), request.file)
-            if request.package is not None:
-                __import__ (request.package)
-                sys.modules [request.package].__dict__ [request.name] = module
-                module.__package__ = request.package
-            self.modules [request.name] = request
+            self.load (request.name, zlib.decompress (request.source), request.file)
+            self.infos [request.name] = request
 
         return request.Result ()
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
-    def load (self, name, source, file, path = None):
-        """Load module by it's source and name"""
+    def load (self, name, source, file, is_package = False):
         module = imp.new_module (name)
-        module.__file__ = 'remote:{}'.format (file)
+        module.__file__   = file
         module.__loader__ = self
-        if path is not None:
-            module.__path__ = [path]
+        if is_package:
+            module.__path__ = [self.tag]
 
         sys.modules [name] = module
         try:
@@ -155,4 +160,11 @@ class ImportService (Service):
         except Exception:
             del sys.modules [name]
             raise
+
+    def info (self, name):
+        info = self.infos.get (name)
+        if info is None:
+            raise ImportError ('Can\'t find module \'{}\''.format (name))
+        return info
+
 # vim: nu ft=python columns=120 :

@@ -3,9 +3,9 @@ from ...event import *
 from ...disposable import *
 
 __all__ = ('Service', 'ServiceError')
-#-----------------------------------------------------------------------------#
-# Service                                                                     #
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+# Service                                                                      #
+#------------------------------------------------------------------------------#
 class ServiceError (Exception): pass
 class Service (object):
     def __init__ (self, ports = None, persistence = None):
@@ -17,6 +17,9 @@ class Service (object):
         self.OnAttach = Event ()
         self.OnDetach = Event ()
 
+    #--------------------------------------------------------------------------#
+    # Attach                                                                   #
+    #--------------------------------------------------------------------------#
     def Attach (self, channel):
         if self.channel is not None:
             raise ServiceError ('channel already been attached')
@@ -37,4 +40,8 @@ class Service (object):
         except Exception:
             disposable.Dispose ()
             raise
+
+    @property
+    def IsAttached (self):
+        return self.channel is not None
 # vim: nu ft=python columns=120 :

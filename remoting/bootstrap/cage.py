@@ -68,6 +68,7 @@ class Cage (object):
                 del sys.modules [name]
                 raise
 
+        # introspection
         def is_package (self, name):
             return self.path is not None
 
