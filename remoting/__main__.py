@@ -5,9 +5,7 @@ import time
 import itertools
 
 from . import *
-from ..log import *
-from ..async import *
-
+from ..app import *
 #------------------------------------------------------------------------------#
 # Remote Objects                                                               #
 #------------------------------------------------------------------------------#
@@ -70,28 +68,29 @@ class Benchmark (object):
             self.future.ErrorSet (error)
 
 #------------------------------------------------------------------------------#
-# Benchmark Run                                                                #
+# Main                                                                         #
 #------------------------------------------------------------------------------#
 @Async
-def benchmark_run (domain, log):
-    started = time.time ()
-    with log.Pending ('Domain Start'):
-        yield domain.Run ()
-    instance = domain.InstanceCreate (Remote)
+def Main (app):
+    with ForkDomain (app.Core, run = False) as domain:
+        started = time.time ()
+        with app.Log.Pending ('Domain Start'):
+            yield domain.Run ()
+        instance = domain.InstanceCreate (Remote)
 
-    with log.Pending ('Method'):
-        method_bench = yield Benchmark (lambda: instance.Method.Async ()).Run ()
-        if method_bench.Results != list (range (Count)):
-            raise ValueError ('Method benchmark failed')
+        with app.Log.Pending ('Method'):
+            method_bench = yield Benchmark (lambda: instance.Method.Async ()).Run ()
+            if method_bench.Results != list (range (Count)):
+                raise ValueError ('Method benchmark failed')
 
-    with log.Pending ('Function'):
-        func_bench = yield Benchmark (lambda: domain.Call.Async (RemoteFunction)).Run ()
-        if func_bench.Results != [1,] * Count:
-            raise ValueError ('Function benchmark failed')
-    stopped = time.time ()
+        with app.Log.Pending ('Function'):
+            func_bench = yield Benchmark (lambda: domain.Call.Async (RemoteFunction)).Run ()
+            if func_bench.Results != [1,] * Count:
+                raise ValueError ('Function benchmark failed')
+        stopped = time.time ()
 
     # output result
-    log.Info ('Count:{0} Elapsed:{1:.1f}s'.format (Count, stopped - started))
+    app.Log.Info ('Count:{0} Elapsed:{1:.1f}s'.format (Count, stopped - started))
 
     print ('\n  Type       Total   Per Call   Calls/Sec')
     print ('  ---------  ------  ---------  --------')
@@ -101,16 +100,8 @@ def benchmark_run (domain, log):
         .format (func_bench.Elapsed, func_bench.Elapsed / Count, int (Count / func_bench.Elapsed))))
 
 #------------------------------------------------------------------------------#
-# Main                                                                         #
+# Entry Point                                                                  #
 #------------------------------------------------------------------------------#
-def main ():
-    with LoggerCreate () as logger:
-        log = Log ('benchmark')
-        log.Subscribe (logger)
-        with Core () as core:
-            domain = ForkDomain (core, run = False)
-            benchmark_run (domain, log).Continue (lambda future: domain.Dispose ())
-
 if __name__ == '__main__':
-    main ()
+    Application (Main, 'remoting benchmark')
 # vim: nu ft=python columns=120 :
