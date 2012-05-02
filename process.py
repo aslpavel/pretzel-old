@@ -107,27 +107,31 @@ class Process (object):
 #------------------------------------------------------------------------------#
 # Call Process                                                                 #
 #------------------------------------------------------------------------------#
-@Async
 def ProcessCall (core, command, input = None, environ = None, check = None, buffer_size = None):
     buffer_size = default_buffer_size if buffer_size is None else buffer_size
 
-    with Process (core, command, environ, check, buffer_size) as proc:
-        # input
-        if input is not None:
-            proc.Stdin.Write (input).Continue (lambda future: proc.Stdin.Close ())
-        else:
-            proc.Stdin.Close ()
+    # helper
+    def processCall ():
+        with Process (core, command, environ, check, buffer_size) as proc:
+            # input
+            if input is not None:
+                proc.Stdin.Write (input).Continue (lambda future: proc.Stdin.Close ())
+            else:
+                proc.Stdin.Close ()
 
-        # output
-        try:
-            output = io.BytesIO ()
-            while True:
-                output.write ((yield proc.Stdout.Read (buffer_size)))
-        except CoreHUPError: pass
+            # output
+            try:
+                output = io.BytesIO ()
+                while True:
+                    output.write ((yield proc.Stdout.Read (buffer_size)))
+            except CoreHUPError: pass
 
-        # return
-        yield proc.Result
-        AsyncReturn (output.getvalue ())
+            # return
+            yield proc.Result
+            AsyncReturn (output.getvalue ())
+
+    # coroutine future
+    return Async (processCall) ()
 
 #------------------------------------------------------------------------------#
 # Defaults                                                                     #
