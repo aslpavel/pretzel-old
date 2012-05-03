@@ -64,17 +64,17 @@ class ImportService (Service):
         if not self.IsAttached:
             raise ImportError ('Import service is detached')
 
-        if not self.override:
-            # try to fined localy first
+        # search locally
+        if not self.override and not self.locked:
+            self.locked = True
             try:
-                if not self.locked:
-                    self.locked = True
-                    loader = pkgutil.get_loader (name)
-                    if loader is not None:
-                        return loader
+                loader = pkgutil.get_loader (name)
+                if loader is not None:
+                    return loader
             finally:
                 self.locked = False
 
+        # remote import
         info = ~self.channel.Request (PORT_IMPORT_LOAD, name = name, path = path)
         if info.source is None:
             return
@@ -121,6 +121,10 @@ class ImportService (Service):
     #--------------------------------------------------------------------------#
     @DummyAsync
     def port_LOAD (self, request):
+        # python 2.7 bug in pkgutil.get_loader
+        if sys.modules.get (request.name) is None:
+            return request.Result (source = None)
+
         loader = pkgutil.get_loader (request.name)
         if (loader is None or                    # loader is not found
             not hasattr (loader, 'get_source')): # get_source is not available
