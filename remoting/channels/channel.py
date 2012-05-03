@@ -127,7 +127,7 @@ class Channel (object):
 
                     future.wait.Replace (self.yield_queue.Future.Wait)
 
-        except CoreHUPError: pass
+        except CoreDisconnectedError: pass
         except FutureCanceled: pass
         finally:
             # resolve queued futures

@@ -90,7 +90,7 @@ class Process (object):
     def result_worker (self, fd):
         try:
             yield self.core.Poll (fd, self.core.READABLE)
-        except CoreHUPError: pass
+        except CoreDisconnectedError: pass
         except Exception:
             os.kill (self.pid, signal.SIGTERM)
             os.waitpid (self.pid, 0)
@@ -124,7 +124,7 @@ def ProcessCall (core, command, input = None, environ = None, check = None, buff
                 output = io.BytesIO ()
                 while True:
                     output.write ((yield proc.Stdout.Read (buffer_size)))
-            except CoreHUPError: pass
+            except CoreDisconnectedError: pass
 
             # return
             yield proc.Result
