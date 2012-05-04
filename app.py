@@ -13,7 +13,7 @@ __all__ = async.__all__ + ('Application',)
 # Application                                                                  #
 #------------------------------------------------------------------------------#
 class Application (object):
-    def __init__ (self, main, name = None, run = True, log_file = None, console = None):
+    def __init__ (self, main, name = None, run = True, log_file = None, console = None, core = None):
         """Application Object
 
         Options:
@@ -27,9 +27,9 @@ class Application (object):
         self.log_file = log_file
         self.runned = False
 
-        self.core   = Core ()
         self.log    = Log (name)
         self.logger = None
+        self.core   = Core () if core is None else core
         self.console = True if console is None else console
 
         if run:

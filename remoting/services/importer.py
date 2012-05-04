@@ -65,19 +65,22 @@ class ImportService (Service):
             raise ImportError ('Import service is detached')
 
         # search locally
-        if not self.override and not self.locked:
-            self.locked = True
-            try:
-                loader = pkgutil.get_loader (name)
-                if loader is not None:
-                    return loader
-            finally:
-                self.locked = False
+        if not self.override:
+            if not self.locked:
+                self.locked = True
+                try:
+                    loader = pkgutil.get_loader (name)
+                    if loader is not None:
+                        return loader
+                finally:
+                    self.locked = False
+            else:
+                return None
 
         # remote import
         info = ~self.channel.Request (PORT_IMPORT_LOAD, name = name, path = path)
         if info.source is None:
-            return
+            return None
 
         self.infos [name] = info
         return self
