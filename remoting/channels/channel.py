@@ -19,7 +19,7 @@ class Channel (object):
     def __init__ (self, core):
         self.core  = core
         self.ports = BindPool ()
-        self.yield_queue = WaitQueue (lambda: core.SleepUntil (0))
+        self.yield_queue = WaitQueue (lambda: core.Idle ())
 
         # receive
         self.recv_queue  = {}
@@ -57,9 +57,8 @@ class Channel (object):
 
         # cancel
         def cancel ():
-            if not future.IsCompleted ():
-                self.recv_queue.pop (message.uid, None)
-                future.ErrorRaise (FutureCanceled ())
+            self.recv_queue.pop (message.uid, None)
+            future.ErrorRaise (FutureCanceled ())
 
         # future
         future = MutableFuture ()
@@ -118,7 +117,8 @@ class Channel (object):
                     self.yield_queue.Enqueue (self.handle_request, handler, uid, getter)
                 else:
                     future = self.recv_queue.pop (uid)
-                    future.cancel.Replace ()
+                    if future.IsCompleted (): # canceled?
+                        continue
 
                     if port == PORT_RESULT:
                         self.yield_queue.Enqueue (future.ResultSet, getter)
