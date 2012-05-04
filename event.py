@@ -1,11 +1,61 @@
 # -*- coding: utf-8 -*-
 from .async import *
+from .async.cancel import *
 
-__all__ = ('Event', 'AsyncEvent')
+__all__ = ('Event', 'AsyncEvent', 'ExternalEvent')
+#------------------------------------------------------------------------------#
+# Base Event                                                                   #
+#------------------------------------------------------------------------------#
+class BaseEvent (object):
+    __slots__ = tuple ()
+
+    #--------------------------------------------------------------------------#
+    # Fire                                                                     #
+    #--------------------------------------------------------------------------#
+    def __call__ (self, *args):
+        raise NotImplementedError ()
+
+    #--------------------------------------------------------------------------#
+    # Add                                                                      #
+    #--------------------------------------------------------------------------#
+    def Add (self, handler):
+        raise NotImplementedError ()
+
+    def __iadd__ (self, handler):
+        self.Add (handler)
+        return self
+
+    #--------------------------------------------------------------------------#
+    # Remove                                                                   #
+    #--------------------------------------------------------------------------#
+    def Remove (self, handler_id):
+        raise NotImplementedError ()
+
+    def __isub__ (self, handler_id):
+        self.Remove (handler_id)
+        return self
+
+    #--------------------------------------------------------------------------#
+    # Await                                                                    #
+    #--------------------------------------------------------------------------#
+    def Await (self):
+        def cancel ():
+            self.Remove (handler_id)
+            future.RaiseError (FutureCanceled ())
+
+        def handler (*args):
+            self.Remove (handler_id)
+            future.ResultSet (args)
+
+        future     = Future (cancel = Cancel (cancel))
+        handler_id = self.Add (handler)
+
+        return future
+
 #------------------------------------------------------------------------------#
 # Event                                                                        #
 #------------------------------------------------------------------------------#
-class Event (object):
+class Event (BaseEvent):
     __slots__ = ('handlers',)
 
     def __init__ (self):
@@ -19,26 +69,18 @@ class Event (object):
             handler (*args, **keys)
 
     #--------------------------------------------------------------------------#
-    # Add Handler                                                              #
+    # Add | Remove                                                             #
     #--------------------------------------------------------------------------#
     def Add (self, handler):
-        """Add handler"""
         self.handlers.append (handler)
+        return handler
 
-    def __iadd__ (self, handler):
-        self.Add (handler)
-        return self
-
-    #--------------------------------------------------------------------------#
-    # Remove Handler                                                           #
-    #--------------------------------------------------------------------------#
-    def Remove (self, handler):
-        """Remove handler"""
-        self.handlers.remove (handler)
-
-    def __isub__ (self, handler):
-        self.Remove (handler)
-        return self
+    def Remove (self, handler_id):
+        try:
+            self.handlers.remove (handler_id)
+            return True
+        except ValueError: pass
+        return False
 
 #------------------------------------------------------------------------------#
 # Async Event                                                                  #
@@ -54,4 +96,22 @@ class AsyncEvent (Event):
         for handler in tuple (self.handlers):
             yield handler (*args, **keys)
 
+#------------------------------------------------------------------------------#
+# External Event                                                               #
+#------------------------------------------------------------------------------#
+class ExternalEvent (BaseEvent):
+    __slots__ = ('add', 'remove')
+
+    def __init__ (self, add, remove):
+        self.add    = add
+        self.remove = remove
+
+    #--------------------------------------------------------------------------#
+    # Add | Remove                                                             #
+    #--------------------------------------------------------------------------#
+    def Add (self, handler):
+        return self.add (handler)
+
+    def Remove (self, handler_id):
+        return self.remove (handler_id)
 # vim: nu ft=python columns=120 :
