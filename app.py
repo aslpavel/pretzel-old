@@ -84,8 +84,7 @@ class Application (object):
                 raise
 
             finally:
-                if critical:
-                    sys.exit (1)
+                self.core.Stop ()
 
         return future.Continue (watch_continuation)
 
