@@ -2,7 +2,7 @@
 from .async import *
 from .async.cancel import *
 
-__all__ = ('Event', 'AsyncEvent', 'ExternalEvent')
+__all__ = ('Event', 'AsyncEvent', 'DelegatedEvent')
 #------------------------------------------------------------------------------#
 # Base Event                                                                   #
 #------------------------------------------------------------------------------#
@@ -41,7 +41,7 @@ class BaseEvent (object):
     def Await (self):
         def cancel ():
             self.Remove (handler_id)
-            future.RaiseError (FutureCanceled ())
+            future.ErrorRaise (FutureCanceled ())
 
         def handler (*args):
             self.Remove (handler_id)
@@ -97,9 +97,9 @@ class AsyncEvent (Event):
             yield handler (*args, **keys)
 
 #------------------------------------------------------------------------------#
-# External Event                                                               #
+# Delegated Event                                                              #
 #------------------------------------------------------------------------------#
-class ExternalEvent (BaseEvent):
+class DelegatedEvent (BaseEvent):
     __slots__ = ('add', 'remove')
 
     def __init__ (self, add, remove):
