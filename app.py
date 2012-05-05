@@ -39,7 +39,6 @@ class Application (object):
     # Run                                                                      #
     #--------------------------------------------------------------------------#
     def Run (self):
-        """Run Application"""
         if self.runned:
             raise RuntimeError ('Application has already been run')
         self.runned = True
@@ -48,28 +47,34 @@ class Application (object):
         self.logger = CompositeLogger (LoggerCreate () if self.console else TextLogger ())
         try:
             with CompositeDisposable (self.logger) as disposable:
-                # subscribe logger
+                #--------------------------------------------------------------#
+                # Logging                                                      #
+                #--------------------------------------------------------------#
                 disposable.Add (self.log.Subscribe (self.logger))
-
-                # open log file
                 if self.log_file:
                     try:
-                        self.Logger.Subscribe (TextLogger (open (self.log_file, 'a+')))
+                        log_stream = open (self.log_file, 'a+')
+                        disposable.Add (log_stream)
+                        disposable.Add (self.Logger.Subscribe (TextLogger (log_stream)))
                     except IOError as error:
                         self.log.Error ('Failed to open log file \'{}\': {}'.format (self.log_file, error.strerror))
 
-                # run main
+                #--------------------------------------------------------------#
+                # Main                                                         #
+                #--------------------------------------------------------------#
                 main_result = self.main (self)
                 if isinstance (main_result, BaseFuture):
-                    self.Watch (main_result, name = self.name, critical = True)
-
-                # run core
-                self.core.Run ()
+                    with self.core:
+                        self.core.Sleep (1 << 27) # ~ 100 Years (keeps core running until main is resolved)
+                        self.Watch (main_result, name = self.name, critical = True)
         finally:
             self.logger, self.log = None, None
 
+    #--------------------------------------------------------------------------#
+    # Watch                                                                    #
+    #--------------------------------------------------------------------------#
     def Watch (self, future, name = None, critical = False):
-        """Watch for future"""
+        """Watch over future"""
         def watch_continuation (future):
             try:
                 return future.Result ()
@@ -92,21 +97,10 @@ class Application (object):
     #--------------------------------------------------------------------------#
     # Properties                                                               #
     #--------------------------------------------------------------------------#
-    @property
-    def Name (self):
-        return self.name
-
-    @property
-    def Log (self):
-        return self.log
-
-    @property
-    def Logger (self):
-        return self.logger
-
-    @property
-    def Core (self):
-        return self.core
+    Name   = property (lambda self: self.name)
+    Core   = property (lambda self: self.core)
+    Log    = property (lambda self: self.log)
+    Logger = property (lambda self: self.logger)
 
 stream_type = io.BytesIO if sys.version_info [0] < 3 else io.StringIO
 # vim: nu ft=python columns=120 :
