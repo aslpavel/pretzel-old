@@ -89,7 +89,8 @@ class Channel (object):
     # Dispose                                                                  #
     #--------------------------------------------------------------------------#
     def Dispose (self):
-        self.recv_worker.Dispose ()
+        if self.recv_worker is not None:
+            self.recv_worker.Dispose ()
 
     def __enter__ (self):
         return self
