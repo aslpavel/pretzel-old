@@ -27,9 +27,9 @@ class Application (object):
         self.log_file = log_file
         self.runned = False
 
-        self.log    = Log (name)
-        self.logger = None
-        self.core   = Core () if core is None else core
+        self.log     = Log (name)
+        self.logger  = None
+        self.core    = Core () if core is None else core
         self.console = True if console is None else console
 
         if run:
