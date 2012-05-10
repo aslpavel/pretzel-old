@@ -4,6 +4,7 @@ import operator
 
 from ..disposable import *
 from ..async import *
+from ..async.cancel import *
 
 __all__ = ('Observable', 'Observer')
 #------------------------------------------------------------------------------#
@@ -17,17 +18,40 @@ class Observable (object):
     # Creation                                                                 #
     #--------------------------------------------------------------------------#
     @classmethod
-    def FromEvent (cls, event, add = None, remove = None):
-        if add is None:
-            add = lambda handler: operator.iadd (event, handler)
-        if remove is None:
-            remove = lambda handler: operator.isub (event, handler)
-
-        def Subscribe (self, observer):
-            add (observer.OnNext)
-            return Disposable (remove)
+    def FromEvent (cls, event):
+        def Subscribe (observer):
+            handler_id = event.Add (lambda *args: observer.OnNext (args))
+            return Disposable (lambda: event.Remove (handler_id))
 
         return AnonymousObservable (Subscribe)
+
+    #--------------------------------------------------------------------------#
+    # Await                                                                    #
+    #--------------------------------------------------------------------------#
+    def Await (self):
+        # create future
+        def cancel ():
+            disposable.Dispose ()
+            future.ErrorRaise (FutureCanceled ())
+
+        future = Future (cancel = Cancel (cancel))
+
+        # create observer
+        def onNext (value):
+            disposable.Dispose ()
+            future.ResultSet (value)
+
+        def onError (error):
+            disposable.Dispose ()
+            future.ErrorSet (error)
+
+        def onCompleted ():
+            disposable.Dispose ()
+            future.ErrorRaise (FutureError ('Observable has been completed'))
+
+        disposable = self.Subscribe (AnonymousObserver (onNext, onError, onCompleted))
+
+        return future
 
     #--------------------------------------------------------------------------#
     # Select                                                                   #
@@ -54,6 +78,37 @@ class Observable (object):
 
             disposable.Replace (self.Subscribe (AnonymousObserver (onNext, onError, onCompleted)))
             return disposable
+
+        return AnonymousObservable (Subscribe)
+
+    #--------------------------------------------------------------------------#
+    # Throttle                                                                 #
+    #--------------------------------------------------------------------------#
+    def Throttle (self, core, delay):
+        def Subscribe (observer):
+            context = Context (value = None, hasValue = False, worker = SucceededFuture (None))
+            @Async
+            def worker ():
+                yield core.Sleep (delay)
+                observer.OnNext (context.value)
+                context.value, context.hasValue = None, False
+
+            def onNext (value):
+                context.worker.Cancle ()
+                context.value, context.hasValue = value, True
+                context.worker = worker ()
+
+            def onError (error):
+                context.worker.Cancel ()
+                observer.OnError (error)
+
+            def onCompleted ():
+                context.worker.Cancel ()
+                if context.hasValue:
+                    observer.OnNext (context.value)
+
+            return CompositeDisposable (context.worker,
+                self.Subscribe (AnonymousObserver (onNext, onError, onCompleted)))
 
         return AnonymousObservable (Subscribe)
 
@@ -97,46 +152,31 @@ class Observable (object):
     #--------------------------------------------------------------------------#
     # Smother                                                                  #
     #--------------------------------------------------------------------------#
-    def Smother (self, delay, core):
-        """Smother observable
-        
-        Produce only last event within each delay time span
-        """
+    def Smother (self, core, delay):
         def Subscribe (observer):
-            context = Context (value = None, changed = False, running = False)
-
+            context = Context (value = None, hasValue = False, worker = SucceededFuture (None))
             @Async
-            def timerTask ():
-                now = yield core.Sleep (0)
-                context.running = True
-                try:
-                    while True:
-                        now = yield core.SleepUntil (now + delay)
-                        if context.stopped:
-                            return
-                        if context.chagned:
-                            observer.OnNext (context.value)
-                            context.changed = False
-                finally:
-                    context.running = False
+            def worker ():
+                yield core.Sleep (delay)
+                observer.OnNext (context.value)
+                context.value, context.hasValue = None, False
 
             def onNext (value):
-                if not context.running:
-                    timerTask ()
-                context.value, context.changed = value, True
+                context.value, context.hasValue = value, True
+                if context.worker.IsCompleted ():
+                    worker ()
 
             def onError (error):
-                context.running = False
-                observer.OnError (error)
+                context.worker.Cancle ()
+                observer.OnError ()
 
             def onCompleted ():
-                context.running = False
-                if context.changed:
+                context.worker.Cancle ()
+                if context.hasValue:
                     observer.OnNext (context.value)
-                observer.OnCompleted ()
 
-            return CompositeDisposable (lambda: setattr (context, 'running', False),
-                self.Subscribe (AnonymousObserver (onNext, onError, onCompleted)))
+            return CompositeDisposable (context.worker,
+                self.Subsctibe (AnonymousObserver (onNext, onError, onCompleted)))
 
         return AnonymousObservable (Subscribe)
 
@@ -144,6 +184,9 @@ class Observable (object):
 # Observer Interface                                                           #
 #------------------------------------------------------------------------------#
 class Observer (object):
+    #--------------------------------------------------------------------------#
+    # Observer                                                                 #
+    #--------------------------------------------------------------------------#
     def OnNext (self, value):
         raise NotImplementedError ()
 
@@ -153,6 +196,9 @@ class Observer (object):
     def OnCompleted (self):
         raise NotImplementedError ()
 
+    #--------------------------------------------------------------------------#
+    # Safe Observer                                                            #
+    #--------------------------------------------------------------------------#
     def ToSafe (self):
         def onNext (value):
             try: self.OnNext (value)
