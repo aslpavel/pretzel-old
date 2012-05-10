@@ -94,7 +94,7 @@ class Observable (object):
                 context.value, context.hasValue = None, False
 
             def onNext (value):
-                context.worker.Cancle ()
+                context.worker.Cancel ()
                 context.value, context.hasValue = value, True
                 context.worker = worker ()
 
@@ -167,11 +167,11 @@ class Observable (object):
                     worker ()
 
             def onError (error):
-                context.worker.Cancle ()
+                context.worker.Cancel ()
                 observer.OnError ()
 
             def onCompleted ():
-                context.worker.Cancle ()
+                context.worker.Cancel ()
                 if context.hasValue:
                     observer.OnNext (context.value)
 
