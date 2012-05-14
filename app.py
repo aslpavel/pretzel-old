@@ -6,6 +6,7 @@ import traceback
 from . import async
 from .log import *
 from .async import *
+from .event import *
 from .disposable import *
 
 __all__ = async.__all__ + ('Application',)
@@ -32,6 +33,7 @@ class Application (object):
         self.core    = Core () if core is None else core
         self.console = True if console is None else console
 
+        self.OnQuit  = Event ()
         if run:
             self.Run ()
 
@@ -62,11 +64,14 @@ class Application (object):
                 #--------------------------------------------------------------#
                 # Main                                                         #
                 #--------------------------------------------------------------#
-                main_result = self.main (self)
-                if isinstance (main_result, BaseFuture):
-                    with self.core:
-                        self.core.Sleep (1 << 27) # ~ 100 Years (keeps core running until main is resolved)
-                        self.Watch (main_result, name = self.name, critical = True)
+                try:
+                    main_result = self.main (self)
+                    if isinstance (main_result, BaseFuture):
+                        with self.core:
+                            self.core.Sleep (1 << 27) # ~ 100 Years (keeps core running until main is resolved)
+                            self.Watch (main_result, name = self.name, critical = True)
+                finally:
+                    self.OnQuit (self)
         finally:
             self.logger, self.log = None, None
 

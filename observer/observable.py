@@ -6,7 +6,7 @@ from ..disposable import *
 from ..async import *
 from ..async.cancel import *
 
-__all__ = ('Observable', 'Observer')
+__all__ = ('Observable', 'Observer', 'Subject',)
 #------------------------------------------------------------------------------#
 # Observable Interface                                                         #
 #------------------------------------------------------------------------------#
@@ -213,6 +213,43 @@ class Observer (object):
             except Exception: pass
 
         return AnonymousObserver (onNext, onError, onCompleted)
+
+#------------------------------------------------------------------------------#
+# Subject                                                                      #
+#------------------------------------------------------------------------------#
+class Subject (Observable, Observer):
+    __slots__ = ('observers',)
+
+    def __init__ (self):
+        self.observers = []
+
+    #--------------------------------------------------------------------------#
+    # Observable Interface                                                     #
+    #--------------------------------------------------------------------------#
+    def Subscribe (self, observer):
+        self.observers.append (observer)
+        def dispose ():
+            try:
+                self.observers.remove (observer)
+            except ValueError: pass
+        return Disposable (dispose)
+
+    #--------------------------------------------------------------------------#
+    # Observer Interface                                                       #
+    #--------------------------------------------------------------------------#
+    def OnNext (self, value):
+        for observer in tuple (self.observers):
+            observer.OnNext (value)
+
+    def OnError (self, error):
+        for observer in tuple (self.observers):
+            observer.OnError (error)
+        del self.observers [:]
+
+    def OnCompleted (self):
+        for observer in tuple (self.observers):
+            observer.OnCompleted ()
+        del self.observers [:]
 
 from .utils import *
 # vim: nu ft=python columns=120 :
