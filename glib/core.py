@@ -9,11 +9,11 @@ from ..async.cancel import *
 
 from gi.repository import GLib
 
-__all__ = ('GtkCore',)
+__all__ = ('GCore',)
 #------------------------------------------------------------------------------#
-# Gtk Core                                                                     #
+# GLib Core                                                                    #
 #------------------------------------------------------------------------------#
-class GtkCore (object):
+class GCore (object):
     def __init__ (self, context = None):
         self.uids, self.futures = set (), set ()
 

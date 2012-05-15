@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 from .. import event
 
-__all__ = ('GtkEvent',)
+__all__ = ('GEvent',)
 #------------------------------------------------------------------------------#
-# GtkEvent                                                                     #
+# GObject Event                                                                #
 #------------------------------------------------------------------------------#
-class GtkEvent (event.BaseEvent):
+class GEvent (event.BaseEvent):
     __slots__ = ('source', 'name')
 
     def __init__ (self, source, name):
