@@ -40,12 +40,12 @@ class BaseEvent (object):
     #--------------------------------------------------------------------------#
     def Await (self):
         def cancel ():
-            self.Remove (handler_id)
             future.ErrorRaise (FutureCanceled ())
+            self.Remove (handler_id)
 
         def handler (*args):
-            self.Remove (handler_id)
             future.ResultSet (args)
+            self.Remove (handler_id)
 
         future     = Future (cancel = Cancel (cancel))
         handler_id = self.Add (handler)
