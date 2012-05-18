@@ -87,15 +87,24 @@ class LinkerService (Service):
         desc, self.desc = self.desc, self.desc + 1
 
         # dispose
-        target_dispose = members.get ('__exit__')
-        def dispose (this, et, eo, tb):
-            if target_dispose is not None:
-                result = target_dispose (et, eo, tb)
+        target_enter = members.get ('__enter__')
+        if target_enter:
+            def enter (this):
+                context = target_enter ()
+                if context is target:
+                    return this
+                return context
+            members ['__enter__'] = enter
+        else:
+            members ['__enter__'] = lambda this: this
+
+        target_exit = members.get ('__exit__')
+        def exit (this, et, eo, tb):
+            if target_exit is not None:
+                target_exit (et, eo, tb)
             self.local_d2r.pop (desc, None)
             return False
-        members ['__exit__'] = dispose
-        if '__enter__' not in members:
-            members ['__enter__'] = lambda this: this
+        members ['__exit__'] = exit
 
         # create reference
         ref = (type ('{0}_ref'.format (type (target).__name__), (Reference,), members)
@@ -177,13 +186,13 @@ class LinkerService (Service):
         members ['__setattr__'] = setter
 
         # dispose
-        ref_dispose = members.get ('__exit__', None)
-        def dispose (this, et, eo, tb):
-            if ref_dispose:
-                ref_dispose (this, et, eo, tb)
+        ref_exit = members.get ('__exit__', None)
+        def exit (this, et, eo, tb):
+            if ref_exit:
+                ref_exit (this, et, eo, tb)
             self.remote_d2r.pop (ref_desc, None)
             return False
-        members ['__exit__'] = dispose
+        members ['__exit__'] = exit
 
         # create reference
         ref = type ('%s_remote_ref' % info.name, (Reference, ), members) (REFERENCE_REMOTE, self, ref_desc, None)

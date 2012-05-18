@@ -28,6 +28,11 @@ class ForkDomainTests (unittest.TestCase):
         self.remote.value = 11
         self.assertEqual (self.remote.ValueGet (), 11)
 
+    def testContext (self):
+        value = self.remote.value
+        with self.remote as remote:
+            self.assertEqual (value + 1, remote.value)
+
     def testError (self):
         with self.assertRaises (SomeError):
             self.remote.Error ()
@@ -61,6 +66,7 @@ class ForkDomainTests (unittest.TestCase):
 class Remote (object):
     def __init__ (self, value):
         self.value = value
+        self.non_marshable = lambda: None # non marshable type
 
     def ValueGet (self):
         return self.value
@@ -78,6 +84,20 @@ class Remote (object):
 
     def Error (self):
         raise SomeError ()
+
+    #--------------------------------------------------------------------------#
+    # Disposable                                                               #
+    #--------------------------------------------------------------------------#
+    def Dispose (self):
+        pass
+
+    def __enter__ (self):
+        self.value += 1
+        return self
+
+    def __exit__ (self, et, eo, tb):
+        self.Dispose ()
+        return False
 
 class SomeError (Exception):
     pass
