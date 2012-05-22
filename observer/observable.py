@@ -38,16 +38,16 @@ class Observable (object):
 
         # create observer
         def onNext (value):
-            future.ResultSet (value)
             disposable.Dispose ()
+            future.ResultSet (value)
 
         def onError (error):
-            future.ErrorSet (error)
             disposable.Dispose ()
+            future.ErrorSet (error)
 
         def onCompleted ():
-            future.ErrorRaise (FutureError ('Observable has been completed'))
             disposable.Dispose ()
+            future.ErrorRaise (FutureError ('Observable has been completed'))
 
         disposable = self.Subscribe (AnonymousObserver (onNext, onError, onCompleted))
 
