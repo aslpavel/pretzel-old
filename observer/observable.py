@@ -106,6 +106,7 @@ class Observable (object):
                 context.worker.Cancel ()
                 if context.hasValue:
                     observer.OnNext (context.value)
+                observer.OnCompleted ()
 
             return CompositeDisposable (context.worker,
                 self.Subscribe (AnonymousObserver (onNext, onError, onCompleted)))
@@ -174,6 +175,7 @@ class Observable (object):
                 context.worker.Cancel ()
                 if context.hasValue:
                     observer.OnNext (context.value)
+                observer.OnCompleted ()
 
             return CompositeDisposable (context.worker,
                 self.Subsctibe (AnonymousObserver (onNext, onError, onCompleted)))
