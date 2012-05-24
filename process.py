@@ -52,7 +52,7 @@ class Process (object):
                 os.kill (os.getpid (), signal.SIGKILL)
 
     #--------------------------------------------------------------------------#
-    # Properites                                                               #
+    # Properties                                                               #
     #--------------------------------------------------------------------------#
     @property
     def Stdin (self):
