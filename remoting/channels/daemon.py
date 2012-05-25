@@ -3,6 +3,7 @@ import sys
 import os
 import socket
 import errno
+import traceback
 import binascii
 
 from .file import *
@@ -54,6 +55,8 @@ class DaemonChannel (FileChannel):
 
                 # exec
                 os.execvp (sys.executable, [sys.executable, '-'])
+            except Exception:
+                traceback.print_exc ()
             finally:
                 sys.exit (1)
 

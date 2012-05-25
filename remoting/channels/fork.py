@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+import traceback
 
 from ..bootstrap import *
 from .file import *
@@ -38,6 +39,8 @@ class ForkChannel (FileChannel):
                 os.close (lr), os.close (lw), os.close (payload_out)
                 os.dup2 (payload_in, 0)
                 os.execvp (self.command [0], self.command)
+            except Exception:
+                traceback.print_exc ()
             finally:
                 sys.exit (1)
 

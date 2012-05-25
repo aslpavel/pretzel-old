@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
+import traceback
 
 from ..bootstrap import *
 from .file import *
@@ -56,6 +57,8 @@ class SSHChannel (FileChannel):
                 sys.stdout.close ()
                 os.dup2 (rw, 1)
                 os.execvp (self.command [0], self.command)
+            except Exception:
+                traceback.print_exc ()
             finally:
                 sys.exit (1)
 
