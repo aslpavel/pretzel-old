@@ -76,7 +76,8 @@ def main ():
     domains = import_module (".domains.fork", remoting_name)
 
     with async.Core () as core:
-        domains.ForkRemoteDomain (core, {rr}, {rw})
+        domain = domains.ForkRemoteDomain (core, {rr}, {rw})
+        domain.Channel.OnStop.Add (lambda future: core.Stop ())
 
 if __name__ == "__main__":
     main ()

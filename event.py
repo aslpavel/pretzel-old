@@ -94,7 +94,9 @@ class AsyncEvent (Event):
     @Async
     def __call__ (self, *args, **keys):
         for handler in tuple (self.handlers):
-            yield handler (*args, **keys)
+            future = handler (*args, **keys)
+            if isinstance (future, BaseFuture):
+                yield future
 
 #------------------------------------------------------------------------------#
 # Delegated Event                                                              #

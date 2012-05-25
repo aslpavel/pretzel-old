@@ -19,8 +19,8 @@ class SSHDomain (LocalDomain):
 class SSHRemoteDomain (RemoteDomain):
     def __init__ (self, core):
         # create channel
-        channel = FileChannel (core)
-        channel.in_file = core.AsyncFileCreate (0, closefd = True)
+        channel          = FileChannel (core)
+        channel.in_file  = core.AsyncFileCreate (0, closefd = True)
         channel.out_file = core.AsyncFileCreate (1, closefd = True)
 
         RemoteDomain.__init__ (self, channel, run = True)

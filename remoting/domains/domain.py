@@ -41,6 +41,17 @@ class Domain (object):
         return self.channel.IsRunning
 
     #--------------------------------------------------------------------------#
+    # Properties                                                               #
+    #--------------------------------------------------------------------------#
+    @property
+    def Channel (self):
+        return self.channel
+
+    @property
+    def Services (self):
+        return self.services
+
+    #--------------------------------------------------------------------------#
     # Attribute                                                                #
     #--------------------------------------------------------------------------#
     def __getattr__ (self, attr):

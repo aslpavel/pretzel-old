@@ -87,7 +87,8 @@ def main ():
     domains = import_module (".domains.ssh", remoting_name)
 
     with async.Core () as core:
-        domains.SSHRemoteDomain (core)
+        domain = domains.SSHRemoteDomain (core)
+        domain.Channel.OnStop.Add (lambda future: core.Stop ())
 
 if __name__ == "__main__":
     sys.stdout = sys.stderr
