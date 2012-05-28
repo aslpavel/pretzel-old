@@ -108,8 +108,6 @@ class Process (object):
 # Call Process                                                                 #
 #------------------------------------------------------------------------------#
 def ProcessCall (core, command, input = None, environ = None, check = None, buffer_size = None):
-    buffer_size = default_buffer_size if buffer_size is None else buffer_size
-
     # helper
     def processCall ():
         with Process (core, command, environ, check, buffer_size) as proc:
