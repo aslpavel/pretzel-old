@@ -12,9 +12,10 @@ def load_tests (loader, tests, pattern):
     from . import log
     from . import remoting
     from . import observer
+    from . import fs
 
     suite = TestSuite ()
-    for test in (tests, async, log, udb, remoting, observer):
+    for test in (tests, async, log, udb, remoting, observer, fs):
         suite.addTests (loader.loadTestsFromModule (test))
 
     return suite
