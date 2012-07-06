@@ -188,15 +188,12 @@ class FileMonitorWatch (object):
 
     @Async
     def Changed (self):
-        try:
-            changed, deleted = self.OnChanged.Await (), self.OnDeleted.Await ()
-            future = yield AnyFuture (changed, deleted)
-            if future is deleted:
-                raise FileMonitorError ('Watch has been deleted')
+        changed, deleted = self.OnChanged.Await (), self.OnDeleted.Await ()
+        future = yield AnyFuture (changed, deleted)
+        if future is deleted:
+            raise FileMonitorError ('Watch has been deleted')
 
-            AsyncReturn (changed.Result ())
-        except FutureCanceled:
-            self.Dispose ()
+        AsyncReturn (changed.Result ())
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
