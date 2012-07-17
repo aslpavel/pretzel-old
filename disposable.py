@@ -105,15 +105,13 @@ class MutableDisposable (BaseDisposable):
 # Composite Disposable                                                         #
 #------------------------------------------------------------------------------#
 class CompositeDisposable (BaseDisposable):
-    __slots__ = ('disposed', 'disposables')
+    __slots__ = ('disposables',)
 
     def __init__ (self, *disposables):
-        self.disposed = False
         self.disposables = []
         try:
             for disposable in disposables:
-                disposable.__enter__ ()
-                self.disposables.append (disposable)
+                self.Add (disposable)
         except Exception:
             self.Dispose ()
             raise
@@ -123,7 +121,7 @@ class CompositeDisposable (BaseDisposable):
     #--------------------------------------------------------------------------#
     def Add (self, disposable):
         disposable.__enter__ ()
-        if self.disposed:
+        if self.disposables is None:
             disposable.__exit__ (None, None, None)
         else:
             self.disposables.append (disposable)
@@ -133,6 +131,9 @@ class CompositeDisposable (BaseDisposable):
         return self
 
     def Remove (self, disposable):
+        if self.disposables is None:
+            return
+
         self.disposables.remove (disposable)
         disposable.__exit__ (None, None, None)
 
@@ -144,18 +145,19 @@ class CompositeDisposable (BaseDisposable):
     # Dispose                                                                  #
     #--------------------------------------------------------------------------#
     def Dispose (self):
-        if not self.disposed:
-            self.disposed = True
-            for disposable in reversed (self.disposables):
-                disposable.__exit__ (None, None, None)
-            del self.disposables [:]
+        if self.disposables is None:
+            return
+
+        disposables, self.disposables = self.disposables, None
+        for disposable in reversed (disposables):
+            disposable.__exit__ (None, None, None)
 
     #--------------------------------------------------------------------------#
     # Status                                                                   #
     #--------------------------------------------------------------------------#
     def IsDisposed (self):
-        return self.disposed
+        return self.disposables is None
 
     def __len__ (self):
-        return len (self.disposables)
+        return len (self.disposables) if self.disposables else 0
 # vim: nu ft=python columns=120 :
