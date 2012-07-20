@@ -64,7 +64,10 @@ class SSHChannel (FileChannel):
 
         # set files
         self.in_file = self.core.AsyncFileCreate (lr, closefd = True)
+        self.in_file.CloseOnExec (True)
+
         self.out_file = self.core.AsyncFileCreate (lw, closefd = True)
+        self.out_file.CloseOnExec (True)
 
         yield FileChannel.run (self)
 

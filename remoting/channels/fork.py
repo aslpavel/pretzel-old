@@ -44,16 +44,19 @@ class ForkChannel (FileChannel):
             finally:
                 sys.exit (1)
 
+        # set files
+        self.in_file = self.core.AsyncFileCreate (lr, closefd = True)
+        self.in_file.CloseOnExec (True)
+
+        self.out_file = self.core.AsyncFileCreate (lw, closefd = True)
+        self.out_file.CloseOnExec (True)
+
         # send payload
         try:
             os.write (payload_out, payload.format (bootstrap = FullBootstrap (),
                 remoting_name = remoting_name, rr = rr, rw =rw).encode ())
         finally:
             os.close (payload_out)
-
-        # set files
-        self.in_file = self.core.AsyncFileCreate (lr, closefd = True)
-        self.out_file = self.core.AsyncFileCreate (lw, closefd = True)
 
         yield FileChannel.run (self)
 
