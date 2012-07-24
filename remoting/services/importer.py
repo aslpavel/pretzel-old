@@ -156,7 +156,10 @@ class ImportService (Service):
         module.__file__   = file
         module.__loader__ = self
         if is_package:
-            module.__path__ = [self.tag]
+            module.__path__    = [self.tag]
+            module.__package__ = name
+        else:
+            module.__package__ = name.rpartition('.')[0]
 
         sys.modules [name] = module
         try:
