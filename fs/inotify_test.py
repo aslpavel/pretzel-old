@@ -24,7 +24,7 @@ class FileMonitorInotifyTest (unittest.TestCase):
                 dispose += file_monitor
 
                 # watch
-                file_watch = file_monitor.Watch (stream.name, IN_CLOSE_NOWRITE)
+                file_watch = file_monitor.Watch (stream.name, FM_CLOSE_NOWRITE)
                 dispose += file_watch
 
                 # init
@@ -39,7 +39,7 @@ class FileMonitorInotifyTest (unittest.TestCase):
                 # check
                 self.assertTrue  (stream.closed, 'File was not closed')
                 self.assertEqual (result, changed, 'Test timeouted')
-                self.assertTrue  (result, result.Result () [1] & IN_CLOSE_NOWRITE)
+                self.assertTrue  (result, result.Result () [1] & FM_CLOSE_NOWRITE)
 
         with Core () as core:
             main_future = main (core)

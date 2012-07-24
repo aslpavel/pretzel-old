@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import errno
 import struct
 import ctypes
 import ctypes.util
@@ -51,40 +52,42 @@ class InotifyImpl (object):
 #------------------------------------------------------------------------------#
 # Flags                                                                        #
 #------------------------------------------------------------------------------#
-flags = {
-    'IN_ACCESS'       : (0x00000001, 'file was accessed'),
-    'IN_MODIFY'       : (0x00000002, 'file was modified'),
-    'IN_ATTRIB'       : (0x00000004, 'metadata changed'),
-    'IN_CLOSE_WRITE'  : (0x00000008, 'writable file was closed'),
-    'IN_CLOSE_NOWRITE': (0x00000010, 'unwritable file closed'),
-    'IN_OPEN'         : (0x00000020, 'file was opened'),
-    'IN_MOVED_FROM'   : (0x00000040, 'file was moved from X'),
-    'IN_MOVED_TO'     : (0x00000080, 'file was moved to Y'),
-    'IN_CREATE'       : (0x00000100, 'subfile was created'),
-    'IN_DELETE'       : (0x00000200, 'subfile was deleted'),
-    'IN_DELETE_SELF'  : (0x00000400, 'self was deleted'),
-    'IN_MOVE_SELF'    : (0x00000800, 'self was moved'),
+inotify_flags = {
+    'FM_ACCESS'       : (0x00000001, 'access'),
+    'FM_MODIFY'       : (0x00000002, 'modify'),
+    'FM_ATTRIB'       : (0x00000004, 'attrib'),
+    'FM_CLOSE_WRITE'  : (0x00000008, 'close_write'),
+    'FM_CLOSE_NOWRITE': (0x00000010, 'close_nowrite'),
+    'FM_OPEN'         : (0x00000020, 'open'),
+    'FM_MOVED_FROM'   : (0x00000040, 'moved_from'),
+    'FM_MOVED_TO'     : (0x00000080, 'moved_to'),
+    'FM_CREATE'       : (0x00000100, 'create'),
+    'FM_DELETE'       : (0x00000200, 'delete'),
+    'FM_DELETE_SELF'  : (0x00000400, 'delete_self'),
+    'FM_MOVE_SELF'    : (0x00000800, 'move_self'),
 
-    'IN_ONLYDIR'      : (0x01000000, 'only watch the path if it is a directory'),
-    'IN_DONT_FOLLOW'  : (0x02000000, 'don\'t follow a sym link'),
-    'IN_EXCL_UNLINK'  : (0x04000000, 'exclude events on unlinked objects'),
-    'IN_MASK_ADD'     : (0x20000000, 'add to the mask of an already existing watch'),
-    'IN_ONESHOT'      : (0x80000000, 'only send event once'),
+    'FM_ONLYDIR'      : (0x01000000, 'onlydir'),
+    'FM_DONT_FOLLOW'  : (0x02000000, 'dont_follow'),
+    'FM_EXCL_UNLINK'  : (0x04000000, 'excl_unlink'),
+    'FM_MASK_ADD'     : (0x20000000, 'mask_add'),
+    'FM_ONESHOT'      : (0x80000000, 'oneshot'),
 
     # out only flags
-    'IN_UNMOUNT'      : (0x00002000, 'backing fs was unmounted'),
-    'IN_Q_OVERFLOW'   : (0x00004000, 'event queued overflowed'),
-    'IN_IGNORED'      : (0x00008000, 'file was ignored'),
-    'IN_ISDIR'        : (0x40000000, 'event occurred against dir'),
+    'FM_UNMOUNT'      : (0x00002000, 'unmount'),
+    'FM_Q_OVERFLOW'   : (0x00004000, 'overflow'),
+    'FM_IGNORED'      : (0x00008000, 'ignored'),
+    'FM_ISDIR'        : (0x40000000, 'isdir'),
 }
 
 # combined flags
-flags ['IN_MOVE'] = (flags ['IN_MOVED_FROM'][0] | flags ['IN_MOVED_TO'][0], 'file was moved')
-flags ['IN_CLOSE'] = (flags ['IN_CLOSE_WRITE'][0] | flags ['IN_CLOSE_NOWRITE'][0], 'file was closed')
+inotify_flags ['FM_MOVE'] = (inotify_flags ['FM_MOVED_FROM'][0] | inotify_flags ['FM_MOVED_TO'][0], 'moved')
+inotify_flags ['FM_CLOSE'] = (inotify_flags ['FM_CLOSE_WRITE'][0] | inotify_flags ['FM_CLOSE_NOWRITE'][0], 'closed')
 
-for name, desc in flags.items ():
+inotify_flag_to_name = {}
+for name, desc in inotify_flags.items ():
+    inotify_flag_to_name [desc [0]] = desc [1]
     globals () [name] = desc [0]
-__all__.extend (flags)
+__all__.extend (inotify_flags)
 
 #------------------------------------------------------------------------------#
 # File Monitor                                                                 #
@@ -109,7 +112,7 @@ class FileMonitor (object):
     #--------------------------------------------------------------------------#
     # Methods                                                                  #
     #--------------------------------------------------------------------------#
-    def Watch (self, path, mask = None):
+    def Watch (self, path, mask):
         if self.worker is None or self.worker.IsCompleted ():
             raise FileMonitorError ('worker is dead')
 
@@ -120,7 +123,12 @@ class FileMonitor (object):
         watch = FileMonitorWatch (self, desc, path)
         self.watches [desc] = watch
         return watch
-    
+
+    @staticmethod
+    def FlagsToNames (flags):
+        return tuple (inotify_flag_to_name [1 << bit]
+            for bit in range (flags.bit_length ()) if flags & (1 << bit))
+
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
@@ -133,7 +141,7 @@ class FileMonitor (object):
 
     def __enter__ (self):
         return self
-    
+
     def __exit__ (self, et, eo, tb):
         self.Dispose ()
         return False
@@ -172,10 +180,10 @@ class FileMonitor (object):
 class FileMonitorWatch (object):
     def __init__ (self, monitor, desc, path):
         self.monitor = monitor
-        self.desc = desc
-        self.path = path
-        self.disposed = False
+        self.desc    = desc
+        self.path    = path
 
+        self.disposed = False
         self.OnChanged = Event ()
         self.OnDeleted = Event ()
 
@@ -204,12 +212,16 @@ class FileMonitorWatch (object):
             try:
                 self.monitor.watches.pop (self.desc, None)
                 self.monitor.inotify_impl.rm_watch (self.monitor.fd, self.desc)
+            except OSError as error:
+                # watch has been removed by ignore event
+                if error.errno != errno.EINVAL:
+                    raise
             finally:
                 self.OnDeleted (self)
-    
+
     def __enter__ (self):
         return self
-    
+
     def __exit__ (self, et, eo, tb):
         self.Dispose ()
         return False
