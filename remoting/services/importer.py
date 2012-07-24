@@ -163,12 +163,10 @@ class ImportService (Service):
 
         sys.modules [name] = module
         try:
-            code = compile (source, module.__file__, 'exec')
-            Exec (code, module.__dict__)
-
+            Exec (compile (source, module.__file__, 'exec'), module.__dict__)
             return module
         except Exception:
-            del sys.modules [name]
+            sys.modules.pop (name, None)
             raise
 
     def info (self, name):
