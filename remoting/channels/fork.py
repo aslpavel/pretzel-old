@@ -3,11 +3,11 @@ import sys
 import os
 import traceback
 
-from ..bootstrap import *
 from .file import *
 from .channel import *
 from .. import __name__ as remoting_name
 from ...async import *
+from ...bootstrap import *
 
 __all__ = ('ForkChannel',)
 #-----------------------------------------------------------------------------#
@@ -53,7 +53,7 @@ class ForkChannel (FileChannel):
 
         # send payload
         try:
-            os.write (payload_out, payload.format (bootstrap = FullBootstrap (),
+            os.write (payload_out, payload.format (bootstrap = BootstrapModule (),
                 remoting_name = remoting_name, rr = rr, rw =rw).encode ())
         finally:
             os.close (payload_out)

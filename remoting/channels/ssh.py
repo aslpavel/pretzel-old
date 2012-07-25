@@ -3,11 +3,11 @@ import sys
 import os
 import traceback
 
-from ..bootstrap import *
 from .file import *
 from .channel import *
 from .. import __name__ as remoting_name
 from ...async import *
+from ...bootstrap import *
 
 __all__ = ('SSHChannel',)
 #------------------------------------------------------------------------------#
@@ -31,7 +31,7 @@ class SSHChannel (FileChannel):
         if port is not None:
             self.command.extend (('-p', port))
         self.command.extend (('-c', '\'{0}\''.format (payload.format (
-            bootstrap = FullBootstrap (), remoting_name = remoting_name))))
+            bootstrap = BootstrapModule (), remoting_name = remoting_name))))
 
         FileChannel.__init__ (self, core)
 

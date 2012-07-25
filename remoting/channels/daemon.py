@@ -9,10 +9,10 @@ import binascii
 from .file import *
 from .channel import *
 from ..domains.pair import *
-from ..bootstrap import *
 from .. import __name__ as remoting_name
 from ...async import *
 from ...event import *
+from ...bootstrap import *
 
 __all__ = ('DaemonChannel',)
 #------------------------------------------------------------------------------#
@@ -63,7 +63,7 @@ class DaemonChannel (FileChannel):
         # send payload
         try:
             path_base64 = binascii.b2a_base64 (self.path.encode ('utf-8')).strip ().decode ('utf-8')
-            os.write (payload_out, payload.format (bootstrap = FullBootstrap (), remoting_name = remoting_name,
+            os.write (payload_out, payload.format (bootstrap = BootstrapModule (), remoting_name = remoting_name,
                 path = path_base64, ready_out = ready_out).encode ())
         finally:
             os.close (payload_out)

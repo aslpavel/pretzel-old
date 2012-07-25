@@ -13,7 +13,7 @@ class Domain (object):
         self.services = services
         self.disposable  = Disposable ()
 
-        if True if run is None else run:
+        if run:
             ~self.Run ()
 
     #--------------------------------------------------------------------------#

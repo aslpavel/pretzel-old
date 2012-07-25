@@ -5,11 +5,11 @@ import types
 from importlib import import_module
 
 from .domain import *
-from ..bootstrap.cage import *
 from ..services.linker import *
 from ..services.importer import *
 from ..services.persist import *
 from ...async import *
+from ...bootstrap import *
 
 __all__ = ('LocalDomain', 'RemoteDomain')
 #------------------------------------------------------------------------------#
@@ -49,16 +49,20 @@ class LocalDomain (Domain):
             raise DomainError ('__main__ file cannot be determined')
 
         # push main
-        package_name = getattr (main, '__package__', None)
-        if package_name is None or len (package_name) == 0:
+        pkgname = getattr (main, '__package__', None)
+        if pkgname:
+            # __main__ is a part of a package
+            tomb = None
+            topname = pkgname.split ('.') [0]
+            if topname != __name__.split ('.') [0]:
+                # __main__ is not a part of this package
+                tomb = Tomb ()
+                tomb.Add (sys.modules [topname])
+            yield self.linker.Call.Async (tomb_push, pkgname, tomb)
+
+        else:
             with open (main.__file__, 'rb') as stream:
                 yield self.importer.PushModule.Async ('_remote_main', stream.read (), main.__file__)
-        else:
-            # __main__ is a part of a package
-            package = sys.modules [package_name]
-            cage = CageBuilder ()
-            cage.AddPath (os.path.dirname (package.__file__))
-            yield self.linker.Call.Async (cage_push, package_name, cage.ToBytes ())
 
         # persistence
         module_persist (self.persist, '__main__')
@@ -90,9 +94,12 @@ def module_persist (persist, module_name):
         if isinstance (value, (type, types.FunctionType)):
             persist += value
 
-def cage_push (package_name, data):
-    if sys.modules.get ('_remote_main') is not None:
+def tomb_push (name, tomb):
+    if '_remote_main' in sys.modules:
         return
-    sys.meta_path.append (Cage (data))
-    sys.modules ['_remote_main'] = import_module ('{}.__main__'.format (package_name))
+
+    if tomb:
+        sys.meta_path.insert (0, tomb)
+
+    sys.modules ['_remote_main'] = import_module ('{}.__main__'.format (name))
 # vim: nu ft=python columns=120 :

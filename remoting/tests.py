@@ -9,7 +9,7 @@ from ..async import *
 #-----------------------------------------------------------------------------#
 class ForkDomainTests (unittest.TestCase):
     def setUp (self):
-        self.domain = ForkDomain (Core (), push_main = False)
+        self.domain = ForkDomain (Core (), run = True, push_main = False)
         self.remote = self.domain.InstanceCreate (Remote, 10)
 
     def tearDown (self):
@@ -60,6 +60,16 @@ class ForkDomainTests (unittest.TestCase):
         self.assertNotEqual (self.domain.Call (GetId, self.domain),
             id (self.domain))
 
+    def testNestedDomain (self):
+        import os
+        local_pid  = os.getpid ()
+        remote_pid = self.domain.Call (os.getpid)
+        nested_pid = self.remote.NestedCall (self.domain.channel.core, os.getpid)
+
+        self.assertNotEqual (local_pid, remote_pid)
+        self.assertNotEqual (local_pid, nested_pid)
+        self.assertNotEqual (remote_pid, nested_pid)
+
 #-----------------------------------------------------------------------------#
 # Helpers                                                                     #
 #-----------------------------------------------------------------------------#
@@ -84,6 +94,10 @@ class Remote (object):
 
     def Error (self):
         raise SomeError ()
+
+    def NestedCall (self, core, func, *args, **keys):
+        with ForkDomain (core, run = True, push_main = False) as domain:
+            return domain.Call (func, *args, **keys)
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
