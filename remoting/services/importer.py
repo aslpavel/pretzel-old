@@ -33,10 +33,10 @@ class ImportService (Service):
             (PORT_IMPORT_PUSH, self.port_PUSH)
         ])
 
-        self.infos    = {}
         self.locked   = False
         self.override = override
         self.tag      = '{}{}'.format (id (self), time.time ())
+        self.containments = {}
 
         def on_attach (channel):
             if insert_path:
@@ -44,7 +44,7 @@ class ImportService (Service):
         self.OnAttach += on_attach
 
         def on_detach (channel):
-            self.infos.clear ()
+            self.containments.clear ()
             if insert_path:
                 sys.meta_path.remove (self)
         self.OnDetach += on_detach
@@ -57,7 +57,7 @@ class ImportService (Service):
             # inside package but it is imported with different loader
             return
 
-        if name in self.infos:
+        if name in self.containments:
             # previously found
             return self
 
@@ -78,11 +78,11 @@ class ImportService (Service):
                 return None
 
         # remote import
-        info = ~self.channel.Request (PORT_IMPORT_LOAD, name = name, path = path)
-        if info.source is None:
+        response = ~self.channel.Request (PORT_IMPORT_LOAD, name = name, path = path)
+        if response.source is None:
             return None
 
-        self.infos [name] = info
+        self.containments [name] = response.source, response.filename, response.ispkg
         return self
 
     #--------------------------------------------------------------------------#
@@ -93,8 +93,8 @@ class ImportService (Service):
         if module is not None:
             return module
 
-        info = self.info (name)
-        return self.load (name, zlib.decompress (info.source), info.file, info.is_package)
+        source, filename, ispkg = self.containment (name)
+        return self.load (name, zlib.decompress (source), filename, ispkg)
 
     # data
     def get_data (self, path):
@@ -102,22 +102,22 @@ class ImportService (Service):
 
     # introspect
     def is_package (self, name):
-        return self.info (name).is_package
+        return self.containment (name) [2]
 
     def get_code (self, name):
-        info = self.info (name)
-        return compile (zlib.decompress (info.source), info.file, 'exec')
+        source, filename, ispkg = self.containment (name)
+        return compile (zlib.decompress (source), filename, 'exec')
 
     def get_source (self, name):
-        return zlib.decompress (self.info (name).source).decode ('utf-8')
+        return zlib.decompress (self.containment (name) [0]).decode ('utf-8')
 
     #--------------------------------------------------------------------------#
     # Service's Methods                                                        #
     #--------------------------------------------------------------------------#
     @Delegate
-    def PushModule (self, name, source, file):
+    def PushModule (self, name, source, filename):
         return self.channel.Request (PORT_IMPORT_PUSH, name = name, source = zlib.compress (source),
-            file = file, is_package = False)
+            filename = filename, ispkg = False)
 
     #--------------------------------------------------------------------------#
     # Ports Handlers                                                           #
@@ -125,37 +125,36 @@ class ImportService (Service):
     @DummyAsync
     def port_LOAD (self, request):
         # python 2.7 bug in pkgutil.get_loader
-        if sys.modules.get (request.name) is None:
+        if sys.modules.get (request.name, False) is None:
             return request.Result (source = None)
 
         loader = pkgutil.get_loader (request.name)
-        if (loader is None or                    # loader is not found
-            not hasattr (loader, 'get_source')): # get_source is not available
-                return request.Result (source = None)
+        if loader is None or not hasattr (loader, 'get_source'):
+            return request.Result (source = None)
 
         source = loader.get_source (request.name)
         if source is None:
             return request.Result (source = None)
 
         return request.Result (source = zlib.compress (source.encode ('utf-8')),
-            is_package = loader.is_package (request.name), file = '<ImportService \'{}\'>'.format (request.name))
+            ispkg = loader.is_package (request.name), filename = 'file:{}'.format (request.name))
 
     @DummyAsync
     def port_PUSH (self, request):
         if request.name not in sys.modules:
-            self.load (request.name, zlib.decompress (request.source), request.file)
-            self.infos [request.name] = request
+            self.load (request.name, zlib.decompress (request.source), request.filename)
+            self.containments [request.name] = request.source, request.filename, request.ispkg
 
         return request.Result ()
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
-    def load (self, name, source, file, is_package = False):
+    def load (self, name, source, filename, ispkg = False):
         module = imp.new_module (name)
-        module.__file__   = file
+        module.__file__   = filename
         module.__loader__ = self
-        if is_package:
+        if ispkg:
             module.__path__    = [self.tag]
             module.__package__ = name
         else:
@@ -169,10 +168,10 @@ class ImportService (Service):
             sys.modules.pop (name, None)
             raise
 
-    def info (self, name):
-        info = self.infos.get (name)
-        if info is None:
+    def containment (self, name):
+        containment = self.containments.get (name)
+        if containment is None:
             raise ImportError ('Can\'t find module \'{}\''.format (name))
-        return info
+        return containment
 
 # vim: nu ft=python columns=120 :

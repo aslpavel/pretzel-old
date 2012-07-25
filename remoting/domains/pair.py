@@ -2,6 +2,7 @@
 import os
 import sys
 import types
+import inspect
 from importlib import import_module
 
 from .domain import *
@@ -61,8 +62,9 @@ class LocalDomain (Domain):
             yield self.linker.Call.Async (tomb_push, pkgname, tomb)
 
         else:
-            with open (main.__file__, 'rb') as stream:
-                yield self.importer.PushModule.Async ('_remote_main', stream.read (), main.__file__)
+            yield self.importer.PushModule.Async ('_remote_main',
+                inspect.getsource (main).encode ('utf-8'),
+                inspect.getsourcefile (main))
 
         # persistence
         module_persist (self.persist, '__main__')

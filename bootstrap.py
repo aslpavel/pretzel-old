@@ -53,8 +53,7 @@ class Tomb (object):
                         self.containments ['.'.join ((name, file [:-3]))] = source, filename, False 
         else:
             with open (filename, 'rb') as stream:
-                source = stream.read ()
-            self.containments [modname] = source, filename, False
+                self.containments [modname] = stream.read (), filename, False
 
     def __iadd__ (self, module):
         self.Add (module)
