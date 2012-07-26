@@ -70,9 +70,16 @@ class Benchmark (object):
 #------------------------------------------------------------------------------#
 # Main                                                                         #
 #------------------------------------------------------------------------------#
+output_template = """
+  Type       Total   Per Call   Calls/Sec
+  ---------  ------  ---------  --------
+  Method   : {0:6<.3f}s  {1:6<.6f}s  {2}
+  Function : {3:6<.3f}s  {4:6<.6f}s  {5}
+"""
+
 @Async
 def Main (app):
-    with ForkDomain (app.Core, run = False) as domain:
+    with ForkDomain (app.Core) as domain:
         started = time.time ()
         with app.Log.Pending ('Domain Start'):
             yield domain.Run ()
@@ -91,13 +98,9 @@ def Main (app):
 
     # output result
     app.Log.Info ('Count:{0} Elapsed:{1:.1f}s'.format (Count, stopped - started))
-
-    print ('\n  Type       Total   Per Call   Calls/Sec')
-    print ('  ---------  ------  ---------  --------')
-    print (('  Method   : {0:6<.3f}s  {1:6<.6f}s  {2}'
-        .format (method_bench.Elapsed, method_bench.Elapsed / Count, int (Count / method_bench.Elapsed))))
-    print (('  Function : {0:6<.3f}s  {1:6<.6f}s  {2}\n'
-        .format (func_bench.Elapsed, func_bench.Elapsed / Count, int (Count / func_bench.Elapsed))))
+    print (output_template.format (
+        method_bench.Elapsed, method_bench.Elapsed / Count, int (Count / method_bench.Elapsed),
+        func_bench.Elapsed,   func_bench.Elapsed / Count,   int (Count / func_bench.Elapsed)))
 
 #------------------------------------------------------------------------------#
 # Entry Point                                                                  #

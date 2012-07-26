@@ -45,7 +45,8 @@ class LocalDomain (Domain):
         if not self.channel.IsRunning:
             raise DomainError ('channel is not running')
 
-        main = sys.modules ['__main__']
+        mainname = '_remote_main' if '_remote_main' in sys.modules else '__main__'
+        main     = sys.modules [mainname]
         if getattr (main, '__file__', None) is None:
             raise DomainError ('__main__ file cannot be determined')
 
@@ -67,7 +68,7 @@ class LocalDomain (Domain):
                 inspect.getsourcefile (main))
 
         # persistence
-        module_persist (self.persist, '__main__')
+        module_persist (self.persist, mainname)
         yield self.linker.Call.Async (module_persist, self.persist, '_remote_main')
 
 #------------------------------------------------------------------------------#

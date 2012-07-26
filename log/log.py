@@ -222,7 +222,9 @@ class PendingEvent (ProgressEvent):
         if self.observables is None:
             raise RuntimeError ('Pending event has already been completed')
 
+        self.end_time = time.time ()
         observables, self.observables = self.observables, None
+
         if error is None:
             self.value = True
             for observable in observables:

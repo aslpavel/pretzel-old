@@ -31,13 +31,21 @@ class ForkChannel (FileChannel):
         # create child
         self.pid = os.fork ()
         if self.pid:
-            # parent process
-            os.close (rr), os.close (rw), os.close (payload_in)
+            # parent
+            os.close (rr)
+            os.close (rw)
+            os.close (payload_in)
+
         else:
+            # child
             try:
-                # child
-                os.close (lr), os.close (lw), os.close (payload_out)
+                os.close (lr)
+                os.close (lw)
+                os.close (payload_out)
+
                 os.dup2 (payload_in, 0)
+                os.close (payload_in)
+
                 os.execvp (self.command [0], self.command)
             except Exception:
                 traceback.print_exc ()
@@ -61,10 +69,7 @@ class ForkChannel (FileChannel):
         yield FileChannel.run (self)
 
         # wait for child
-        @DummyAsync
-        def wait_child ():
-            os.waitpid (self.pid, 0)
-        self.OnStop += wait_child
+        self.OnStop += lambda: os.waitpid (self.pid, 0)
 
 #-----------------------------------------------------------------------------#
 # Payload Pattern                                                             #
@@ -83,7 +88,7 @@ def main ():
 
     with async.Core () as core:
         domain = domains.ForkRemoteDomain (core, {rr}, {rw})
-        domain.Channel.OnStop.Add (lambda future: core.Stop ())
+        domain.Channel.OnStop += core.Stop
 
 if __name__ == "__main__":
     main ()

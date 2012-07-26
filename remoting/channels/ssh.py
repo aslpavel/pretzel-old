@@ -47,15 +47,24 @@ class SSHChannel (FileChannel):
         # create child
         self.pid = os.fork ()
         if self.pid:
-            os.close (rr), os.close (rw)
+            # parent
+            os.close (rr)
+            os.close (rw)
+
         else:
+            # child
             try:
-                # child
-                os.close (lr), os.close (lw)
+                os.close (lr)
+                os.close (lw)
+
                 sys.stdin.close ()
                 os.dup2 (rr, 0)
+                os.close (rr)
+
                 sys.stdout.close ()
                 os.dup2 (rw, 1)
+                os.close (rw)
+
                 os.execvp (self.command [0], self.command)
             except Exception:
                 traceback.print_exc ()
@@ -72,10 +81,7 @@ class SSHChannel (FileChannel):
         yield FileChannel.run (self)
 
         # wait for child
-        @DummyAsync
-        def wait_child ():
-            os.waitpid (self.pid, 0)
-        self.OnStop += wait_child
+        self.OnStop += lambda: os.waitpid (self.pid, 0)
 
 #------------------------------------------------------------------------------#
 # Payload Pattern                                                              #
@@ -94,7 +100,7 @@ def main ():
 
     with async.Core () as core:
         domain = domains.SSHRemoteDomain (core)
-        domain.Channel.OnStop.Add (lambda future: core.Stop ())
+        domain.Channel.OnStop += core.Stop
 
 if __name__ == "__main__":
     sys.stdout = sys.stderr

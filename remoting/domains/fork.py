@@ -18,8 +18,12 @@ class ForkRemoteDomain (RemoteDomain):
     def __init__ (self, core, rr, rw):
         # create channel
         channel = FileChannel (core)
+
         channel.in_file = core.AsyncFileCreate (rr, closefd = True)
+        channel.in_file.CloseOnExec (True)
+
         channel.out_file = core.AsyncFileCreate (rw, closefd = True)
+        channel.out_file.CloseOnExec (True)
 
         RemoteDomain.__init__ (self, channel, run = True)
 
