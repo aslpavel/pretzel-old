@@ -1,79 +1,78 @@
 # -*- coding: utf-8 -*-
-from ...disposable import *
-from ...async import *
+import collections
 
-__all__ = ('Domain', 'DomainError')
+from ...async import *
+from ...disposable import *
+
+__all__ = ('Domain', 'DomainError',)
 #------------------------------------------------------------------------------#
 # Domain                                                                       #
 #------------------------------------------------------------------------------#
 class DomainError (Exception): pass
 class Domain (object):
-    def __init__ (self, channel, services, run = None):
-        self.channel = channel
-        self.services = services
-        self.disposable  = Disposable ()
+    def __init__ (self, channel, services):
+        self.channel  = channel
+        self.services = collections.OrderedDict ((service.NAME, service) for service in services)
 
-        if run:
-            ~self.Run ()
+        self.exports   = {}
+        self.dispose   = CompositeDisposable ()
 
     #--------------------------------------------------------------------------#
-    # Task Interface                                                           #
+    # Methods                                                                  #
+    #--------------------------------------------------------------------------#  
+    def ServiceByName (self, name):
+        service = self.services.get (name)
+        if service is None:
+            raise DomainError ('No such service: \'{}\''.format (name))
+        return service
+
+    #--------------------------------------------------------------------------#
+    # Connect                                                                  #
     #--------------------------------------------------------------------------#
     @Async
-    def Run (self):
-        self.disposable.Dispose ()
-        self.disposable  = CompositeDisposable (self.channel)
-        error = False
-        try:
-            for service in self.services:
-                self.disposable += service.Attach (self.channel)
+    def Connect (self):
+        if self.IsConnected:
+            return
 
-            yield self.channel.Run ()
-        except Exception:
-            error = True
-            raise
-        finally:
-            if error:
-                self.disposable.Dispose ()
+        # methods
+        for service in self.services.values ():
+            yield service.Connect (self)
+            self.dispose += service
+
+        # channel
+        yield self.channel.Connect ()
+        self.dispose += self.channel
 
     @property
-    def IsRunning (self):
-        return self.channel.IsRunning
+    def IsConnected (self):
+        return self.channel.IsConnected
 
     #--------------------------------------------------------------------------#
-    # Properties                                                               #
+    # Exports                                                                  #
     #--------------------------------------------------------------------------#
-    @property
-    def Channel (self):
-        return self.channel
+    def Export (self, name, handler):
+        if hasattr (self, name):
+            raise ValueError ('Name has already been bound: \'{}\''.format (name))
+        self.exports [name] = handler
+        return Disposable (lambda: self.exports.pop (name))
 
-    @property
-    def Services (self):
-        return self.services
-
-    #--------------------------------------------------------------------------#
-    # Attribute                                                                #
-    #--------------------------------------------------------------------------#
-    def __getattr__ (self, attr):
-        if not self.channel.IsRunning:
-            raise DomainError ('Channel is not running')
-
-        if attr [0].isupper ():
-            for service in self.services:
-                try:
-                    return getattr (service, attr)
-                except AttributeError: pass
-        raise AttributeError (attr)
+    def __getattr__ (self, name):
+        handler = self.exports.get (name)
+        if handler is None:
+            raise AttributeError ('No such attribute: \'{}\''.format (name))
+        return handler
 
     #--------------------------------------------------------------------------#
-    # Dispose                                                                  #
+    # Disposable                                                               #
     #--------------------------------------------------------------------------#
     def Dispose (self):
-        self.disposable.Dispose ()
-
+        self.dispose.Dispose ()
+        self.dispose = CompositeDisposable ()
+        self.exports.clear ()
+    
     def __enter__ (self):
         return self
-
+    
     def __exit__ (self, et, eo, tb):
         self.Dispose ()
         return False

@@ -1,109 +1,140 @@
 # -*- coding: utf-8 -*-
-import sys
-import io
 import os
-import itertools
+import sys
+import pickle
+
+import struct
 import traceback
+import itertools
 
-__all__ = ('Message', 'ErrorMessage', 'PORT_RESULT', 'PORT_ERROR', 'PORT_SYSTEM')
-#-----------------------------------------------------------------------------#
-# Ports                                                                       #
-#-----------------------------------------------------------------------------#
-PORT_RESULT = 0
-PORT_ERROR  = 1
-PORT_SYSTEM = 10
+from ..async import *
 
-#-----------------------------------------------------------------------------#
-# Message                                                                     #
-#-----------------------------------------------------------------------------#
+__all__ = ('Message',)
+#------------------------------------------------------------------------------#
+# Message                                                                      #
+#------------------------------------------------------------------------------#
+MESSAGE_RESULT = 0
+MESSAGE_ERROR  = 1
+
 class Message (object):
-    __slots__ = ('uid', 'port', 'attr')
-    _uid = itertools.count ()
-    def __init__ (self, port, **attr):
-        object.__setattr__ (self, 'uid', next (self._uid))
-        object.__setattr__ (self, 'port', port)
-        object.__setattr__ (self, 'attr', attr)
+    __slots__     = ('src', 'dst', 'data',)
+    header_struct = struct.Struct ('!BHHI')
+    uid_struct    = struct.Struct ('!I')
+    uid_iter      = itertools.count ()
+    type          = MESSAGE_RESULT
+
+    def __init__ (self, dst, data, src = None):
+        self.src = b'uid::' + self.uid_struct.pack (next (self.uid_iter)) if src is None else src
+        self.dst = dst
+        self.data = data
 
     #--------------------------------------------------------------------------#
-    # Attributes                                                               #
+    # Public                                                                   #
     #--------------------------------------------------------------------------#
-    def __getattr__ (self, attr):
-        try: return self.attr [attr]
-        except KeyError:
-            pass
-        raise AttributeError (attr)
+    @property
+    def Data (self):
+        return self.data
 
-    def __setattr__ (self, attr, value):
-        raise AttributeError ('Message attributes are read only')
+    def Response (self, data):
+        return Message (self.src, data, self.dst)
 
-    #--------------------------------------------------------------------------#
-    # Save | Restore                                                           #
-    #--------------------------------------------------------------------------#
-    def __setstate__ (self, state):
-        port, uid, attr =  state
-        object.__setattr__ (self, 'uid', uid)
-        object.__setattr__ (self, 'port', port)
-        object.__setattr__ (self, 'attr', attr)
-
-    def __getstate__  (self):
-        return self.port, self.uid, self.attr
+    def ErrorResponse (self, error):
+        return ErrorMessage.FromError (self.src, error, self.dst)
 
     #--------------------------------------------------------------------------#
-    # Create Response                                                          #
+    # Save | Load                                                              #
     #--------------------------------------------------------------------------#
-    def Result (self, **attr):
-        return ResponseMessage (self.uid, **attr)
+    @DummyAsync
+    def SaveAsync (self, stream):
+        src_end = len (self.src)
+        dst_end = src_end + len (self.dst)
+        size    = dst_end + len (self.data)
 
-    def Error (self, error):
-        return ErrorMessage (self.uid, *error)
+        stream.WriteNoWait (self.header_struct.pack (self.type, src_end, dst_end, size) +
+            self.src + self.dst + self.data)
 
-    def Raise (self, error):
-        try: raise error
-        except Exception:
-            return self.Error (*sys.exc_info ())
+    @classmethod
+    @Async
+    def LoadAsync (cls, stream):
+        type, src_end, dst_end, size = cls.header_struct.unpack (
+            (yield stream.ReadExactly (cls.header_struct.size)))
+        body = yield stream.ReadExactly (size)
+
+        if type == MESSAGE_RESULT:
+            AsyncReturn (Message (body [src_end:dst_end], body [dst_end:], body [:src_end]))
+
+        elif type == MESSAGE_ERROR:
+            AsyncReturn (ErrorMessage (body [src_end:dst_end], body [dst_end:], body [:src_end]))
+
+        assert False, 'Unknown message type: {}'.format (type)
+
+    def Save (self, stream):
+        src_end = len (self.src)
+        dst_end = src_end + len (self.dst)
+        size    = dst_end + len (self.data)
+
+        stream.write (self.header_struct.pack (self.type, src_end, dst_end, size) +
+            self.src + self.dst + self.data)
+
+    @classmethod
+    def Load (cls, stream):
+        type, src_end, dst_end, size = cls.header_struct.unpack (stream.read (cls.header_struct.size))
+        body = stream.read (size)
+
+        if type == MESSAGE_RESULT:
+            return Message (body [src_end:dst_end], body [dst_end:], body [:src_end])
+
+        elif type == MESSAGE_ERROR:
+            return ErrorMessage (body [src_end:dst_end], body [dst_end:], body [:src_end])
+
+        assert False, 'Unknown message type: {}'.format (type)
 
     #--------------------------------------------------------------------------#
-    # Representation                                                           #
+    # Private                                                                  #
     #--------------------------------------------------------------------------#
     def __str__ (self):
-        return '{} {} {}'.format (self.port, self.uid, self.attr)
+        return '<Message [{}]: \x1b[38;01m{} -> {}\x1b[m: {}>'\
+            .format (os.getpid (), self.src, self.dst, self.data)
 
-    __repr__ = __str__
+    def __repr__ (self):
+        return slef.__str__ ()
 
-#-----------------------------------------------------------------------------#
-# Response Message                                                            #
-#-----------------------------------------------------------------------------#
-class ResponseMessage (Message):
-    __slots__ = Message.__slots__
-    def __init__ (self, uid, **attr):
-        object.__setattr__ (self, 'port', PORT_RESULT)
-        object.__setattr__ (self, 'uid', uid)
-        object.__setattr__ (self, 'attr', attr)
+#------------------------------------------------------------------------------#
+# Error Message                                                                #
+#------------------------------------------------------------------------------#
+error_pattern = """
+`-------------------------------------------------------------------------------
+Path:  {src} -> {dst}
+Error: {name}: {message}
 
-#-----------------------------------------------------------------------------#
-# Error Message                                                               #
-#-----------------------------------------------------------------------------#
+{traceback}"""
 class ErrorMessage (Message):
     __slots__ = Message.__slots__
-    def __init__ (self, uid, et, eo, tb):
-        object.__setattr__ (self, 'port', PORT_ERROR)
-        object.__setattr__ (self, 'uid', uid)
-        object.__setattr__ (self, 'attr', {
-            'error_type' : et,
-            'error'      : eo,
-            'traceback'  : traceback.format_exception (et, eo, tb)
-        })
+    type      = MESSAGE_ERROR
 
-    def exc_info (self):
-        if sys.version_info [0] > 2:
-            tb_stream = io.StringIO ()
-            tb_stream.write ('\n`{0:-^79}\n'.format (' remote traceback:{} '.format (os.getpid ())))
-            tb_stream.write (''.join (self.traceback).rstrip ('\n'))
-        else:
-            tb_stream = io.BytesIO ()
-            tb_stream.write ('\n`{0:-^79}\n'.format (' remote traceback:{} '.format (os.getpid ())))
-            tb_stream.write (''.join (self.traceback).rstrip ('\n').encode ('utf-8'))
+    #--------------------------------------------------------------------------#
+    # Public                                                                   #
+    #--------------------------------------------------------------------------#
+    @property
+    def Data (self):
+        info = pickle.loads (self.data)
+        error_type = info ['type']
+        error      = info ['error']
+        traceback  = info ['traceback']
 
-        return self.error_type, self.error_type (tb_stream.getvalue ()), None
+        raise error_type (error_pattern.format (
+            src       = self.src,
+            dst       = self.dst,
+            name      = error_type.__name__,
+            message   = str (error).split ('\n') [-1],
+            traceback = traceback))
+
+    @classmethod
+    def FromError (cls, dst, error, src):
+        return cls (dst, pickle.dumps ({
+            'type':      error [0],
+            'error':     error [1],
+            'message':   str (error [1]).split ('\n') [-1],
+            'traceback': '{}{}{}'.format (*traceback.format_exception (*error)).strip ('\n')}), src)
 
 # vim: nu ft=python columns=120 :

@@ -1,135 +1,96 @@
 # -*- coding: utf-8 -*-
 import sys
 
-from ..message import *
+from ...event import *
 from ...async import *
 from ...async.wait import *
 from ...async.cancel import *
-from ...event import *
+from ...disposable import *
 
-from ..utils.bind_pool import *
-from ..utils.wait_queue import *
-
-__all__ = ('Channel', 'PersistenceChannel', 'ChannelError')
+__all__ = ('Channel', 'ChannelError',)
 #------------------------------------------------------------------------------#
 # Channel                                                                      #
 #------------------------------------------------------------------------------#
 class ChannelError (Exception): pass
 class Channel (object):
     def __init__ (self, core):
-        self.core  = core
-        self.ports = BindPool ()
-        self.yield_queue = WaitQueue (lambda: core.Idle ())
+        self.core = core
 
-        # receive
-        self.recv_queue  = {}
-        self.recv_wait   = MutableWait ()
-        self.recv_worker = None
+        self.recv_handlers = {}
+        self.recv_queue    = {}
+        self.recv_worker   = None
+        self.recv_wait     = MutableWait ()
 
-        # events
-        self.OnStart = AsyncEvent ()
-        self.OnStop  = AsyncEvent ()
+        self.OnDisconnect  = Event ()
 
     #--------------------------------------------------------------------------#
-    # Run                                                                      #
+    # Connect                                                                  #
     #--------------------------------------------------------------------------#
     @Async
-    def Run (self):
-        if self.recv_worker is not None:
-            raise ChannelError ('Channel has already been run')
-        yield self.run ()
-
+    def Connect (self):
+        if not self.IsConnected:
+            try: yield self.connect ()
+            except Exception:
+                self.disconnect ()
+                
     @property
-    def IsRunning (self):
-        return self.recv_worker is not None and not self.recv_worker.IsCompleted ()
+    def IsConnected (self):
+        return False if self.recv_worker is None else not self.recv_worker.IsCompleted ()
 
     #--------------------------------------------------------------------------#
-    # Request                                                                  #
+    # Methods                                                                  #
     #--------------------------------------------------------------------------#
-    @Async
-    def Request (self, port, **attr):
-        if not self.IsRunning:
-            raise ChannelError ('Channel is not running')
+    def Send (self, message):
+        return FailedFuture (NotImplementedError ())
 
-        # message
-        message = Message (port, **attr)
-        yield self.SendMsg (message)
+    def Recv (self):
+        return FailedFuture (NotImplementedError ())
 
-        # cancel
-        def cancel ():
-            self.recv_queue.pop (message.uid, None)
-            future.ErrorRaise (FutureCanceled ())
+    def RecvTo (self, destination):
+        future = self.recv_queue.get (destination)
+        if future is None:
+            def cancel ():
+                self.recv_queue.pop (destination, None)
+                future.ErrorRaise (FutureCanceled ())
 
-        # future
-        future = MutableFuture ()
-        future.wait.Replace (self.recv_wait)
-        future.cancel.Replace (Cancel (cancel))
+            future = MutableFuture ()
+            future.wait.Replace (self.recv_wait)
+            future.cancel.Replace (Cancel (cancel))
 
-        # enqueue
-        self.recv_queue [message.uid] = future
+            self.recv_queue [destination] = future
 
-        AsyncReturn ((yield future) ())
+        return future
 
-    #--------------------------------------------------------------------------#
-    # Port Interface                                                           #
-    #--------------------------------------------------------------------------#
-    def BindPort (self, port, handler):
-        return self.ports.Bind (port, handler)
-
-    #--------------------------------------------------------------------------#
-    # Channel Interface                                                        #
-    #--------------------------------------------------------------------------#
-    def SendMsg (self, message):
-        raise NotImplementedError ()
-
-    def RecvMsg (self):
-        raise NotImplementedError ()
-
-    #--------------------------------------------------------------------------#
-    # Dispose                                                                  #
-    #--------------------------------------------------------------------------#
-    def Dispose (self):
-        if self.recv_worker is not None:
-            self.recv_worker.Dispose ()
-
-    def __enter__ (self):
-        return self
-
-    def __exit__ (self, et, eo, tb):
-        self.Dispose ()
-        return False
-
+    def RecvToHandler (self, destination, handler):
+        if self.recv_handlers.get (destination) is not None:
+            raise ChannelError ('Handler has already been assigned')
+        self.recv_handlers [destination] = handler
+        return Disposable (lambda: self.recv_handlers.pop (destination))
+        
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
+    @DummyAsync
+    def connect (self):
+        self.recv_worker = self.recv_main ().Traceback ('recv_main')
+        if self.recv_worker.IsCompleted ():
+            self.recv_worker.Result ()
+            raise ChannelError ('Receive worker has terminated immediately')
+
+    def disconnect (self):
+        self.OnDisconnect ()
+
     @Async
     def recv_main (self):
         try:
             while True:
-                future = self.RecvMsg ()
-                self.recv_wait.Replace (future.Wait)
-                port, uid, getter = yield future
-                if port >= PORT_SYSTEM:
-                    handler = self.ports.get (port)
-                    if handler is None:
-                        sys.stderr.write (':: error: unbound port {0}\n'.format (port))
-                        continue
+                message_future = self.Recv ()
+                self.recv_wait.Replace (message_future.Wait)
+                self.recv_dispatch ((yield message_future))
 
-                    self.yield_queue.Enqueue (self.handle_request, handler, uid, getter)
-                else:
-                    future = self.recv_queue.pop (uid)
-                    if future.IsCompleted (): # canceled?
-                        continue
-
-                    if port == PORT_RESULT:
-                        self.yield_queue.Enqueue (future.ResultSet, getter)
-                    elif port == PORT_ERROR:
-                        self.yield_queue.Enqueue (self.handle_error, future, getter)
-
-                    future.wait.Replace (self.yield_queue.Future.Wait)
-
-        except CoreDisconnectedError: pass
         except FutureCanceled: pass
+        except CoreStopped: pass
+        except CoreDisconnectedError: pass
         finally:
             # resolve queued futures
             error = sys.exc_info ()
@@ -140,66 +101,35 @@ class Channel (object):
                 else:
                     future.ErrorSet (error)
 
-            # fire stop
-            yield self.OnStop ()
-
-    #--------------------------------------------------------------------------#
-    # Handlers                                                                 #
-    #--------------------------------------------------------------------------#
-    def handle_error (self, future, getter):
-        try: future.ErrorSet (getter ().exc_info ())
-        except Exception:
-            future.ErrorSet (sys.exc_info ())
+            self.disconnect ()
 
     @Async
-    def handle_request (self, handler, uid, getter):
-        try:
-            yield self.SendMsg ((yield handler (getter ())))
-            return
-        except Exception:
-            error = sys.exc_info ()
-        yield self.SendMsg (ErrorMessage (uid, *error))
+    def recv_dispatch (self, message):
+        untie_future = self.core.Idle ()
+
+        future = self.recv_queue.pop (message.dst, None)
+        if future is not None:
+            future.wait.Replace (untie_future.Wait)
+            yield untie_future
+            future.ResultSet (message)
+
+        handler = self.recv_handlers.get (message.dst, None)
+        if handler is not None:
+            yield untie_future
+            handler (message)
 
     #--------------------------------------------------------------------------#
-    # Private                                                                  #
+    # Disposable                                                               #
     #--------------------------------------------------------------------------#
-    @Async
-    def run (self):
-        self.recv_worker = self.recv_main ()
-        if self.recv_worker.IsCompleted ():
-            self.recv_worker.Result ()
-            raise ChannelError ('Receive worker has terminated immediately')
+    def Dispose (self):
+        if self.recv_worker is not None:
+            self.recv_worker.Dispose ()
 
-        # fire start
-        yield self.OnStart ()
-
-#------------------------------------------------------------------------------#
-# Persistence Channel                                                          #
-#------------------------------------------------------------------------------#
-class PersistenceChannel (Channel):
-    def __init__ (self, core):
-        self.persistence = BindPool ()
-        self.not_persistent = {tuple, list, dict, set, frozenset}
-
-        Channel.__init__ (self, core)
-
-    #--------------------------------------------------------------------------#
-    # Persistence Interface                                                    #
-    #--------------------------------------------------------------------------#
-    def BindPersistence (self, slot, save, restore):
-        return self.persistence.Bind (slot, (save, restore))
-
-    def Save (self, target):
-        if type (target) in self.not_persistent:
-            return None
-        for slot, pair in self.persistence.items ():
-            save, restore = pair
-            target_id = save (target)
-            if target_id is not None:
-                return slot, target_id
-
-    def Restore (self, uid):
-        slot, target_id = uid
-        return self.persistence [slot][1] (target_id)
-
+    def __enter__ (self):
+        return self
+    
+    def __exit__ (self, et, eo, tb):
+        self.Dispose ()
+        return False
+    
 # vim: nu ft=python columns=120 :

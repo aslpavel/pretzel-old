@@ -15,31 +15,29 @@ __all__ = ('SSHChannel',)
 #------------------------------------------------------------------------------#
 class SSHChannel (FileChannel):
     def __init__ (self, core, host, port = None, identity_file = None, ssh_exec = None, py_exec = None):
-        self.host = host
+        self.pid           = None
+        self.host          = host
+        self.port          = port
+        self.ssh_exec      = 'ssh' if ssh_exec is None else ssh_exec
+        self.py_exec       = sys.executable if py_exec is None else py_exec
         self.identity_file = identity_file
 
-        # executable
-        if py_exec is None:
-            py_exec = sys.executable
-        if ssh_exec is None:
-            ssh_exec = 'ssh'
-
         # ssh command
-        self.command = [ssh_exec, host, py_exec]
-        if identity_file is not None:
-            self.command.extend (('-i', identity_file))
-        if port is not None:
-            self.command.extend (('-p', port))
-        self.command.extend (('-c', '\'{0}\''.format (payload.format (
-            bootstrap = BootstrapModule (), remoting_name = remoting_name))))
+        self.command = [self.ssh_exec, host, self.py_exec]
+        if self.identity_file is not None:
+            self.command.extend (('-i', self.identity_file))
+        if self.port is not None:
+            self.command.extend (('-p', self.port))
+        self.command.extend (('-c', '\'{0}\''
+            .format (payload.format (bootstrap = BootstrapModule (), remoting_name = remoting_name))))
 
         FileChannel.__init__ (self, core)
 
     #--------------------------------------------------------------------------#
-    # Run Implementation                                                       #
+    # Private                                                                  #
     #--------------------------------------------------------------------------#
     @Async
-    def run (self):
+    def connect (self):
         # create ssh connection
         lr, rw = os.pipe ()
         rr, lw = os.pipe ()
@@ -66,22 +64,24 @@ class SSHChannel (FileChannel):
                 os.close (rw)
 
                 os.execvp (self.command [0], self.command)
-            except Exception:
-                traceback.print_exc ()
+
+            except Exception: traceback.print_exc ()
             finally:
                 sys.exit (1)
 
         # set files
-        self.in_file = self.core.AsyncFileCreate (lr, closefd = True)
-        self.in_file.CloseOnExec (True)
+        self.FilesSet (
+            self.core.AsyncFileCreate (lr, closefd = True),
+            self.core.AsyncFileCreate (lw, closefd = True))
 
-        self.out_file = self.core.AsyncFileCreate (lw, closefd = True)
-        self.out_file.CloseOnExec (True)
+        yield FileChannel.connect (self)
 
-        yield FileChannel.run (self)
+    def disconnect (self):
+        FileChannel.disconnect (self)
 
-        # wait for child
-        self.OnStop += lambda: os.waitpid (self.pid, 0)
+        pid, self.pid = self.pid, None
+        if pid is not None:
+            os.waitpid (pid, 0)
 
 #------------------------------------------------------------------------------#
 # Payload Pattern                                                              #
@@ -89,22 +89,22 @@ class SSHChannel (FileChannel):
 payload = r"""# -*- coding: utf-8 -*-
 {bootstrap}
 
-import io, os, sys
+import sys
 from importlib import import_module
 
-def main ():
-    remoting_name = "{remoting_name}"
-    remoting = import_module (remoting_name)
-    async    = import_module ("..async", remoting_name)
-    domains  = import_module (".domains.ssh", remoting_name)
+def Main ():
+    import_module ("{remoting_name}")
+    async    = import_module ("..async", "{remoting_name}")
+    domains  = import_module (".domains.ssh", "{remoting_name}")
 
     with async.Core () as core:
         domain = domains.SSHRemoteDomain (core)
-        domain.Channel.OnStop += core.Stop
+        domain.channel.OnDisconnect += core.Stop
+        domain.Connect ().Traceback ("remote::connect")
 
 if __name__ == "__main__":
     sys.stdout = sys.stderr
-    main ()
+    Main ()
 """
     
 # vim: nu ft=python columns=120 :

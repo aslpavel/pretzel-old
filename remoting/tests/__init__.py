@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
-from .domains.fork import ForkDomain
-from .domains.ssh  import SSHDomain
 
-__all__ = ('ForkDomain', 'SSHDomain',)
+__all__ = tuple ()
 #------------------------------------------------------------------------------#
 # Load Test Protocol                                                           #
 #------------------------------------------------------------------------------#
 def load_tests (loader, tests, pattern):
     from unittest import TestSuite
-    from . import tests
+    from . import message
+    from . import linker
+    from . import future
+    from . import nested
 
     suite = TestSuite ()
-    for test in (tests,):
+    for test in (message, linker, future, nested,):
         suite.addTests (loader.loadTestsFromModule (test))
     return suite
 

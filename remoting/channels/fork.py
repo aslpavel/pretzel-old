@@ -4,25 +4,24 @@ import os
 import traceback
 
 from .file import *
-from .channel import *
 from .. import __name__ as remoting_name
 from ...async import *
 from ...bootstrap import *
 
 __all__ = ('ForkChannel',)
-#-----------------------------------------------------------------------------#
-# Fork Channel                                                                #
-#-----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+# ForkChannel                                                                  #
+#------------------------------------------------------------------------------#
 class ForkChannel (FileChannel):
     def __init__ (self, core, command = None):
-        self.command = [sys.executable, '-'] if command is None else command
         FileChannel.__init__ (self, core)
+        self.command = [sys.executable, '-'] if command is None else command
 
     #--------------------------------------------------------------------------#
-    # Run Implementation                                                       #
+    # Private                                                                  #
     #--------------------------------------------------------------------------#
     @Async
-    def run (self):
+    def connect (self):
         # create pipes
         lr, rw = os.pipe ()
         rr, lw = os.pipe ()
@@ -47,51 +46,51 @@ class ForkChannel (FileChannel):
                 os.close (payload_in)
 
                 os.execvp (self.command [0], self.command)
-            except Exception:
-                traceback.print_exc ()
+
+            except Exception: traceback.print_exc ()
             finally:
                 sys.exit (1)
 
         # set files
-        self.in_file = self.core.AsyncFileCreate (lr, closefd = True)
-        self.in_file.CloseOnExec (True)
-
-        self.out_file = self.core.AsyncFileCreate (lw, closefd = True)
-        self.out_file.CloseOnExec (True)
+        self.FilesSet (
+            self.core.AsyncFileCreate (lr, closefd = True),
+            self.core.AsyncFileCreate (lw, closefd = True))
 
         # send payload
         try:
             os.write (payload_out, payload.format (bootstrap = BootstrapModule (),
-                remoting_name = remoting_name, rr = rr, rw =rw).encode ())
+                remoting_name = remoting_name, rr = rr, rw = rw).encode ())
         finally:
             os.close (payload_out)
 
-        yield FileChannel.run (self)
+        yield FileChannel.connect (self)
 
-        # wait for child
-        self.OnStop += lambda: os.waitpid (self.pid, 0)
+    def disconnect (self):
+        FileChannel.disconnect (self)
+
+        pid, self.pid = self.pid, None
+        if pid is not None:
+            os.waitpid (pid, 0)
 
 #-----------------------------------------------------------------------------#
-# Payload Pattern                                                             #
+# Payload                                                                     #
 #-----------------------------------------------------------------------------#
 payload = r"""# -*- coding: utf-8 -*-
 {bootstrap}
-
-import io, os, sys
 from importlib import import_module
 
-def main ():
-    remoting_name = "{remoting_name}"
-    remoting = import_module (remoting_name)
-    async    = import_module ("..async", remoting_name)
-    domains  = import_module (".domains.fork", remoting_name)
+def Main ():
+    import_module ("{remoting_name}")
+    async   = import_module ("..async", "{remoting_name}")
+    domains = import_module (".domains.fork", "{remoting_name}")
 
     with async.Core () as core:
         domain = domains.ForkRemoteDomain (core, {rr}, {rw})
-        domain.Channel.OnStop += core.Stop
+        domain.channel.OnDisconnect += core.Stop
+        domain.Connect ().Traceback ("remote::connect")
 
 if __name__ == "__main__":
-    main ()
+    Main ()
 """
-    
+
 # vim: nu ft=python columns=120 :

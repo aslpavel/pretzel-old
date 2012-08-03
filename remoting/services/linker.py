@@ -1,267 +1,142 @@
 # -*- coding: utf-8 -*-
-import inspect
+import itertools
 
 from .service import *
+from ..utils.proxy import *
+from ..message import *
 from ...async import *
 
 __all__ = ('LinkerService',)
-#-----------------------------------------------------------------------------#
-# Ports                                                                       #
-#-----------------------------------------------------------------------------#
-PORT_LINKER_CREATE = 10
-PORT_LINKER_INFO   = 11
-PORT_LINKER_METHOD = 12
-PORT_LINKER_GET    = 13
-PORT_LINKER_SET    = 14
-PORT_LINKER_CALL   = 15
-
-PERSISTENCE_LINKER = 1
-#-----------------------------------------------------------------------------#
-# Linker                                                                      #
-#-----------------------------------------------------------------------------#
-class LinkerError (ServiceError): pass
+#------------------------------------------------------------------------------#
+# Linker Service                                                               #
+#------------------------------------------------------------------------------#
 class LinkerService (Service):
+    NAME    = b'linker::'
+    CALL    = b'linker::call'
+    CREATE  = b'linker::create'
+    METHOD  = b'linker::method'
+    PROPSET = b'linker::propset'
+    PROPGET = b'linker::propget'
+
     def __init__ (self):
-        self.local_d2r, self.remote_d2r = {}, {}
-        self.desc = 0
+        Service.__init__ (self,
+            exports = (
+                ('ToProxy',     self.ToProxy),
+                ('ProxyCreate', self.ProxyCreate),
+                ('Call',        self.Call)),
+            handlers = (
+                (self.CALL,     self.call_handler),
+                (self.CREATE,   self.create_handler),
+                (self.METHOD,   self.method_handler),
+                (self.PROPGET,  self.get_handler),
+                (self.PROPSET,  self.set_handler)),
+            persistence = (
+                (Proxy, self.proxyPack, self.proxyUnpack),))
 
-        Service.__init__ (self, [
-            (PORT_LINKER_CREATE, self.port_CREATE),
-            (PORT_LINKER_INFO, self.port_INFO),
-            (PORT_LINKER_METHOD, self.port_METHOD),
-            (PORT_LINKER_GET, self.port_GET),
-            (PORT_LINKER_SET, self.port_SET),
-            (PORT_LINKER_CALL, self.port_CALL),
-        ], [
-            (PERSISTENCE_LINKER, self.save_Reference, self.restore_Reference)
-        ])
-
-        self.method_skip = {
-            # creation
-            '__init__', '__new__',
-            # attributes
-            '__getattr__', '__setattr__', '__delattr__', '__getattribute__',
-            # pickle
-            '__reduce_ex__', '__reduce__', '__getstate__', '__setstate__',
-            # repr
-            '__repr__', '__str__',
-            # type
-            '__class__', '__subclasshook__',
-            # hash
-            '__hash__'
-        }
-
-        def detach (channel):
-            self.local_d2r.clear ()
-            self.remote_d2r.clear ()
-        self.OnDetach += detach
+        # marshal mappings
+        self.desc      = itertools.count ()
+        self.desc2prov = {}
+        self.prov2desc = {}
+        next (self.desc)
 
     #--------------------------------------------------------------------------#
-    # Service's Methods                                                        #
+    # Methods                                                                  #
     #--------------------------------------------------------------------------#
-    def ToReference (self, target):
-        """Create reference to target"""
-        if self.channel is None:
-            raise LinkerError ('channel hasn\'t been attached')
+    def ToProxy (self, instance):
+        return Proxy (LocalProxyProvider (instance))
 
-        if isinstance (target, Reference):
-            if target.ref_linker == self:
-                return target
-            target = target.ref_target
-
-        # methods
-        members = {}
-        for name, member in inspect.getmembers (target):
-            if hasattr (member, '__call__') and name not in self.method_skip:
-                members [name] = member
-
-        # fields
-        def getter (this, name):
-            return getattr (target, name)
-        def setter (this, name, value):
-            setattr (target, name, value)
-        members ['__getattr__'] = getter
-        members ['__setattr__'] = setter
-
-        # desc
-        desc, self.desc = self.desc, self.desc + 1
-
-        # dispose
-        target_enter = members.get ('__enter__')
-        if target_enter:
-            def enter (this):
-                context = target_enter ()
-                if context is target:
-                    return this
-                return context
-            members ['__enter__'] = enter
-        else:
-            members ['__enter__'] = lambda this: this
-
-        target_exit = members.get ('__exit__')
-        def exit (this, et, eo, tb):
-            if target_exit is not None:
-                target_exit (et, eo, tb)
-            self.local_d2r.pop (desc, None)
-            return False
-        members ['__exit__'] = exit
-
-        # create reference
-        ref = (type ('{0}_ref'.format (type (target).__name__), (Reference,), members)
-            (REFERENCE_LOCAL, self, desc, target))
-
-        # update mapping
-        self.local_d2r [desc] = ref
-
-        return ref
-
-    @Delegate
-    @Async
-    def InstanceCreate (self, type, *args, **keys):
-        response = yield self.channel.Request (PORT_LINKER_CREATE, type = type, args = args, keys = keys)
-        AsyncReturn (response.result)
-
-    @Delegate
-    @Async
+    def ProxyCreate (self, type, *args, **keys):
+        return self.domain.Request (self.CREATE, type, args, keys)
+        
     def Call (self, func, *args, **keys):
-        response = yield self.channel.Request (PORT_LINKER_CALL, func = func, args = args, keys = keys)
-        AsyncReturn (response.result)
-
+        return self.domain.Request (self.CALL, func, args, keys)
+        
     #--------------------------------------------------------------------------#
-    # Persistence                                                              #
+    # Marshal                                                                  #
     #--------------------------------------------------------------------------#
-    def save_Reference (self, ref):
-        if isinstance (ref, Reference):
-            return ref.ref_type, ref.ref_desc
+    def proxyPack (self, proxy):
+        prov = proxy._provider
+        desc = self.prov2desc.get (prov)
+        if desc is None:
+            desc = next (self.desc) << 1
+            self.desc2prov [desc], self.prov2desc [prov] = prov, desc
 
-    def restore_Reference (self, ref_state):
-        ref_type, ref_desc = ref_state
+        return desc
 
-        if ref_type == REFERENCE_LOCAL:
-            # means local for remote host
-            ref = self.remote_d2r.get (ref_desc)
-            if ref is None:
-                ref_future = self.restore_remote (ref_type, ref_desc)
-                ref_future.Wait ()
-                return ref_future.Result ()
+    def proxyUnpack (self, desc):
+        desc ^= 0x1
+        prov = self.desc2prov.get (desc)
+        if prov is None:
+            prov = RemoteProxyProvider (self, desc)
+            self.desc2prov [desc], self.prov2desc [prov] = prov, desc
 
-        elif ref_type == REFERENCE_REMOTE:
-            ref = self.local_d2r.get (ref_desc)
-            if not ref:
-                raise LinkerError ('unregistred reference descriptor')
-        else:
-            raise LinkerError ('invalid reference type: {0}'.format (ref_type))
-
-        return ref
-
-    @Async
-    def restore_remote (self, ref_type, ref_desc):
-        info = yield self.channel.Request (PORT_LINKER_INFO, desc = ref_desc)
-
-        # methods
-        members = {}
-        def method_factory (method_name):
-            @Delegate
-            def method (this, *args, **keys):
-                return (self.channel.Request (PORT_LINKER_METHOD,
-                    desc = ref_desc,
-                    name = method_name,
-                    args = args,
-                    keys = keys)
-                        .ContinueWithFunction (lambda response: response.result))
-            return method
-
-        for method_name in info.methods:
-            members [method_name] = method_factory (method_name)
-
-        # fields
-        @Delegate
-        def getter (this, name):
-            return (self.channel.Request (PORT_LINKER_GET, desc = ref_desc, name = name)
-                .ContinueWithFunction (lambda response: response.result))
-        @Delegate
-        def setter (this, name, value):
-            return self.channel.Request (PORT_LINKER_SET, desc = ref_desc, name = name, value = value)
-        members ['__getattr__'] = getter
-        members ['__setattr__'] = setter
-
-        # dispose
-        ref_exit = members.get ('__exit__', None)
-        def exit (this, et, eo, tb):
-            if ref_exit:
-                ref_exit (this, et, eo, tb)
-            self.remote_d2r.pop (ref_desc, None)
-            return False
-        members ['__exit__'] = exit
-
-        # create reference
-        ref = type ('%s_remote_ref' % info.name, (Reference, ), members) (REFERENCE_REMOTE, self, ref_desc, None)
-
-        # update cache
-        self.remote_d2r [ref_desc] = ref
-
-        AsyncReturn (ref)
-
-    #--------------------------------------------------------------------------#
-    # Ports Handlers                                                           #
-    #--------------------------------------------------------------------------#
-    @DummyAsync
-    def port_CREATE (self, request):
-        return request.Result (result = self.ToReference (request.type (*request.args, **request.keys)))
-
-    @DummyAsync
-    def port_INFO (self, request):
-        instance = self.instance_get (request)
-        methods = [name for name, method in inspect.getmembers (instance)
-            if hasattr (method, '__call__')
-            if name not in self.method_skip]
-        return request.Result (methods = methods, name = type (instance).__name__)
-
-    @Async
-    def port_METHOD (self, request):
-        result = getattr (self.instance_get (request), request.name) (*request.args, **request.keys)
-        if isinstance (result, BaseFuture):
-            result = yield result
-        AsyncReturn (request.Result (result = result))
-
-    @DummyAsync
-    def port_GET (self, request):
-        return request.Result (result = getattr (self.instance_get (request), request.name))
-
-    @DummyAsync
-    def port_SET (self, request):
-        setattr (self.instance_get (request), request.name, request.value)
-        return request.Result ()
-
-    @Async
-    def port_CALL (self, request):
-        result = request.func (*request.args, **request.keys)
-        if isinstance (result, BaseFuture):
-            result = yield result
-        AsyncReturn (request.Result (result = result))
+        return Proxy (prov)
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
-    def instance_get (self, request):
-        ref = self.local_d2r.get (request.desc)
-        if not ref:
-            raise ValueError ('bad descriptor {0}'.format (request.desc))
-        return ref
+    @DummyAsync
+    def call_handler (self, message):
+        with self.domain.Response (message) as response:
+            func, args, keys = self.domain.Unpack (message.Data)
+            response (func (*args, **keys))
+
+    @DummyAsync
+    def create_handler (self, message):
+        with self.domain.Response (message) as response:
+            type, args, keys = self.domain.Unpack (message.Data)
+            response (self.ToProxy (type (*args, **keys)))
+
+    @Async
+    def method_handler (self, message):
+        with self.domain.Response (message) as response:
+            desc, name, args, keys = self.domain.Unpack (message.Data)
+            prov = self.desc2prov.get (desc)
+            if prov is None:
+                raise ValueError ('Unknown proxy provider: \'desc:{}\''.format (desc))
+
+            response ((yield prov.Call (name, *args, **keys)))
+
+    @Async
+    def get_handler (self, message):
+        with self.domain.Response (message) as response:
+            desc, name = self.domain.Unpack (message.Data)
+            prov = self.desc2prov.get (desc)
+            if prov is None:
+                raise ValueError ('Unknown proxy provider: \'desc:{}\''.format (desc))
+
+            response ((yield prov.PropertyGet (name)))
+
+    @Async
+    def set_handler (self, message):
+        with self.domain.Response (message) as response:
+            desc, name, value = self.domain.Unpack (message.Data)
+            prov = self.desc2prov.get (desc)
+            if prov is None:
+                raise ValueError ('Unknown proxy provider: \'desc:{}\''.format (desc))
+
+            response ((yield prov.PropertySet (name, value)))
 
 #------------------------------------------------------------------------------#
-# Reference                                                                    #
+# Remote Proxy Provider                                                        #
 #------------------------------------------------------------------------------#
-REFERENCE_LOCAL = 0
-REFERENCE_REMOTE = 1
+class RemoteProxyProvider (ProxyProvider):
+    __slots__ = ProxyProvider.__slots__ + ('linker', 'desc',)
 
-class Reference (object):
-    __slots__ = ('ref_type', 'ref_desc', 'ref_linker', 'ref_target')
+    def __init__ (self, linker, desc = None):
+        self.linker = linker
+        self.desc   = desc ^ 0x1
+    
+    #--------------------------------------------------------------------------#
+    # Proxy Provider Interface                                                 #
+    #--------------------------------------------------------------------------#
+    def Call (self, name, *args, **keys):
+        return self.linker.domain.Request (LinkerService.METHOD, self.desc, name, args, keys)
 
-    def __init__ (self, type, linker, desc, target):
-        object.__setattr__ (self, 'ref_type', type)
-        object.__setattr__ (self, 'ref_desc', desc)
-        object.__setattr__ (self, 'ref_linker', linker)
-        object.__setattr__ (self, 'ref_target', target)
+    def PropertyGet (self, name):
+        return self.linker.domain.Request (LinkerService.PROPGET, self.desc, name)
 
+    def PropertySet (self, name, value):
+        return self.linker.domain.Request (LinkerService.PROPSET, self.desc, name, value)
+    
 # vim: nu ft=python columns=120 :

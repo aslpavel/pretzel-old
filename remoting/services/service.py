@@ -1,47 +1,62 @@
 # -*- coding: utf-8 -*-
-from ...event import *
+from ...async import *
 from ...disposable import *
 
-__all__ = ('Service', 'ServiceError')
+__all__ = ('Service', 'ServiceError',)
 #------------------------------------------------------------------------------#
 # Service                                                                      #
 #------------------------------------------------------------------------------#
 class ServiceError (Exception): pass
 class Service (object):
-    def __init__ (self, ports = None, persistence = None):
-        self.channel = None
-        self.ports = [] if ports is None else ports
-        self.persistence = [] if persistence is None else persistence
+    NAME = b'service::'
 
-        # events
-        self.OnAttach = Event ()
-        self.OnDetach = Event ()
+    def __init__ (self, exports = None, handlers = None, persistence = None):
+        self.exports     = tuple () if exports is None     else exports
+        self.handlers    = tuple () if handlers is None    else handlers
+        self.persistence = tuple () if persistence is None else persistence
+
+        self.domain   = None
+        self.dispose  = CompositeDisposable ()
 
     #--------------------------------------------------------------------------#
-    # Attach                                                                   #
+    # Public                                                                   #
     #--------------------------------------------------------------------------#
-    def Attach (self, channel):
-        if self.channel is not None:
-            raise ServiceError ('channel already been attached')
-        self.channel = channel
+    @DummyAsync
+    def Connect (self, domain):
+        if self.domain is not None:
+            raise ServiceError ('Service has alread been connected')
+        self.domain = domain
 
-        def disconnect ():
-            channel, self.channel = self.channel, None
-            self.OnDetach (channel)
-        disposable = CompositeDisposable (Disposable (disconnect))
-        try:
-            for port, handler in self.ports:
-                disposable += channel.BindPort (port, handler)
-            for slot, save, restore  in self.persistence:
-                disposable += channel.BindPersistence (slot, save, restore)
-            self.OnAttach (channel)
+        # exports
+        for name, handler in self.exports:
+            self.dispose += domain.Export (name, handler)
 
-            return disposable
-        except Exception:
-            disposable.Dispose ()
-            raise
+        # handlers
+        for destination, handler in self.handlers:
+            self.dispose += domain.channel.RecvToHandler (destination, handler)
+
+        # persistence
+        for type, pack, unpack in self.persistence:
+            self.dispose += domain.RegisterType (type, pack, unpack)
+        self.dispose += domain.RegisterObject (self, self.NAME)
 
     @property
-    def IsAttached (self):
-        return self.channel is not None
+    def IsConnected (self):
+        return self.domain is not None
+
+    #--------------------------------------------------------------------------#
+    # Disposable                                                               #
+    #--------------------------------------------------------------------------#
+    def Dispose (self):
+        self.domain = None
+        self.dispose.Dispose ()
+        self.dispose = CompositeDisposable ()
+
+    def __enter__ (self):
+        return self
+    
+    def __exit__ (self, et, eo, tb):
+        self.Dispose ()
+        return False
+
 # vim: nu ft=python columns=120 :

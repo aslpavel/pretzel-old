@@ -1,11 +1,15 @@
 #! /usr/bin/python
 # -*- coding: utf-8 -*-
-from __future__ import print_function
+import sys
+import os
+import io
 import time
 import itertools
 
 from . import *
+from .message import *
 from ..app import *
+
 #------------------------------------------------------------------------------#
 # Remote Objects                                                               #
 #------------------------------------------------------------------------------#
@@ -20,91 +24,113 @@ def RemoteFunction ():
     return 1
 
 #------------------------------------------------------------------------------#
-# Benchmark                                                                    #
+# Timer                                                                        #
 #------------------------------------------------------------------------------#
-Count = 1 << 13
-class Benchmark (object):
-    def __init__ (self, async):
-        self.async = async
-        self.results = []
+class Timer (object):
+    def __init__ (self):
+        self.start, self.stop = None, None
 
-        self.future = None
-        self.started, self.stopped = None, None
+    def __enter__ (self):
+        self.start = time.time ()
+        return self
 
-    #--------------------------------------------------------------------------#
-    # Run                                                                      #
-    #--------------------------------------------------------------------------#
-    def Run (self):
-        self.started = time.time ()
-        for count in range (Count):
-            self.async ().Continue (self.result_append)
-
-        self.future = Future ()
-        return self.future
-
-    #--------------------------------------------------------------------------#
-    # Properties                                                               #
-    #--------------------------------------------------------------------------#
-    @property
-    def Results (self):
-        return self.results
+    def __exit__ (self, et, oe, tb):
+        self.stop = time.time ()
+        return False
 
     @property
     def Elapsed (self):
-        return self.stopped - self.started
+        return self.stop - self.start if self.start and self.stop else None
 
-    #--------------------------------------------------------------------------#
-    # Private                                                                  #
-    #--------------------------------------------------------------------------#
-    def result_append (self, future):
-        error = future.Error ()
-        if error is None:
-            self.results.append (future.Result ())
-            if len (self.results) == Count:
-                self.stopped = time.time ()
-                self.future.ResultSet (self)
-        else:
-            self.stopped = time.time ()
-            self.future.ErrorSet (error)
+    @property
+    def ElapsedString (self):
+        return 'None' if self.Elapsed is None else '{:.3f}'.format (self.Elapsed ())
 
 #------------------------------------------------------------------------------#
 # Main                                                                         #
 #------------------------------------------------------------------------------#
-output_template = """
+OutputTemplate = """
   Type       Total   Per Call   Calls/Sec
   ---------  ------  ---------  --------
-  Method   : {0:6<.3f}s  {1:6<.6f}s  {2}
-  Function : {3:6<.3f}s  {4:6<.6f}s  {5}
+  Method   : {:6<.3f}s  {:6<.6f}s  {}
+  Function : {:6<.3f}s  {:6<.6f}s  {}
+  Message  : {:6<.3f}s  {:6<.6f}s  {}
+
 """
+CallCount = 1 << 13
+MsgCount  = 1 << 18
+
+def Usage ():
+    sys.stderr.write ('Usage: {} [ssh|fork]\n'.format (__package__))
 
 @Async
 def Main (app):
-    with ForkDomain (app.Core) as domain:
-        started = time.time ()
-        with app.Log.Pending ('Domain Start'):
-            yield domain.Run ()
-        instance = domain.InstanceCreate (Remote)
+    if '-h' in sys.argv:
+        Usage ()
+        sys.exit (0)
 
+    domain_type = 'fork' if len (sys.argv) < 2 else sys.argv [1]
+    if domain_type == 'fork':
+        domain = ForkDomain (app.Core)
+    elif domain_type == 'ssh':
+        domain = SSHDomain  (app.Core, 'localhost' if len (sys.argv) < 3 else sys.argv [2])
+    else:
+        app.Log.Error ('Unknown domain type: \'{}\''.format (domain_type))
+        Usage ()
+        sys.exit (1)
+
+    with domain:
+        yield domain.Connect ()
+        #----------------------------------------------------------------------#
+        # Method                                                               #
+        #----------------------------------------------------------------------#
+        proxy = yield domain.ProxyCreate (Remote)
         with app.Log.Pending ('Method'):
-            method_bench = yield Benchmark (lambda: instance.Method.Async ()).Run ()
-            if method_bench.Results != list (range (Count)):
+            with Timer () as method_timer:
+                futures = [proxy.Method () for i in range (CallCount)]
+                yield AllFuture (*futures)
+
+        for index, future in enumerate (futures):
+            if index != future.Result ():
                 raise ValueError ('Method benchmark failed')
-
+        
+        #----------------------------------------------------------------------#
+        # Function                                                             #
+        #----------------------------------------------------------------------#
         with app.Log.Pending ('Function'):
-            func_bench = yield Benchmark (lambda: domain.Call.Async (RemoteFunction)).Run ()
-            if func_bench.Results != [1,] * Count:
-                raise ValueError ('Function benchmark failed')
-        stopped = time.time ()
+            with Timer () as func_timer:
+                futures = [domain.Call (RemoteFunction) for i in range (CallCount)]
+                yield AllFuture (*futures)
 
-    # output result
-    app.Log.Info ('Count:{0} Elapsed:{1:.1f}s'.format (Count, stopped - started))
-    print (output_template.format (
-        method_bench.Elapsed, method_bench.Elapsed / Count, int (Count / method_bench.Elapsed),
-        func_bench.Elapsed,   func_bench.Elapsed / Count,   int (Count / func_bench.Elapsed)))
+        for future in futures:
+            if future.Result () != 1:
+                raise ValueError ('Function benchmark failed')
+            
+        #----------------------------------------------------------------------#
+        # Message                                                              #
+        #----------------------------------------------------------------------#
+        with app.Log.Pending ('Message'):
+            stream = io.BytesIO ()
+            with Timer () as msg_timer:
+                for i in range (MsgCount):
+                    Message (b'dummy::', b'DATA').Save (stream)
+                    stream.seek (0)
+                    Message.Load (stream)
+                    stream.seek (0)
+                    stream.truncate ()
+        
+    #--------------------------------------------------------------------------#
+    # Output                                                                   #
+    #--------------------------------------------------------------------------#
+    app.Log.Info ('Elapsed:{:.1f}s'.format (method_timer.Elapsed + func_timer.Elapsed + msg_timer.Elapsed))
+    sys.stdout.write (OutputTemplate.format (
+        method_timer.Elapsed, method_timer.Elapsed / CallCount, int (CallCount / method_timer.Elapsed),
+        func_timer.Elapsed,   func_timer.Elapsed / CallCount,   int (CallCount / func_timer.Elapsed),
+        msg_timer.Elapsed,    msg_timer.Elapsed / MsgCount,     int (MsgCount  / msg_timer.Elapsed)))
 
 #------------------------------------------------------------------------------#
 # Entry Point                                                                  #
 #------------------------------------------------------------------------------#
 if __name__ == '__main__':
-    Application (Main, 'remoting benchmark')
+    Application (Main, 'benchmark')
 # vim: nu ft=python columns=120 :
