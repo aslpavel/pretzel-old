@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import io
 import sys
 import pickle
 
@@ -131,10 +132,16 @@ class ErrorMessage (Message):
 
     @classmethod
     def FromError (cls, dst, error, src):
+        traceback_stream = io.StringIO ()
+        class TracebackStream (object):
+            def write (self, data):
+                traceback_stream.write (data.decode ('utf-8') if hasattr (data, 'decode') else data)
+        traceback.print_exc (file = TracebackStream ())
+
         return cls (dst, pickle.dumps ({
             'type':      error [0],
             'error':     error [1],
             'message':   str (error [1]).split ('\n') [-1],
-            'traceback': '{}{}{}'.format (*traceback.format_exception (*error)).strip ('\n')}), src)
+            'traceback': traceback_stream.getvalue ().strip ('\n')}), src)
 
 # vim: nu ft=python columns=120 :

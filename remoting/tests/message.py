@@ -69,6 +69,9 @@ class MessageTest (unittest.TestCase):
         self.assertEqual (msg_load.dst, msg_error.dst)
         self.assertEqual (type (msg_load), type (msg_error))
 
+        with self.assertRaises (ValueError): msg_error.Data
+        with self.assertRaises (ValueError): msg_load.Data
+
     def testResponse (self):
         msg = Message (b'dst', b'data', b'src')
 

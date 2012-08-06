@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import sys
 import io
 import traceback
 
@@ -85,12 +84,18 @@ class Application (object):
                 return future.Result ()
 
             except Exception:
-                error_stream = stream_type ()
-                traceback.print_exc (file = error_stream)
                 self.log.Error (String (('UNNAMED' if name is None else name, '17'), ' has terminated with error:'))
-                error_stream.seek (0)
-                for line in error_stream:
+
+                traceback_stream = io.StringIO ()
+                class TracebackStream (object):
+                    def write (self, data):
+                        traceback_stream.write (data.decode ('utf-8') if hasattr (data, 'decode') else data)
+                traceback.print_exc (file = TracebackStream ())
+
+                traceback_stream.seek (0)
+                for line in traceback_stream:
                     self.log.Error (line.rstrip ('\n'))
+
                 raise
 
             finally:
@@ -107,5 +112,4 @@ class Application (object):
     Log    = property (lambda self: self.log)
     Logger = property (lambda self: self.logger)
 
-stream_type = io.BytesIO if sys.version_info [0] < 3 else io.StringIO
 # vim: nu ft=python columns=120 :
