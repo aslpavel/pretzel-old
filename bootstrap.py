@@ -82,7 +82,7 @@ class Tomb (object):
         module.__loader__ = self
         module.__file__   = filename
         if ispkg:
-            module.__path__    = []
+            module.__path__    = [os.path.dirname (filename)]
             module.__package__ = name
         else:
             module.__package__ = name.rpartition('.')[0]

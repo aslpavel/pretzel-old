@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import sys
 import imp
 import pkgutil
@@ -102,7 +103,7 @@ class ImporterService (Service):
         module.__file__   = filename
         module.__loader__ = self
         if ispkg:
-            module.__path__    = []
+            module.__path__    = [os.path.dirname (filename)]
             module.__package__ = name
         else:
             module.__package__ = name.rpartition('.')[0]
