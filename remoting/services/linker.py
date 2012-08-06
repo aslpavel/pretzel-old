@@ -5,6 +5,7 @@ from .service import *
 from ..utils.proxy import *
 from ..message import *
 from ...async import *
+from ...disposable import *
 
 __all__ = ('LinkerService',)
 #------------------------------------------------------------------------------#
@@ -38,6 +39,15 @@ class LinkerService (Service):
         self.desc2prov = {}
         self.prov2desc = {}
         next (self.desc)
+
+    @Async
+    def Connect (self, domain):
+        yield Service.Connect (self, domain)
+
+        def dispose ():
+            self.desc2prov.clear ()
+            self.prov2desc.clear ()
+        self.dispose += Disposable (dispose)
 
     #--------------------------------------------------------------------------#
     # Methods                                                                  #
@@ -126,7 +136,7 @@ class RemoteProxyProvider (ProxyProvider):
     def __init__ (self, linker, desc = None):
         self.linker = linker
         self.desc   = desc ^ 0x1
-    
+
     #--------------------------------------------------------------------------#
     # Proxy Provider Interface                                                 #
     #--------------------------------------------------------------------------#

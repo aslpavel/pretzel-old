@@ -46,6 +46,11 @@ class LinkerTest (unittest.TestCase):
                 lambda_proxy ('new new value')
                 self.assertEqual ((yield proxy.value), 'new new value')
 
+                # proxy mapping
+                obj = yield proxy.ObjectCreate (domain)
+                self.assertTrue ((yield proxy.ObjectEqual (obj)))
+                self.assertEqual ((yield proxy.obj), obj)
+
         with Core () as core:
             run_future = run ()
         run_future.Result ()
@@ -59,6 +64,7 @@ def RemoteIncrease (value):
 class Remote (object):
     def __init__ (self, value):
         self.value = value
+        self.obj = None
 
     def Value (self):
         return self.value
@@ -71,5 +77,12 @@ class Remote (object):
 
     def Lambda (self, domain):
         return domain.ToProxy (lambda value: setattr (self, 'value', value))
+
+    def ObjectCreate (self, domain, obj = None):
+        self.obj = domain.ToProxy (object ()) if obj is None else obj
+        return self.obj
+
+    def ObjectEqual (self, obj):
+        return self.obj == obj
 
 # vim: nu ft=python columns=120 :
