@@ -15,6 +15,7 @@ class FutureServiceError (Exception): pass
 class FutureService (Service):
     NAME    = b'future::'
     RESOLVE = b'future::resolve'
+    CANCEL  = b'future::cancel'
 
     FUTURE_SUCCESS = 0
     FUTURE_ERROR   = 1
@@ -22,7 +23,9 @@ class FutureService (Service):
 
     def __init__ (self):
         Service.__init__ (self,
-            handlers = ((self.RESOLVE, self.resolve_handler),),
+            handlers = (
+                (self.RESOLVE, self.resolve_handler),
+                (self.CANCEL,  self.cancel_handler)),
             persistence = ((BaseFuture, self.futurePack, self.futureUnpack),))
 
         self.desc        = itertools.count ()
@@ -58,15 +61,15 @@ class FutureService (Service):
             self.desc2future [desc], self.future2desc [future] = future, desc
 
             def resolve (future):
-                self.desc2future.pop (desc, None)
-                self.future2desc.pop (future, None)
+                if self.desc2future.pop (desc, None) is not None:
+                    self.future2desc.pop (future, None)
 
-                error = future.Error ()
-                if error is None:
-                    data = desc ^ 0x1, self.FUTURE_SUCCESS, future.Result () 
-                else:
-                    data = desc ^ 0x1, self.FUTURE_ERROR, error [1]
-                self.domain.channel.Send (Message (self.RESOLVE, self.domain.Pack (data)))
+                    error = future.Error ()
+                    if error is None:
+                        data = desc ^ 0x1, self.FUTURE_SUCCESS, future.Result ()
+                    else:
+                        data = desc ^ 0x1, self.FUTURE_ERROR, error [1]
+                    self.domain.channel.Send (Message (self.RESOLVE, self.domain.Pack (data)))
                     
             future.Continue (resolve).Traceback ()
 
@@ -84,13 +87,13 @@ class FutureService (Service):
             desc   = value ^ 0x1
             future = self.desc2future.get (desc)
             if future is None:
-                def resolve (future):
+                def resolve (this):
                     self.desc2future.pop (desc, None)
                     self.future2desc.pop (future, None)
 
                 def cancel ():
-                    resolve ()
                     future.ErrorRaise (FutureCanceled ())
+                    self.domain.channel.Send (Message (self.CANCEL, self.domain.Pack (desc ^ 0x1)))
 
                 future = Future (cancel = Cancel (cancel))
                 future.Continue (resolve)
@@ -107,6 +110,7 @@ class FutureService (Service):
     @DummyAsync
     def resolve_handler (self, message):
         desc, type, value = self.domain.Unpack (message.Data)
+
         future = self.desc2future.get (desc)
         if future is not None:
             if type == self.FUTURE_SUCCESS:
@@ -115,5 +119,14 @@ class FutureService (Service):
                 future.ErrorRaise (value)
             else:
                 assert False, 'Invalid future type: {}'.format (type)
+
+    @DummyAsync
+    def cancel_handler (self, message):
+        desc = self.domain.Unpack (message.Data)
+
+        future = self.desc2future.pop (desc, None)
+        if future is not None:
+            self.future2desc.pop (future, None)
+            future.Cancel ()
 
 # vim: nu ft=python columns=120 :
