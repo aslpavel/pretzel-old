@@ -41,14 +41,7 @@ class DefaultDomain (Domain):
 
         self.channel.Send (request)
         AsyncReturn (self.Unpack ((yield response).Data))
-  
-    """TODO: if handler is asynchronous?
-    def Response (self, message, handler):
-        try:
-            self.channel.Send (message.Response (handler (*self.Unapck (message.Data))))
-        except Exception:
-            self.channel.Error (message.ErrorResponse (sys.exc_info ()))
-    """
+
     def Response (self, message):
         return Response (self, message)
 
@@ -65,6 +58,34 @@ class DefaultDomain (Domain):
             (self.channel, self.CHANNEL_NAME),
             (self.channel.core, self.CORE_NAME)):
                 self.dispose += self.RegisterObject (obj, name)
+
+#------------------------------------------------------------------------------#
+# Response                                                                     #
+#------------------------------------------------------------------------------#
+class ResponseReturn (BaseException): pass
+class Response (object):
+    __slots__ = ('domain', 'message',)
+
+    def __init__ (self, domain, message):
+        self.domain  = domain
+        self.message = message
+
+    def __call__ (self, result = None):
+        raise ResponseReturn (result)
+
+    def __enter__ (self):
+        return self
+
+    def __exit__ (self, et, eo, tb):
+        if et is None:
+            self.domain.channel.Send (self.message.Response (self.domain.Pack (None)))
+        elif et == ResponseReturn:
+            try: self.domain.channel.Send (self.message.Response (self.domain.Pack (eo.args [0])))
+            except Exception:
+                self.domain.channel.Send (self.message.ErrorResponse (sys.exc_info ()))
+        else:
+            self.domain.channel.Send (self.message.ErrorResponse ((et, eo, tb)))
+        return True
 
 #------------------------------------------------------------------------------#
 # Local Domain                                                                 #
@@ -116,34 +137,6 @@ class LocalDomain (DefaultDomain):
 class RemoteDomain (DefaultDomain):
     def __init__ (self, channel):
         DefaultDomain.__init__ (self, channel, insert_importer = True)
-
-#------------------------------------------------------------------------------#
-# Response                                                                     #
-#------------------------------------------------------------------------------#
-class ResponseReturn (BaseException): pass
-class Response (object):
-    __slots__ = ('domain', 'message',)
-
-    def __init__ (self, domain, message):
-        self.domain  = domain
-        self.message = message
-
-    def __call__ (self, result = None):
-        raise ResponseReturn (result)
-
-    def __enter__ (self):
-        return self
-
-    def __exit__ (self, et, eo, tb):
-        if et is None:
-            self.domain.channel.Send (self.message.Response (self.domain.Pack (None)))
-        elif et == ResponseReturn:
-            try: self.domain.channel.Send (self.message.Response (self.domain.Pack (eo.args [0])))
-            except Exception:
-                self.domain.channel.Send (self.message.ErrorResponse (sys.exc_info ()))
-        else:
-            self.domain.channel.Send (self.message.ErrorResponse ((et, eo, tb)))
-        return True
 
 #-----------------------------------------------------------------------------#
 # Helpers                                                                     #
