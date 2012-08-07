@@ -18,6 +18,7 @@ class LinkerTest (unittest.TestCase):
 
         with Core () as core:
             run_future = run ()
+            run_future.Continue (lambda future: core.Stop ())
         run_future.Result ()
 
     def testProxy (self):
@@ -53,6 +54,7 @@ class LinkerTest (unittest.TestCase):
 
         with Core () as core:
             run_future = run ()
+            run_future.Continue (lambda future: core.Stop ())
         run_future.Result ()
 
 #------------------------------------------------------------------------------#
