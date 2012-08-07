@@ -29,7 +29,7 @@ class SSHChannel (FileChannel):
         if self.port is not None:
             self.command.extend (('-p', self.port))
         self.command.extend (('-c', '\'{0}\''
-            .format (payload.format (bootstrap = BootstrapModule (), remoting_name = remoting_name))))
+            .format (payload.format (bootstrap = BootstrapModules (), remoting_name = remoting_name))))
 
         FileChannel.__init__ (self, core)
 

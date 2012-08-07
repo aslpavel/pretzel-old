@@ -7,7 +7,7 @@ import pickle
 import binascii
 import inspect
 
-__all__ = ('Tomb', 'BootstrapModule', 'BootstrapSource',)
+__all__ = ('Tomb', 'BootstrapModules', 'BootstrapSource',)
 #------------------------------------------------------------------------------#
 # Tomb                                                                         #
 #------------------------------------------------------------------------------#
@@ -132,20 +132,24 @@ class Tomb (object):
 #------------------------------------------------------------------------------#
 # Bootstrap                                                                    #
 #------------------------------------------------------------------------------#
-def BootstrapModule (module = None):
-    this_module = sys.modules [__name__]
-    if module is None:
-        module  = sys.modules [(__package__ if __package__ else __name__).split ('.') [0]]
-    tomb = Tomb ()
-    tomb += module
-
-    data = binascii.b2a_base64 (tomb.Save ()).strip ().decode ('utf-8')
-    this_payload = BootstrapSource ('_bootstrap', inspect.getsource (this_module),
+def BootstrapModules (modules = None):
+    # this payload
+    this_module  = sys.modules [__name__]
+    this_payload = BootstrapSource ('_bootstrap',
+        inspect.getsource (this_module),
         inspect.getsourcefile (this_module))
+
+    # modules payload
+    tomb    = Tomb ()
+    modules = modules if modules else (sys.modules [(__package__ if __package__ else __name__).split ('.') [0]],)
+    for module in modules:
+        tomb.Add (module)
+    modules_data = binascii.b2a_base64 (tomb.Save ()).strip ().decode ('utf-8')
+
     return module_payload.format (**locals ())
 
-module_payload = r"""{this_payload}
-sys.meta_path.insert (0, _bootstrap.Tomb.Load (binascii.a2b_base64 (b"{data}")))
+module_payload = """{this_payload}\
+sys.meta_path.insert (0, _bootstrap.Tomb.Load (binascii.a2b_base64 (b"{modules_data}")))
 """
 
 def BootstrapSource (name, source, filename):
@@ -211,15 +215,15 @@ else:
 #------------------------------------------------------------------------------#
 def Main ():
     if '-h' in sys.argv:
-        sys.stderr.write ('Usage: {} [<module>]\n'.format (os.path.basename (sys.argv [0])))
+        sys.stderr.write ('Usage: {} [<modules>]\n'.format (os.path.basename (sys.argv [0])))
         sys.exit (1)
 
-    import importlib
-    module_name = sys.argv [1] if len (sys.argv) > 1 else None
-    payload = BootstrapModule (None if module_name is None else importlib.import_module (module_name))
-
     sys.stdout.write ('# -*- coding: utf-8 -*-')
-    sys.stdout.write (payload)
+    if len (sys.argv) > 1:
+        import importlib
+        sys.stdout.write (BootstrapModules (importlib.import_module (name) for name in sys.argv [1:]))
+    else:
+        sys.stdout.write (BootstrapModules ())
     sys.stdout.write ('\n')
 
 if __name__ == '__main__':

@@ -58,7 +58,7 @@ class ForkChannel (FileChannel):
 
         # send payload
         try:
-            os.write (payload_out, payload.format (bootstrap = BootstrapModule (),
+            os.write (payload_out, payload.format (bootstrap = BootstrapModules (),
                 remoting_name = remoting_name, rr = rr, rw = rw).encode ())
         finally:
             os.close (payload_out)
