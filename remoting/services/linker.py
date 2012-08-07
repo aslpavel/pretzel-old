@@ -94,19 +94,19 @@ class LinkerService (Service):
     @DummyAsync
     def call_handler (self, message):
         with self.domain.Response (message) as response:
-            func, args, keys = self.domain.Unpack (message.Data)
+            func, args, keys = response.Args
             response (func (*args, **keys))
 
     @DummyAsync
     def create_handler (self, message):
         with self.domain.Response (message) as response:
-            type, args, keys = self.domain.Unpack (message.Data)
+            type, args, keys = response.Args
             response (self.ToProxy (type (*args, **keys)))
 
     @Async
     def method_handler (self, message):
         with self.domain.Response (message) as response:
-            desc, name, args, keys = self.domain.Unpack (message.Data)
+            desc, name, args, keys = response.Args
             prov = self.desc2prov.get (desc)
             if prov is None:
                 raise ValueError ('Unknown proxy provider: \'desc:{}\''.format (desc))
@@ -116,7 +116,7 @@ class LinkerService (Service):
     @Async
     def get_handler (self, message):
         with self.domain.Response (message) as response:
-            desc, name = self.domain.Unpack (message.Data)
+            desc, name = response.Args
             prov = self.desc2prov.get (desc)
             if prov is None:
                 raise ValueError ('Unknown proxy provider: \'desc:{}\''.format (desc))
@@ -126,7 +126,7 @@ class LinkerService (Service):
     @Async
     def set_handler (self, message):
         with self.domain.Response (message) as response:
-            desc, name, value = self.domain.Unpack (message.Data)
+            desc, name, value = response.Args
             prov = self.desc2prov.get (desc)
             if prov is None:
                 raise ValueError ('Unknown proxy provider: \'desc:{}\''.format (desc))

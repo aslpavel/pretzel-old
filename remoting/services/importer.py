@@ -77,7 +77,7 @@ class ImporterService (Service):
     @DummyAsync
     def find_handler (self, message):
         with self.domain.Response (message) as response:
-            name = self.domain.Unpack (message.Data) [0]
+            name = response.Args [0]
             if sys.modules.get (name, False) is None:
                 return
             loader = pkgutil.get_loader (name)
@@ -95,7 +95,7 @@ class ImporterService (Service):
     @DummyAsync
     def push_handler (self, message):
         with self.domain.Response (message) as response:
-            name, source, filename = self.domain.Unpack (message.Data)
+            name, source, filename = response.Args (message.Data)
             self.load (name, source, filename, ispkg = False)
             
     def load (self, name, source, filename, ispkg):

@@ -70,6 +70,16 @@ class Response (object):
         self.domain  = domain
         self.message = message
 
+    #--------------------------------------------------------------------------#
+    # Properties                                                               #
+    #--------------------------------------------------------------------------#
+    @property
+    def Args (self):
+        return self.domain.Unpack (self.message.Data)
+
+    #--------------------------------------------------------------------------#
+    # Return                                                                   #
+    #--------------------------------------------------------------------------#
     def __call__ (self, result = None):
         raise ResponseReturn (result)
 
