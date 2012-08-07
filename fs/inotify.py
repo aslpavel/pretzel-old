@@ -20,21 +20,29 @@ class InotifyImpl (object):
            not hasattr (libc, 'inotify_add_watch') or \
            not hasattr (libc, 'inotify_rm_watch'):
                raise NotImplementedError ('inotify interface not implemented by libc')
-        self.libc = libc
+
+        # functions
+        self.inotify_init = libc.inotify_init
+        self.inotify_init.argtypes = tuple ()
+        self.inotify_init.restype  = ctypes.c_int
+
+        self.inotify_add_watch = libc.inotify_add_watch
+        self.inotify_add_watch.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_uint,)
+        self.inotify_add_watch.restype  = ctypes.c_int
+
+        self.inotify_rm_watch = libc.inotify_rm_watch
+        self.inotify_rm_watch.argtypes  = (ctypes.c_int, ctypes.c_int,)
+        self.inotify_rm_watch.restype   = ctypes.c_int
 
     def init (self):
-        fd = self.libc.inotify_init ()
+        fd = self.inotify_init ()
         if fd == -1:
             errno = ctypes.get_errno ()
             raise OSError (errno, os.strerror (errno))
         return fd
 
     def add_watch (self, fd, path, mask):
-        assert isinstance (path, str)
-        assert (isinstance (fd, int) and fd >= 0)
-        assert (isinstance (mask, int) and mask > 0)
-
-        watch_desc = self.libc.inotify_add_watch (fd, path.encode (sys.getfilesystemencoding ()), mask)
+        watch_desc = self.inotify_add_watch (fd, path.encode (sys.getfilesystemencoding ()), mask)
         if watch_desc == -1:
             errno = ctypes.get_errno ()
             raise OSError (errno, os.strerror (errno))
@@ -42,10 +50,7 @@ class InotifyImpl (object):
         return watch_desc
 
     def rm_watch (self, fd, wd):
-        assert (isinstance (fd, int) and fd >= 0)
-        assert (isinstance (wd, int) and wd >= 0)
-
-        if self.libc.inotify_rm_watch (fd, wd) != 0:
+        if self.inotify_rm_watch (fd, wd) != 0:
             errno = ctypes.get_errno ()
             raise OSError (errno, os.strerror (errno))
 
