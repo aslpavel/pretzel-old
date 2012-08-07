@@ -6,10 +6,11 @@ __all__ = ('Proxy', 'ProxyAttribute', 'ProxyProvider', 'LocalProxyProvider',)
 # Proxy                                                                        #
 #------------------------------------------------------------------------------#
 class Proxy (object):
-    __slots__ = ('_provider',)
+    __slots__ = ('_provider', '_lock')
 
-    def __init__ (self, provider):
+    def __init__ (self, provider, lock = None):
         object.__setattr__ (self, '_provider', provider)
+        object.__setattr__ (self, '_lock',     lock)
 
     #--------------------------------------------------------------------------#
     # Call                                                                     #
