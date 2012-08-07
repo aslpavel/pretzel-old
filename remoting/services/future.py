@@ -71,7 +71,7 @@ class FutureService (Service):
                         data = desc ^ 0x1, self.FUTURE_ERROR, error [1]
                     self.domain.channel.Send (Message (self.RESOLVE, self.domain.Pack (data)))
                     
-            future.Continue (resolve).Traceback ()
+            future.Continue (resolve)
 
         return self.FUTURE_WAIT, desc
 
