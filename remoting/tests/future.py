@@ -14,7 +14,7 @@ class FutureTest (unittest.TestCase):
         def run ():
             with ForkDomain (core, push_main = False) as domain:
                 yield domain.Connect ()
-                proxy = yield domain.ProxyCreate (RemoteFuture)
+                proxy = yield domain.Call.Proxy (RemoteFuture)
 
                 # done future
                 yield proxy.Create ()

@@ -17,7 +17,6 @@ __all__ = ('LinkerService',)
 class LinkerService (Service):
     NAME    = b'linker::'
     CALL    = b'linker::call'
-    CREATE  = b'linker::create'
     METHOD  = b'linker::method'
     PROPSET = b'linker::propset'
     PROPGET = b'linker::propget'
@@ -26,16 +25,14 @@ class LinkerService (Service):
     def __init__ (self):
         Service.__init__ (self,
             exports = (
-                ('ToProxy',     self.ToProxy),
-                ('ProxyCreate', self.ProxyCreate),
-                ('Call',        self.Call)),
+                ('ToProxy',    self.ToProxy),
+                ('Call',       self.Call)),
             handlers = (
-                (self.CALL,     self.call_handler),
-                (self.CREATE,   self.create_handler),
-                (self.METHOD,   self.method_handler),
-                (self.PROPGET,  self.get_handler),
-                (self.PROPSET,  self.set_handler),
-                (self.DISPOSE,  self.dispose_handler)),
+                (self.CALL,    self.call_handler),
+                (self.METHOD,  self.method_handler),
+                (self.PROPGET, self.get_handler),
+                (self.PROPSET, self.set_handler),
+                (self.DISPOSE, self.dispose_handler)),
             persistence = (
                 (Proxy, self.proxyPack, self.proxyUnpack),))
 
@@ -60,9 +57,6 @@ class LinkerService (Service):
     def ToProxy (self, instance):
         return Proxy (LocalProxyProvider (instance))
 
-    def ProxyCreate (self, type, *args, **keys):
-        return self.domain.Request (self.CREATE, type, args, keys)
-        
     @Queryable
     def Call (self, args, keys, query):
         return self.domain.Request (self.CALL, args [0], args [1:], keys, query)
@@ -97,13 +91,7 @@ class LinkerService (Service):
     def call_handler (self, message):
         with self.domain.Response (message) as response:
             func, args, keys, query = response.Args
-            response ((yield Query (func (*args, **keys), query)))
-
-    @DummyAsync
-    def create_handler (self, message):
-        with self.domain.Response (message) as response:
-            type, args, keys = response.Args
-            response (self.ToProxy (type (*args, **keys)))
+            response ((yield ProxyQuery (func (*args, **keys), query)))
 
     @Async
     def method_handler (self, message):

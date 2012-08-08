@@ -2,7 +2,7 @@
 from .queryable import *
 from ...async import *
 
-__all__ = ('Proxy', 'ProxyAttribute', 'ProxyProvider', 'LocalProxyProvider',)
+__all__ = ('Proxy', 'ProxyQuery', 'ProxyProvider', 'LocalProxyProvider',)
 #------------------------------------------------------------------------------#
 # Proxy                                                                        #
 #------------------------------------------------------------------------------#
@@ -16,16 +16,14 @@ class Proxy (object):
     #--------------------------------------------------------------------------#
     # Call                                                                     #
     #--------------------------------------------------------------------------#
-    @Queryable
-    def __call__ (self, args, keys, query):
-        return self._provider.Call ('__call__', args, keys, query)
+    def __call__ (self, *args, **keys):
+        return self._provider.Call ('__call__', args, keys, tuple ())
 
     #--------------------------------------------------------------------------#
     # Attributes                                                               #
     #--------------------------------------------------------------------------#
-    @Queryable
-    def __getattr__ (self, args, keys, query):
-        return ProxyAttribute (self._provider, args [0], query)
+    def __getattr__ (self, name):
+        return ProxyAttribute (self._provider, name)
 
     def __setattr__ (self, name, value):
         self._provider.PropertySet (name, value)
@@ -45,21 +43,43 @@ class Proxy (object):
 class ProxyAttribute (LazyFuture):
     __slots__ = LazyFuture.__slots__ + ('provider', 'name', 'query',)
 
-    def __init__ (self, provider, name, query):
+    def __init__ (self, provider, name, query = None):
         LazyFuture.__init__ (self, self.propertyGet)
 
         self.provider = provider
         self.name     = name
-        self.query    = query
+        self.query    = query if query else tuple ()
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
+    def propertyGet (self):
+        return self.provider.PropertyGet (self.name, self.query)
+
     def __call__ (self, *args, **keys):
         return self.provider.Call (self.name, args, keys, self.query)
 
-    def propertyGet (self):
-        return self.provider.PropertyGet (self.name, self.query)
+    def __getattr__ (self, name):
+        return ProxyAttribute (self.provider, self.name, self.query + (name,))
+
+    def __str__ (self):
+        return '<ProxyAttribute: Name:{} Query:{}>'.format (self.name, ','.join (self.query))
+
+#------------------------------------------------------------------------------#
+# Proxy Query                                                                  #
+#------------------------------------------------------------------------------#
+@Async
+def ProxyQuery (target, query):
+    for name in query:
+        if name == 'Await':
+            target = yield target
+        elif name == 'Null':
+            target = None
+        elif name == 'Proxy':
+            target = Proxy (LocalProxyProvider (target))
+        else:
+            raise ValueError ('Unknown query command: \'{}\''.format (name))
+    AsyncReturn (target)
 
 #------------------------------------------------------------------------------#
 # Proxy Provider                                                               #
@@ -93,10 +113,10 @@ class LocalProxyProvider (ProxyProvider):
     # Proxy Provider Interface                                                 #
     #--------------------------------------------------------------------------#
     def Call (self, name, args, keys, query):
-        return Query (getattr (self.instance, name) (*args, **keys), query)
+        return ProxyQuery (getattr (self.instance, name) (*args, **keys), query)
 
     def PropertyGet (self, name, query):
-        return Query (getattr (self.instance, name), query)
+        return ProxyQuery (getattr (self.instance, name), query)
 
     @DummyAsync
     def PropertySet (self, name, value):

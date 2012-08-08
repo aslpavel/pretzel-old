@@ -28,7 +28,7 @@ class LinkerTest (unittest.TestCase):
                 yield domain.Connect ()
 
                 # create
-                proxy = yield domain.ProxyCreate (Remote, 'value')
+                proxy = yield domain.Call.Proxy (Remote, 'value')
             
                 # method
                 self.assertEqual ((yield proxy.Value ()), 'value')
@@ -43,7 +43,7 @@ class LinkerTest (unittest.TestCase):
                     yield proxy.Error (ValueError ())
 
                 # lambda proxy
-                lambda_proxy = yield proxy.Lambda (domain)
+                lambda_proxy = yield proxy.Lambda.Proxy ()
                 lambda_proxy ('new new value')
                 self.assertEqual ((yield proxy.value), 'new new value')
 
@@ -77,8 +77,8 @@ class Remote (object):
     def Error (self, error):
         raise error
 
-    def Lambda (self, domain):
-        return domain.ToProxy (lambda value: setattr (self, 'value', value))
+    def Lambda (self):
+        return lambda value: setattr (self, 'value', value)
 
     def ObjectCreate (self, domain, obj = None):
         self.obj = domain.ToProxy (object ()) if obj is None else obj

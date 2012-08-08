@@ -84,7 +84,7 @@ def Main (app):
         #----------------------------------------------------------------------#
         # Method                                                               #
         #----------------------------------------------------------------------#
-        proxy = yield domain.ProxyCreate (Remote)
+        proxy = yield domain.Call.Proxy (Remote)
         with app.Log.Pending ('Method'):
             with Timer () as method_timer:
                 futures = [proxy.Method () for i in range (CallCount)]
