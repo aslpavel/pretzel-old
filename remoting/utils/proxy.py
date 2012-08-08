@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from .queryable import *
 from ...async import *
 
 __all__ = ('Proxy', 'ProxyAttribute', 'ProxyProvider', 'LocalProxyProvider',)
@@ -15,14 +16,16 @@ class Proxy (object):
     #--------------------------------------------------------------------------#
     # Call                                                                     #
     #--------------------------------------------------------------------------#
-    def __call__ (self, *args, **keys):
-        return self._provider.Call ('__call__', *args, **keys)
+    @Queryable
+    def __call__ (self, args, keys, query):
+        return self._provider.Call ('__call__', args, keys, query)
 
     #--------------------------------------------------------------------------#
     # Attributes                                                               #
     #--------------------------------------------------------------------------#
-    def __getattr__ (self, name):
-        return ProxyAttribute (self._provider, name)
+    @Queryable
+    def __getattr__ (self, args, keys, query):
+        return ProxyAttribute (self._provider, args [0], query)
 
     def __setattr__ (self, name, value):
         self._provider.PropertySet (name, value)
@@ -40,22 +43,23 @@ class Proxy (object):
 # Proxy Attribute                                                              #
 #------------------------------------------------------------------------------#
 class ProxyAttribute (LazyFuture):
-    __slots__ = LazyFuture.__slots__ + ('provider', 'name',)
+    __slots__ = LazyFuture.__slots__ + ('provider', 'name', 'query',)
 
-    def __init__ (self, provider, name):
+    def __init__ (self, provider, name, query):
         LazyFuture.__init__ (self, self.propertyGet)
 
         self.provider = provider
-        self.name = name
+        self.name     = name
+        self.query    = query
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
     def __call__ (self, *args, **keys):
-        return self.provider.Call (self.name, *args, **keys)
+        return self.provider.Call (self.name, args, keys, self.query)
 
     def propertyGet (self):
-        return self.provider.PropertyGet (self.name)
+        return self.provider.PropertyGet (self.name, self.query)
 
 #------------------------------------------------------------------------------#
 # Proxy Provider                                                               #
@@ -63,7 +67,7 @@ class ProxyAttribute (LazyFuture):
 class ProxyProvider (object):
     __slots__ = tuple ()
 
-    def Call (self, name, *args, **keys):
+    def Call (self, name, args, keys, query):
         return FailedFuture (NotImplementedError ())
 
     def PropertyGet (self, name):
@@ -88,13 +92,11 @@ class LocalProxyProvider (ProxyProvider):
     #--------------------------------------------------------------------------#
     # Proxy Provider Interface                                                 #
     #--------------------------------------------------------------------------#
-    @DummyAsync
-    def Call (self, name, *args, **keys):
-        return getattr (self.instance, name) (*args, **keys)
+    def Call (self, name, args, keys, query):
+        return Query (getattr (self.instance, name) (*args, **keys), query)
 
-    @DummyAsync
-    def PropertyGet (self, name):
-        return getattr (self.instance, name)
+    def PropertyGet (self, name, query):
+        return Query (getattr (self.instance, name), query)
 
     @DummyAsync
     def PropertySet (self, name, value):

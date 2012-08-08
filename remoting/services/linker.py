@@ -5,6 +5,7 @@ import itertools
 
 from .service import *
 from ..utils.proxy import *
+from ..utils.queryable import *
 from ..message import *
 from ...async import *
 from ...disposable import *
@@ -62,8 +63,9 @@ class LinkerService (Service):
     def ProxyCreate (self, type, *args, **keys):
         return self.domain.Request (self.CREATE, type, args, keys)
         
-    def Call (self, func, *args, **keys):
-        return self.domain.Request (self.CALL, func, args, keys)
+    @Queryable
+    def Call (self, args, keys, query):
+        return self.domain.Request (self.CALL, args [0], args [1:], keys, query)
         
     #--------------------------------------------------------------------------#
     # Marshal                                                                  #
@@ -91,11 +93,11 @@ class LinkerService (Service):
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
-    @DummyAsync
+    @Async
     def call_handler (self, message):
         with self.domain.Response (message) as response:
-            func, args, keys = response.Args
-            response (func (*args, **keys))
+            func, args, keys, query = response.Args
+            response ((yield Query (func (*args, **keys), query)))
 
     @DummyAsync
     def create_handler (self, message):
@@ -106,22 +108,19 @@ class LinkerService (Service):
     @Async
     def method_handler (self, message):
         with self.domain.Response (message) as response:
-            desc, name, args, keys = response.Args
+            desc, name, args, keys, query = response.Args
             prov = self.desc2prov.get (desc)
-            if prov is None:
-                raise ValueError ('Unknown proxy provider: \'desc:{}\''.format (desc))
-
-            response ((yield prov.Call (name, *args, **keys)))
+            response ((yield prov.Call (name, args, keys, query)))
 
     @Async
     def get_handler (self, message):
         with self.domain.Response (message) as response:
-            desc, name = response.Args
+            desc, name, query = response.Args
             prov = self.desc2prov.get (desc)
             if prov is None:
                 raise ValueError ('Unknown proxy provider: \'desc:{}\''.format (desc))
 
-            response ((yield prov.PropertyGet (name)))
+            response ((yield prov.PropertyGet (name, query)))
 
     @Async
     def set_handler (self, message):
@@ -155,11 +154,11 @@ class RemoteProxyProvider (ProxyProvider):
     #--------------------------------------------------------------------------#
     # Proxy Provider Interface                                                 #
     #--------------------------------------------------------------------------#
-    def Call (self, name, *args, **keys):
-        return self.linker.domain.Request (LinkerService.METHOD, self.desc, name, args, keys)
+    def Call (self, name, args, keys, query):
+        return self.linker.domain.Request (LinkerService.METHOD, self.desc, name, args, keys, query)
 
-    def PropertyGet (self, name):
-        return self.linker.domain.Request (LinkerService.PROPGET, self.desc, name)
+    def PropertyGet (self, name, query):
+        return self.linker.domain.Request (LinkerService.PROPGET, self.desc, name, query)
 
     def PropertySet (self, name, value):
         return self.linker.domain.Request (LinkerService.PROPSET, self.desc, name, value)
