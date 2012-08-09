@@ -96,6 +96,7 @@ class ImporterService (Service):
     def push_handler (self, message):
         with self.domain.Response (message) as response:
             name, source, filename = response.Args
+            self.containments [name] = name, source, filename, False
             self.load (name, source, filename, ispkg = False)
             
     def load (self, name, source, filename, ispkg):
