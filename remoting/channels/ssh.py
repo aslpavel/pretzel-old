@@ -5,7 +5,6 @@ import struct
 import traceback
 
 from .file import *
-from .channel import *
 from .. import __name__ as remoting_name
 from ...async import *
 from ...bootstrap import *
