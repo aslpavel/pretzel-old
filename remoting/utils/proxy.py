@@ -71,14 +71,12 @@ class ProxyAttribute (LazyFuture):
 @Async
 def ProxyQuery (target, query):
     for name in query:
-        if name == 'Await':
-            target = yield target
-        elif name == 'Null':
-            target = None
-        elif name == 'Proxy':
-            target = Proxy (LocalProxyProvider (target))
+        if   name == 'Await': target = yield target
+        elif name == 'Null':  target = None
+        elif name == 'Proxy': target = Proxy (LocalProxyProvider (target))
         else:
             raise ValueError ('Unknown query command: \'{}\''.format (name))
+
     AsyncReturn (target)
 
 #------------------------------------------------------------------------------#
