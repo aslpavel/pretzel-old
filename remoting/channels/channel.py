@@ -32,6 +32,7 @@ class Channel (object):
             try: yield self.connect ()
             except Exception:
                 self.disconnect ()
+                raise
                 
     @property
     def IsConnected (self):

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-import sys
 import os
+import sys
+import struct
 import traceback
 
 from .file import *
@@ -23,14 +24,14 @@ class SSHChannel (FileChannel):
         self.identity_file = identity_file
 
         # ssh command
-        self.command = [self.ssh_exec, host, self.py_exec]
-        if self.identity_file is not None:
-            self.command.extend (('-i', self.identity_file))
-        if self.port is not None:
-            self.command.extend (('-p', self.port))
-        self.command.extend (('-c', '\'{0}\''
-            .format (payload.format (bootstrap = BootstrapModules (), remoting_name = remoting_name))))
+        self.command = [self.ssh_exec, '-T', host, self.py_exec]
+        self.command.extend (('-i', self.identity_file) if self.identity_file else [])
+        self.command.extend (('-p', self.port)          if self.port          else [])
+        self.command.extend (('-c', payload_template.format (
+            bootstrap = BootstrapBootstrap ('_bootstrap'),
+            remoting_name = remoting_name)))
 
+        # base .ctor
         FileChannel.__init__ (self, core)
 
     #--------------------------------------------------------------------------#
@@ -69,6 +70,13 @@ class SSHChannel (FileChannel):
             finally:
                 sys.exit (1)
 
+        # send payload
+        tomb    = Tomb ()
+        tomb   += sys.modules [(__package__ if __package__ else __name__).split ('.') [0]]
+        payload = tomb.Save ()
+        os.write (lw, struct.pack ('!L', len (payload)))
+        os.write (lw, payload)
+
         # set files
         self.FilesSet (
             self.core.AsyncFileCreate (lr, closefd = True),
@@ -86,12 +94,21 @@ class SSHChannel (FileChannel):
 #------------------------------------------------------------------------------#
 # Payload Pattern                                                              #
 #------------------------------------------------------------------------------#
-payload = r"""# -*- coding: utf-8 -*-
+payload_template = r"""'# -*- coding: utf-8 -*-
 {bootstrap}
 
-import sys
-from importlib import import_module
+#------------------------------------------------------------------------------#
+# Pretzel                                                                      #
+#------------------------------------------------------------------------------#
+import io, sys, struct
+with io.open (0, "rb", buffering = 0, closefd = False) as stream:
+    size = struct.unpack ("!L", stream.read (struct.calcsize ("!L"))) [0]
+    sys.meta_path.append (_bootstrap.Tomb.Load (stream.read (size)))
 
+#------------------------------------------------------------------------------#
+# Main                                                                         #
+#------------------------------------------------------------------------------#
+from importlib import import_module
 def Main ():
     import_module ("{remoting_name}")
     async    = import_module ("..async", "{remoting_name}")
@@ -105,6 +122,6 @@ def Main ():
 if __name__ == "__main__":
     sys.stdout = sys.stderr
     Main ()
-"""
+'"""
     
 # vim: nu ft=python columns=120 :

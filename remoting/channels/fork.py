@@ -79,6 +79,9 @@ payload = r"""# -*- coding: utf-8 -*-
 {bootstrap}
 from importlib import import_module
 
+#------------------------------------------------------------------------------#
+# Main                                                                         #
+#------------------------------------------------------------------------------#
 def Main ():
     import_module ("{remoting_name}")
     async   = import_module ("..async", "{remoting_name}")

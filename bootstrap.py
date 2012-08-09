@@ -7,7 +7,7 @@ import pickle
 import binascii
 import inspect
 
-__all__ = ('Tomb', 'BootstrapModules', 'BootstrapSource',)
+__all__ = ('Tomb', 'BootstrapModules', 'BootstrapSource', 'BootstrapBootstrap',)
 #------------------------------------------------------------------------------#
 # Tomb                                                                         #
 #------------------------------------------------------------------------------#
@@ -133,11 +133,8 @@ class Tomb (object):
 # Bootstrap                                                                    #
 #------------------------------------------------------------------------------#
 def BootstrapModules (modules = None):
-    # this payload
-    this_module  = sys.modules [__name__]
-    this_payload = BootstrapSource ('_bootstrap',
-        inspect.getsource (this_module),
-        inspect.getsourcefile (this_module))
+    # bootstrap payload
+    bootstrap = BootstrapBootstrap ('_bootstrap')
 
     # modules payload
     tomb    = Tomb ()
@@ -148,8 +145,8 @@ def BootstrapModules (modules = None):
 
     return module_payload.format (**locals ())
 
-module_payload = """{this_payload}\
-sys.meta_path.insert (0, _bootstrap.Tomb.Load (binascii.a2b_base64 (b"{modules_data}")))
+module_payload = """{bootstrap}\
+sys.meta_path.append (_bootstrap.Tomb.Load (binascii.a2b_base64 (b"{modules_data}")))
 """
 
 def BootstrapSource (name, source, filename):
@@ -181,6 +178,10 @@ try: {name} = load ()
 finally:
     del load
 """
+
+def BootstrapBootstrap (name):
+    module  = sys.modules [__name__]
+    return BootstrapSource (name, inspect.getsource (module), inspect.getsourcefile (module))
 
 #------------------------------------------------------------------------------#
 # Exec and Raise                                                               #
