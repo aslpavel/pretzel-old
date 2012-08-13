@@ -214,18 +214,50 @@ else:
 #------------------------------------------------------------------------------#
 # Main                                                                         #
 #------------------------------------------------------------------------------#
+def Usage ():
+    usage_pattern = '''Usage: {name} [options] [<modules>]
+    -h|?      : print this help message
+    -m <file> : use file as main
+'''
+    sys.stderr.write (usage_pattern.format (name = os.path.basename (sys.argv [0])))
+
 def Main ():
-    if '-h' in sys.argv:
-        sys.stderr.write ('Usage: {} [<modules>]\n'.format (os.path.basename (sys.argv [0])))
+    import getopt
+    import importlib
+
+    #--------------------------------------------------------------------------#
+    # Parse Options                                                            #
+    #--------------------------------------------------------------------------#
+    try:
+        opts, args = getopt.getopt (sys.argv [1:], '?hm:')
+    except getopt.GetoptError as error:
+        sys.stderr.write (':: error: {}\n'.format (error))
+        Usage ()
         sys.exit (1)
 
-    sys.stdout.write ('# -*- coding: utf-8 -*-')
-    if len (sys.argv) > 1:
-        import importlib
-        sys.stdout.write (BootstrapModules (importlib.import_module (name) for name in sys.argv [1:]))
+    main_path = None
+    for o, a in opts:
+        if o in ('-h', '-?'):
+            Usage ()
+            sys.exit (0)
+        elif o == '-m':
+            main_path = a
+        else:
+            assert False, 'Uhnadled option: {}'.format (o)
+
+    #--------------------------------------------------------------------------#
+    # Output                                                                   #
+    #--------------------------------------------------------------------------#
+    sys.stdout.write ('# -*- coding: utf-8 -*-\n' if main_path is None else '#! /usr/bin/python\n')
+    if args:
+        sys.stdout.write (BootstrapModules (importlib.import_module (name) for name in args))
     else:
         sys.stdout.write (BootstrapModules ())
     sys.stdout.write ('\n')
+
+    if main_path:
+        with open (main_path, 'r') as main_stream:
+            sys.stdout.write (main_stream.read ())
 
 if __name__ == '__main__':
     Main ()
