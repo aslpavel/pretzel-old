@@ -23,7 +23,13 @@ class SSHChannel (FileChannel):
         self.identity_file = identity_file
 
         # ssh command
-        self.command = [self.ssh_exec, '-T', host, self.py_exec]
+        self.command = [
+            self.ssh_exec,         # command
+            '-T',                  # disable pseudo-tty allocation
+            '-o', 'BatchMode=yes', # don't ask password
+            host,                  # host
+            self.py_exec           # python command
+        ]
         self.command.extend (('-i', self.identity_file) if self.identity_file else [])
         self.command.extend (('-p', self.port)          if self.port          else [])
         self.command.extend (('-c', payload_template.format (
