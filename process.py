@@ -2,8 +2,10 @@
 import io
 import os
 import signal
+import traceback
 
 from .async import *
+from .async.core.fd import *
 from .disposable import *
 
 __all__ = ('Process', 'ProcessCall', 'ProcessError')
@@ -35,19 +37,35 @@ class Process (object):
             # parent
             os.close (ri); os.close (ro); os.close (ralive)
 
-            self.stdin  = self.core.AsyncFileCreate (li, self.buffer_size); self.dispose += self.stdin
-            self.stdout = self.core.AsyncFileCreate (lo, self.buffer_size); self.dispose += self.stdout
-            self.result = self.result_worker (lalive);    self.dispose += self.result
+            self.stdin = self.core.AsyncFileCreate (li, self.buffer_size)
+            self.stdin.CloseOnExec (True)
+            self.dispose += self.stdin
+
+            self.stdout = self.core.AsyncFileCreate (lo, self.buffer_size)
+            self.stdout.CloseOnExec (True)
+            self.dispose += self.stdout
+
+            self.result = self.result_worker (lalive)
+            self.dispose += self.result
         else:
             # child
             try:
                 os.close (lalive)
-                os.close (li); os.dup2 (ri, 0) # standard input
-                os.close (lo); os.dup2 (ro, 1) # standard output
+                os.close (li)
+                os.close (lo)
+
+                os.dup2 (ri, 0)
+                os.close (ri)
+
+                os.dup2 (ro, 1)
+                os.close (ro)
+
                 if self.environ is None:
                     os.execvp (self.command [0], self.command)
                 else:
                     os.execvpe (self.command [0], self.command, self.environ)
+
+            except Exception: traceback.print_exc ()
             finally:
                 os.kill (os.getpid (), signal.SIGKILL)
 
@@ -89,6 +107,7 @@ class Process (object):
     @Async
     def result_worker (self, fd):
         try:
+            FileCloseOnExec (fd, True)
             yield self.core.Poll (fd, self.core.READABLE)
         except CoreDisconnectedError: pass
         except Exception:
@@ -113,9 +132,9 @@ def ProcessCall (core, command, input = None, environ = None, check = None, buff
         with Process (core, command, environ, check, buffer_size) as proc:
             # input
             if input is not None:
-                proc.Stdin.Write (input).Continue (lambda future: proc.Stdin.Close ())
+                proc.Stdin.Write (input).Continue (lambda future: proc.Stdin.Dispose ())
             else:
-                proc.Stdin.Close ()
+                proc.Stdin.Dispose ()
 
             # output
             try:
