@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import re
+import io
 import imp
 import zlib
 import pickle
@@ -43,17 +45,15 @@ class Tomb (object):
                         continue
 
                     filename = os.path.join (path, file)
-                    with open (filename, 'rb') as stream:
-                        source = stream.read ()
-                    name = modname if os.path.samefile (path, root) else \
+                    source   = self.read_source (filename)
+                    name     = modname if os.path.samefile (path, root) else \
                         '.'.join ((modname, os.path.relpath (path, root).replace ('/', '.')))
                     if file.lower () == '__init__.py':
                         self.containments [name] = source, filename, True 
                     else:
                         self.containments ['.'.join ((name, file [:-3]))] = source, filename, False 
         else:
-            with open (filename, 'rb') as stream:
-                self.containments [modname] = stream.read (), filename, False
+            self.containments [modname] = self.read_source (filename), filename, False
 
     def __iadd__ (self, module):
         self.Add (module)
@@ -111,7 +111,7 @@ class Tomb (object):
         containment = self.containments.get (name)
         if containment is None:
             raise ImportError ('No such module: \'{}\''.format (name))
-        return containment [0].decode ('utf-8')
+        return containment [0]
 
     #--------------------------------------------------------------------------#
     # Save | Load                                                              #
@@ -128,6 +128,26 @@ class Tomb (object):
 
     def __setstate__ (self, state):
         self.containments = dict (Tomb.Load (state).containments)
+
+    #--------------------------------------------------------------------------#
+    # Private                                                                  #
+    #--------------------------------------------------------------------------#
+    @staticmethod
+    def read_source (filename):
+        source   = io.BytesIO ()
+        encoding = 'utf-8'
+        encoding_pattern = re.compile (b'coding[:=]\s*([-\w.]+)') # PEP: 0263
+
+        with open (filename, 'rb') as stream:
+            for line in stream:
+                if line.startswith (b'#'):
+                    match = encoding_pattern.search (line)
+                    if match:
+                        encoding = match.group (1).decode ()
+                        continue
+                source.write (line)
+
+        return source.getvalue ().decode (encoding)
 
 #------------------------------------------------------------------------------#
 # Bootstrap                                                                    #
@@ -256,8 +276,7 @@ def Main ():
     sys.stdout.write ('\n')
 
     if main_path:
-        with open (main_path, 'r') as main_stream:
-            sys.stdout.write (main_stream.read ())
+        sys.stdout.write (Tomb.read_source (main_path))
 
 if __name__ == '__main__':
     Main ()
