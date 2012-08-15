@@ -119,7 +119,7 @@ class LocalDomain (DefaultDomain):
     @Async
     def do_push_main (self):
         if not self.IsConnected:
-            raise DomainError ('channel is not connected')
+            raise DomainError ('Channel isn\'t connected')
 
         mainname = '_remote_main' if '_remote_main' in sys.modules else '__main__'
         main     = sys.modules [mainname]
