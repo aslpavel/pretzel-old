@@ -108,7 +108,10 @@ payload_template = r"""'# -*- coding: utf-8 -*-
 import io, sys, struct
 with io.open (0, "rb", buffering = 0, closefd = False) as stream:
     size = struct.unpack ("!L", stream.read (struct.calcsize ("!L"))) [0]
-    sys.meta_path.append (_bootstrap.Tomb.Load (stream.read (size)))
+    data = stream.read (size)
+    if len (data) != size:
+        raise ValueError ("Payload is incomplete")
+    sys.meta_path.append (_bootstrap.Tomb.Load (data))
 
 #------------------------------------------------------------------------------#
 # Main                                                                         #
