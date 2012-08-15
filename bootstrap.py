@@ -85,7 +85,7 @@ class Tomb (object):
             module.__path__    = [os.path.dirname (filename)]
             module.__package__ = name
         else:
-            module.__package__ = name.rpartition('.')[0]
+            module.__package__ = name.rpartition ('.') [0]
 
         sys.modules [name] = module
         try:

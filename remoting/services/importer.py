@@ -45,9 +45,16 @@ class ImporterService (Service):
     # Importer Interface                                                       #
     #--------------------------------------------------------------------------#
     def find_module (self, name, path = None):
+        # cached
         if name in self.containments:
             return self
 
+        # parent
+        package = sys.modules.get (name.rpartition ('.') [0])
+        if package and getattr (package, '__loader__', None) != self:
+            return None
+
+        # remote
         containment = ~self.domain.Request (self.FIND, name)
         if containment is None:
             return None
@@ -107,7 +114,7 @@ class ImporterService (Service):
             module.__path__    = [os.path.dirname (filename)]
             module.__package__ = name
         else:
-            module.__package__ = name.rpartition('.')[0]
+            module.__package__ = name.rpartition ('.') [0]
 
         sys.modules [name] = module
         try:
