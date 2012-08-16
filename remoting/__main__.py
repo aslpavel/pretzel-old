@@ -71,9 +71,9 @@ def Main (app):
 
     domain_type = 'fork' if len (sys.argv) < 2 else sys.argv [1]
     if domain_type == 'fork':
-        domain = ForkDomain (app.Core)
+        domain = ForkDomain ()
     elif domain_type == 'ssh':
-        domain = SSHDomain  (app.Core, 'localhost' if len (sys.argv) < 3 else sys.argv [2])
+        domain = SSHDomain  ('localhost' if len (sys.argv) < 3 else sys.argv [2])
     else:
         app.Log.Error ('Unknown domain type: \'{}\''.format (domain_type))
         Usage ()

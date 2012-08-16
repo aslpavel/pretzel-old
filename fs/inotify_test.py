@@ -12,15 +12,15 @@ __all__ = ('FileMonitorInotifyTest',)
 class FileMonitorInotifyTest (unittest.TestCase):
     def test (self):
         @Async
-        def main (core):
+        def main ():
             with CompositeDisposable () as dispose:
                 # stream
                 stream = open (__file__)
                 dispose += stream
-                core.Idle ().Continue (lambda future: stream.close ())
+                Core.Instance ().Idle ().Continue (lambda future: stream.close ())
 
                 # monitor
-                file_monitor = FileMonitor (core)
+                file_monitor = FileMonitor ()
                 dispose += file_monitor
 
                 # watch
@@ -29,7 +29,7 @@ class FileMonitorInotifyTest (unittest.TestCase):
 
                 # init
                 try:
-                    changed, timeout = file_watch.Changed (), core.Sleep (1)
+                    changed, timeout = file_watch.Changed (), Core.Instance ().Sleep (1)
                     self.assertFalse  (stream.closed, 'File has been closed too early')
                     result = yield AnyFuture (changed, timeout)
                 finally:
@@ -41,8 +41,8 @@ class FileMonitorInotifyTest (unittest.TestCase):
                 self.assertEqual (result, changed, 'Test timeouted')
                 self.assertTrue  (result, result.Result () [1] & FM_CLOSE_NOWRITE)
 
-        with Core () as core:
-            main_future = main (core)
+        with Core.Instance ():
+            main_future = main ()
         main_future.Result ()
 
 # vim: nu ft=python columns=120 :

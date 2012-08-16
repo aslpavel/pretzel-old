@@ -14,7 +14,7 @@ __all__ = ('SSHChannel',)
 # SSH Channel                                                                  #
 #------------------------------------------------------------------------------#
 class SSHChannel (FileChannel):
-    def __init__ (self, core, host, port = None, identity_file = None, ssh_exec = None, py_exec = None):
+    def __init__ (self, host, port = None, identity_file = None, ssh_exec = None, py_exec = None, core = None):
         self.pid           = None
         self.host          = host
         self.port          = port
@@ -37,7 +37,7 @@ class SSHChannel (FileChannel):
             remoting_name = remoting_name)))
 
         # base .ctor
-        FileChannel.__init__ (self, core)
+        FileChannel.__init__ (self, core = core)
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
@@ -83,9 +83,7 @@ class SSHChannel (FileChannel):
         os.write (lw, payload)
 
         # set files
-        self.FilesSet (
-            self.core.AsyncFileCreate (lr, closefd = True),
-            self.core.AsyncFileCreate (lw, closefd = True))
+        self.FilesSet (AsyncFile (lr, core = self.core), AsyncFile (lw, core = self.core))
 
         yield FileChannel.connect (self)
 

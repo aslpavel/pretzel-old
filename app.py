@@ -12,6 +12,7 @@ __all__ = async.__all__ + ('Application',)
 #------------------------------------------------------------------------------#
 # Application                                                                  #
 #------------------------------------------------------------------------------#
+class ApplicationError (object): pass
 class Application (object):
     def __init__ (self, main, name = None, run = True, log_file = None, console = None, core = None):
         """Application Object
@@ -29,8 +30,11 @@ class Application (object):
 
         self.log     = Log (name)
         self.logger  = None
-        self.core    = Core () if core is None else core
         self.console = True if console is None else console
+
+        self.core = Core.Instance (lambda: core or Core ())
+        if self.core != Core.Instance ():
+            raise ApplicationError ('Core has already been initialized')
 
         self.OnQuit  = Event ()
         if run:

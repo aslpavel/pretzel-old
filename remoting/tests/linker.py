@@ -12,11 +12,11 @@ class LinkerTest (unittest.TestCase):
     def testCall (self):
         @Async
         def run ():
-            with ForkDomain (core, push_main = False) as domain:
+            with ForkDomain (push_main = False) as domain:
                 yield domain.Connect ()
                 self.assertEqual ((yield domain.Call (RemoteIncrease, 1)), 2)
 
-        with Core () as core:
+        with Core.Instance () as core:
             run_future = run ()
             run_future.Continue (lambda future: core.Stop ())
         run_future.Result ()
@@ -24,7 +24,7 @@ class LinkerTest (unittest.TestCase):
     def testProxy (self):
         @Async
         def run ():
-            with ForkDomain (core, push_main = False) as domain:
+            with ForkDomain (push_main = False) as domain:
                 yield domain.Connect ()
 
                 # create
@@ -52,7 +52,7 @@ class LinkerTest (unittest.TestCase):
                 self.assertTrue ((yield proxy.ObjectEqual (obj)))
                 self.assertEqual ((yield proxy.obj), obj)
 
-        with Core () as core:
+        with Core.Instance () as core:
             run_future = run ()
             run_future.Continue (lambda future: core.Stop ())
         run_future.Result ()

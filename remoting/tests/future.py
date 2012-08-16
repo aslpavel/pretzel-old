@@ -12,7 +12,7 @@ class FutureTest (unittest.TestCase):
     def testFuture (self):
         @Async
         def run ():
-            with ForkDomain (core, push_main = False) as domain:
+            with ForkDomain (push_main = False) as domain:
                 yield domain.Connect ()
                 proxy = yield domain.Call.Proxy (RemoteFuture)
 
@@ -47,7 +47,7 @@ class FutureTest (unittest.TestCase):
                 self.assertEqual (future.Error () [1].args, ('failed',))
                 self.assertEqual (type (future), RaisedFuture)
 
-        with Core () as core:
+        with Core.Instance () as core:
             run_future = run ()
             run_future.Continue (lambda future: core.Stop ())
         run_future.Result ()

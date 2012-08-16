@@ -101,13 +101,13 @@ class FileMonitorError (Exception): pass
 class FileMonitor (object):
     inotify_impl = InotifyImpl ()
 
-    def __init__ (self, core):
-        self.core = core
+    def __init__ (self, core = None):
+        self.core = core or Core.Instance ()
         self.watches = {}
 
         self.event_struct = struct.Struct ('iIII')
         self.fd = self.inotify_impl.init ()
-        self.file = core.AsyncFileCreate (self.fd)
+        self.file = AsyncFile (self.fd, core = self.core)
         self.worker = self.worker_main ()
 
     @property

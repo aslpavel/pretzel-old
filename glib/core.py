@@ -68,15 +68,6 @@ class GCore (object):
         return self.future_create (GLib.idle_add, resolve)
 
     #--------------------------------------------------------------------------#
-    # Factories                                                                #
-    #--------------------------------------------------------------------------#
-    def AsyncSocketCreate (self, sock):
-        return AsyncSocket (self, sock)
-
-    def AsyncFileCreate (self, fd, buffer_size = None, closefd = None):
-        return AsyncFile (self, fd, buffer_size, closefd)
-
-    #--------------------------------------------------------------------------#
     # Run | Stop                                                               #
     #--------------------------------------------------------------------------#
     def Run (self):

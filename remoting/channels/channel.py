@@ -13,8 +13,8 @@ __all__ = ('Channel', 'ChannelError',)
 #------------------------------------------------------------------------------#
 class ChannelError (Exception): pass
 class Channel (object):
-    def __init__ (self, core):
-        self.core = core
+    def __init__ (self, core = None):
+        self.core = core or Core.Instance ()
 
         self.recv_handlers = {}
         self.recv_queue    = {}

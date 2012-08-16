@@ -3,24 +3,23 @@ from .default import *
 
 from ..channels.fork import *
 from ..channels.file import *
+from ...async.core import *
 
 __all__ = ('ForkDomain', )
 #-----------------------------------------------------------------------------#
 # Local Fork Domain                                                           #
 #-----------------------------------------------------------------------------#
 class ForkDomain (LocalDomain):
-    def __init__ (self, core, command = None, push_main = None):
-        LocalDomain.__init__ (self, ForkChannel (core, command), push_main = push_main)
+    def __init__ (self, command = None, push_main = None, core = None):
+        LocalDomain.__init__ (self, ForkChannel (command, core), push_main = push_main)
 
 #-----------------------------------------------------------------------------#
 # Remote Fork Domain                                                          #
 #-----------------------------------------------------------------------------#
 class ForkRemoteDomain (RemoteDomain):
-    def __init__ (self, core, rr, rw):
-        channel = FileChannel (core)
-        channel.FilesSet (
-        	core.AsyncFileCreate (rr, closefd = True),
-        	core.AsyncFileCreate (rw, closefd = True))
+    def __init__ (self, rr, rw, core = None):
+        channel = FileChannel (core or Core.Instance ())
+        channel.FilesSet (AsyncFile (rr, core = channel.core), AsyncFile (rw, core = channel.core))
 
         RemoteDomain.__init__ (self, channel)
 

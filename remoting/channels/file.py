@@ -7,8 +7,8 @@ __all__ = ('FileChannel',)
 # FileChannel                                                                  #
 #------------------------------------------------------------------------------#
 class FileChannel (Channel):
-    def __init__ (self, core):
-        Channel.__init__ (self, core)
+    def __init__ (self, core = None):
+        Channel.__init__ (self, core = core)
 
         self.ifile = None
         self.ofile = None

@@ -13,18 +13,18 @@ class NestedDomainTest (unittest.TestCase):
     def test (self):
         @Async
         def run ():
-            with ForkDomain (core, push_main = False) as domain:
+            with ForkDomain (push_main = False) as domain:
                 yield domain.Connect ()
 
                 this_pid   = os.getpid ()
                 remote_pid = yield domain.Call (os.getpid)
-                nested_pid = yield domain.Call (Nested, core, os.getpid).Unwrap ()
+                nested_pid = yield domain.Call (Nested, os.getpid).Unwrap ()
 
                 self.assertNotEqual (this_pid, remote_pid)
                 self.assertNotEqual (this_pid, nested_pid)
                 self.assertNotEqual (remote_pid, nested_pid)
 
-        with Core () as core:
+        with Core.Instance () as core:
             run_future = run ()
             run_future.Continue (lambda future: core.Stop ())
         run_future.Result ()
@@ -32,9 +32,9 @@ class NestedDomainTest (unittest.TestCase):
 #------------------------------------------------------------------------------#
 # Helpers                                                                      #
 #------------------------------------------------------------------------------#
-def Nested (core, func, *args, **keys):
+def Nested (func, *args, **keys):
     def nested ():
-        with ForkDomain (core, push_main = False) as domain:
+        with ForkDomain (push_main = False) as domain:
             yield domain.Connect ()
             AsyncReturn ((yield domain.Call (func, *args, **keys)))
     return Async (nested) ()

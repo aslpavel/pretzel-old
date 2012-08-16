@@ -27,9 +27,8 @@ class MessageTest (unittest.TestCase):
     def testSerializeAsync (self):
         msg = Message (b'dst', b'data')
 
-        with Core () as core:
-            r, w = os.pipe ()
-            ra, wa = core.AsyncFileCreate (r), core.AsyncFileCreate (w)
+        with Core.Instance () as core:
+            ra, wa = (AsyncFile (fd) for fd in os.pipe ())
             
             @Async
             def test ():

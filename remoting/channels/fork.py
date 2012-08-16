@@ -13,8 +13,8 @@ __all__ = ('ForkChannel',)
 # ForkChannel                                                                  #
 #------------------------------------------------------------------------------#
 class ForkChannel (FileChannel):
-    def __init__ (self, core, command = None):
-        FileChannel.__init__ (self, core)
+    def __init__ (self, command = None, core = None):
+        FileChannel.__init__ (self, core = core)
         self.command = [sys.executable, '-'] if command is None else command
 
     #--------------------------------------------------------------------------#
@@ -52,9 +52,7 @@ class ForkChannel (FileChannel):
                 sys.exit (1)
 
         # set files
-        self.FilesSet (
-            self.core.AsyncFileCreate (lr, closefd = True),
-            self.core.AsyncFileCreate (lw, closefd = True))
+        self.FilesSet (AsyncFile (lr, core = self.core), AsyncFile (lw, core = self.core))
 
         # send payload
         try:
@@ -87,8 +85,8 @@ def Main ():
     async   = import_module ("..async", "{remoting_name}")
     domains = import_module (".domains.fork", "{remoting_name}")
 
-    with async.Core () as core:
-        domain = domains.ForkRemoteDomain (core, {rr}, {rw})
+    with async.Core.Instance () as core:
+        domain = domains.ForkRemoteDomain ({rr}, {rw}, core = core)
         domain.channel.OnDisconnect += core.Stop
         domain.Connect ().Traceback ("remote::connect")
 

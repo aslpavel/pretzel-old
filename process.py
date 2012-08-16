@@ -14,8 +14,8 @@ __all__ = ('Process', 'ProcessCall', 'ProcessError')
 #------------------------------------------------------------------------------#
 class ProcessError (Exception): pass
 class Process (object):
-    def __init__ (self, core, command, environ = None, check = None, buffer_size = None):
-        self.core    = core
+    def __init__ (self, command, environ = None, check = None, buffer_size = None, core = None):
+        self.core    = core or Core.Instance ()
         self.command = command
         self.environ = environ
         self.buffer_size = default_buffer_size if buffer_size is None else buffer_size
@@ -37,11 +37,11 @@ class Process (object):
             # parent
             os.close (ri); os.close (ro); os.close (ralive)
 
-            self.stdin = self.core.AsyncFileCreate (li, self.buffer_size)
+            self.stdin = AsyncFile (li, self.buffer_size, core = self.core)
             self.stdin.CloseOnExec (True)
             self.dispose += self.stdin
 
-            self.stdout = self.core.AsyncFileCreate (lo, self.buffer_size)
+            self.stdout = AsyncFile (lo, self.buffer_size, core = self.core)
             self.stdout.CloseOnExec (True)
             self.dispose += self.stdout
 
@@ -126,10 +126,10 @@ class Process (object):
 #------------------------------------------------------------------------------#
 # Call Process                                                                 #
 #------------------------------------------------------------------------------#
-def ProcessCall (core, command, input = None, environ = None, check = None, buffer_size = None):
+def ProcessCall (command, input = None, environ = None, check = None, buffer_size = None, core = None):
     # helper
     def processCall ():
-        with Process (core, command, environ, check, buffer_size) as proc:
+        with Process (command, environ, check, buffer_size, core) as proc:
             # input
             if input is not None:
                 proc.Stdin.Write (input).Continue (lambda future: proc.Stdin.Dispose ())
