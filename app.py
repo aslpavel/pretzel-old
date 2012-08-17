@@ -51,7 +51,7 @@ class Application (object):
         # create log and logger
         self.logger = CompositeLogger (LoggerCreate () if self.console else TextLogger ())
         try:
-            with CompositeDisposable (self.logger) as disposable:
+            with CompositeDisposable ((self.logger,)) as disposable:
                 #--------------------------------------------------------------#
                 # Logging                                                      #
                 #--------------------------------------------------------------#

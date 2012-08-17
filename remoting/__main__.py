@@ -88,7 +88,7 @@ def Main (app):
         with app.Log.Pending ('Method'):
             with Timer () as method_timer:
                 futures = [proxy.Method () for i in range (CallCount)]
-                yield AllFuture (*futures)
+                yield AllFuture (futures)
 
         for index, future in enumerate (futures):
             if index != future.Result ():
@@ -100,7 +100,7 @@ def Main (app):
         with app.Log.Pending ('Function'):
             with Timer () as func_timer:
                 futures = [domain.Call (RemoteFunction) for i in range (CallCount)]
-                yield AllFuture (*futures)
+                yield AllFuture (futures)
 
         for future in futures:
             if future.Result () != 1:

@@ -31,7 +31,7 @@ class FileMonitorInotifyTest (unittest.TestCase):
                 try:
                     changed, timeout = file_watch.Changed (), Core.Instance ().Sleep (1)
                     self.assertFalse  (stream.closed, 'File has been closed too early')
-                    result = yield AnyFuture (changed, timeout)
+                    result = yield AnyFuture ((changed, timeout))
                 finally:
                     timeout.Dispose ()
                     changed.Dispose ()

@@ -108,8 +108,8 @@ class Observable (object):
                     observer.OnNext (context.value)
                 observer.OnCompleted ()
 
-            return CompositeDisposable (context.worker,
-                self.Subscribe (AnonymousObserver (onNext, onError, onCompleted)))
+            return CompositeDisposable ((context.worker,
+                self.Subscribe (AnonymousObserver (onNext, onError, onCompleted))))
 
         return AnonymousObservable (Subscribe)
 
@@ -177,8 +177,8 @@ class Observable (object):
                     observer.OnNext (context.value)
                 observer.OnCompleted ()
 
-            return CompositeDisposable (context.worker,
-                self.Subsctibe (AnonymousObserver (onNext, onError, onCompleted)))
+            return CompositeDisposable ((context.worker,
+                self.Subsctibe (AnonymousObserver (onNext, onError, onCompleted))))
 
         return AnonymousObservable (Subscribe)
 

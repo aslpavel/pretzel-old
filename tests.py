@@ -40,7 +40,7 @@ class DisposablesTests (unittest.TestCase):
             lambda: operator.setitem (ctx, 2, 1),
             lambda: operator.setitem (ctx, 3, 1)))
 
-        d = CompositeDisposable (d0)
+        d = CompositeDisposable ((d0,))
         self.assertEqual (ctx, [0, 0, 0, 0])
 
         d += d1

@@ -107,14 +107,15 @@ class MutableDisposable (BaseDisposable):
 class CompositeDisposable (BaseDisposable):
     __slots__ = ('disposables',)
 
-    def __init__ (self, *disposables):
+    def __init__ (self, disposables = None):
         self.disposables = []
-        try:
-            for disposable in disposables:
-                self.Add (disposable)
-        except Exception:
-            self.Dispose ()
-            raise
+        if disposables:
+            try:
+                for disposable in disposables:
+                    self.Add (disposable)
+            except Exception:
+                self.Dispose ()
+                raise
 
     #--------------------------------------------------------------------------#
     # Add|Remove                                                               #
