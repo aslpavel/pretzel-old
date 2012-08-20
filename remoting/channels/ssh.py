@@ -123,7 +123,7 @@ def Main ():
     async    = import_module ("..async", "{remoting_name}")
     domains  = import_module (".domains.ssh", "{remoting_name}")
 
-    with async.Core () as core:
+    with async.Core.Instance () as core:
         domain = domains.SSHRemoteDomain (core)
         domain.channel.OnDisconnect += core.Dispose
         domain.Connect ().Traceback ("remote::connect")

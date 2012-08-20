@@ -45,22 +45,7 @@ class ImporterService (Service):
     # Importer Interface                                                       #
     #--------------------------------------------------------------------------#
     def find_module (self, name, path = None):
-        # cached
-        if name in self.containments:
-            return self
-
-        # parent
-        package = sys.modules.get (name.rpartition ('.') [0])
-        if package and getattr (package, '__loader__', None) != self:
-            return None
-
-        # remote
-        containment = ~self.domain.Request (self.FIND, name)
-        if containment is None:
-            return None
-
-        self.containments [name] = containment
-        return self
+        return None if self.containment (name, False) is None else self
 
     def load_module (self, name):
         module = sys.modules.get (name)
@@ -124,10 +109,20 @@ class ImporterService (Service):
             sys.modules.pop (name, None)
             raise
 
-    def containment (self, name):
-        containment = self.containments.get (name)
-        if containment is None:
+    def containment (self, name, throw = True):
+        containment = self.containments.get (name, False)
+        if containment is False:
+            parent = sys.modules.get (name.rpartition ('.') [0])
+            if parent and getattr (parent, '__loader__', None) != self:
+                # parent was loaded with different loader
+                containment = None
+            else:
+                containment = ~self.domain.Request (self.FIND, name)
+            self.containments [name] = containment
+
+        if containment is None and throw:
             raise ImportError ('Can\'t find module: \'{}\''.format (name))
+
         return containment
 
 # vim: nu ft=python columns=120 :
