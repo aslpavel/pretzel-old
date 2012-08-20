@@ -108,7 +108,7 @@ class Process (object):
     def result_worker (self, fd):
         try:
             FileCloseOnExec (fd, True)
-            yield self.core.Poll (fd, self.core.READABLE)
+            yield self.core.Poll (fd, self.core.READ)
         except CoreDisconnectedError: pass
         except Exception:
             os.kill (self.pid, signal.SIGTERM)

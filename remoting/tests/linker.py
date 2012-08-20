@@ -18,7 +18,7 @@ class LinkerTest (unittest.TestCase):
 
         with Core.Instance () as core:
             run_future = run ()
-            run_future.Continue (lambda future: core.Stop ())
+            run_future.Continue (lambda future: core.Dispose ())
         run_future.Result ()
 
     def testProxy (self):
@@ -35,7 +35,7 @@ class LinkerTest (unittest.TestCase):
 
                 # property
                 self.assertEqual ((yield proxy.value), 'value')
-                proxy.value = 'new value'
+                yield proxy._provider.PropertySet ('value', 'new value')
                 self.assertEqual ((yield proxy.value), 'new value')
 
                 # error
@@ -44,7 +44,7 @@ class LinkerTest (unittest.TestCase):
 
                 # lambda proxy
                 lambda_proxy = yield proxy.Lambda.Proxy ()
-                lambda_proxy ('new new value')
+                yield lambda_proxy ('new new value')
                 self.assertEqual ((yield proxy.value), 'new new value')
 
                 # proxy mapping
@@ -54,7 +54,7 @@ class LinkerTest (unittest.TestCase):
 
         with Core.Instance () as core:
             run_future = run ()
-            run_future.Continue (lambda future: core.Stop ())
+            run_future.Continue (lambda future: core.Dispose ())
         run_future.Result ()
 
 #------------------------------------------------------------------------------#

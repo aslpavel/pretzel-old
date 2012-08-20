@@ -26,7 +26,7 @@ class NestedDomainTest (unittest.TestCase):
 
         with Core.Instance () as core:
             run_future = run ()
-            run_future.Continue (lambda future: core.Stop ())
+            run_future.Continue (lambda future: core.Dispose ())
         run_future.Result ()
 
 #------------------------------------------------------------------------------#

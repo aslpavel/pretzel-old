@@ -119,7 +119,7 @@ class FileMonitor (object):
     #--------------------------------------------------------------------------#
     def Watch (self, path, mask):
         if self.worker is None or self.worker.IsCompleted ():
-            raise FileMonitorError ('worker is dead')
+            raise FileMonitorError ('Worker is dead: {}'.format (self.worker))
 
         desc = self.inotify_impl.add_watch (self.fd, path, mask)
         watch = self.watches.get (desc)

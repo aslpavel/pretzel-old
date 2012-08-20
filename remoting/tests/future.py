@@ -24,6 +24,7 @@ class FutureTest (unittest.TestCase):
                 self.assertTrue  ((yield proxy.Equal (future)))
 
                 yield proxy.Done ('result')
+                yield future
                 self.assertEqual (future.Result (), 'result')
                 self.assertEqual (type ((yield proxy.Future)), SucceededFuture)
 
@@ -32,9 +33,12 @@ class FutureTest (unittest.TestCase):
                 future = yield proxy.Future
 
                 yield proxy.Error (ValueError ('test'))
-                self.assertEqual (future.Error () [0], ValueError)
-                self.assertEqual (future.Error () [1].args, ('test',))
                 self.assertEqual (type ((yield proxy.Future)), RaisedFuture)
+                try:
+                    yield future
+                except Exception as error:
+                    self.assertEqual (type (error), ValueError)
+                    self.assertEqual (error.args, ('test',))
 
                 # succeeded future
                 future = yield proxy.Succeeded ()
@@ -49,7 +53,7 @@ class FutureTest (unittest.TestCase):
 
         with Core.Instance () as core:
             run_future = run ()
-            run_future.Continue (lambda future: core.Stop ())
+            run_future.Continue (lambda future: core.Dispose ())
         run_future.Result ()
 
 #------------------------------------------------------------------------------#

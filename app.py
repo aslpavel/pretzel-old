@@ -71,7 +71,6 @@ class Application (object):
                     main_result = self.main (self)
                     if isinstance (main_result, BaseFuture):
                         with self.core:
-                            self.core.Sleep (1 << 27) # ~ 100 Years (keeps core running until main is resolved)
                             self.Watch (main_result, name = self.name, critical = True)
                 finally:
                     self.OnQuit (self)
@@ -104,7 +103,7 @@ class Application (object):
 
             finally:
                 if critical:
-                    self.core.Stop ()
+                    self.core.Dispose ()
 
         return future.Continue (watch_continuation)
 

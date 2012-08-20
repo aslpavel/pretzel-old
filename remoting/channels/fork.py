@@ -87,7 +87,7 @@ def Main ():
 
     with async.Core.Instance () as core:
         domain = domains.ForkRemoteDomain ({rr}, {rw}, core = core)
-        domain.channel.OnDisconnect += core.Stop
+        domain.channel.OnDisconnect += core.Dispose
         domain.Connect ().Traceback ("remote::connect")
 
 if __name__ == "__main__":

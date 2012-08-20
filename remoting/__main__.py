@@ -65,6 +65,9 @@ def Usage ():
 
 @Async
 def Main (app):
+    #--------------------------------------------------------------------------#
+    # Arguments                                                                #
+    #--------------------------------------------------------------------------#
     if '-h' in sys.argv:
         Usage ()
         sys.exit (0)
@@ -79,6 +82,9 @@ def Main (app):
         Usage ()
         sys.exit (1)
 
+    #--------------------------------------------------------------------------#
+    # Run                                                                      #
+    #--------------------------------------------------------------------------#
     with domain:
         yield domain.Connect ()
         #----------------------------------------------------------------------#
@@ -90,9 +96,8 @@ def Main (app):
                 futures = [proxy.Method () for i in range (CallCount)]
                 yield AllFuture (futures)
 
-        for index, future in enumerate (futures):
-            if index != future.Result ():
-                raise ValueError ('Method benchmark failed')
+        if sorted (list (future.Result () for future in futures)) != list (range (CallCount)):
+            raise ValueError ('Method benchmark failed')
         
         #----------------------------------------------------------------------#
         # Function                                                             #

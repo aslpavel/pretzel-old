@@ -3,7 +3,6 @@ import time
 
 from ..async import *
 from ..async.core.file import *
-from ..async.core.sock import *
 from ..async.wait import *
 from ..async.cancel import *
 
@@ -15,14 +14,11 @@ __all__ = ('GCore',)
 #------------------------------------------------------------------------------#
 class GCore (object):
     def __init__ (self, context = None):
-        self.uids, self.futures = set (), set ()
+        self.futures = set ()
 
     #--------------------------------------------------------------------------#
     # Sleep                                                                    #
     #--------------------------------------------------------------------------#
-    def SleepUntil (self, resume):
-        return self.Sleep (resume - time.time ())
-
     def Sleep (self, delay):
         resume = time.time () + delay
         if delay < 0:
@@ -33,31 +29,28 @@ class GCore (object):
             future.ResultSet (resume)
         return self.future_create (GLib.timeout_add, resolve, int (delay * 1000))
 
-    def Schedule (self, delay, action):
-        return self.Sleep (delay).ContinueWithFunction (lambda now: action ())
+    def SleepUntil (self, resume):
+        return self.Sleep (resume - time.time ())
 
     #--------------------------------------------------------------------------#
     # Poll                                                                     #
     #--------------------------------------------------------------------------#
-    READABLE     = GLib.IO_IN
-    WRITABLE     = GLib.IO_OUT
-    URGENT       = GLib.IO_PRI
-    DISCONNECTED = GLib.IO_HUP
-    INVALID      = GLib.IO_NVAL
-    ERROR        = GLib.IO_ERR
-    ALL          = URGENT | WRITABLE | READABLE
-    ALL_ERRORS   = ERROR | DISCONNECTED | INVALID
+    READ       = GLib.IO_IN
+    WRITE      = GLib.IO_OUT
+    URGENT     = GLib.IO_PRI
+    DISCONNECT = GLib.IO_HUP
+    ERROR      = GLib.IO_ERR | GLib.IO_NVAL | GLib.IO_HUP
 
     def Poll (self, fd, mask):
         # create future
         def resolve (future, fd, cond):
-            if cond & self.ALL_ERRORS:
-                future.ErrorRaise (CoreDisconnectedError () if cond & self.DISCONNECTED
+            if cond & self.ERROR:
+                future.ErrorRaise (CoreDisconnectedError () if cond & self.DISCONNECT
                     else CoreInvalidError () if cond & self.INVALID
                     else CoreIOError ())
             else:
                 future.ResultSet (cond)
-        return self.future_create (GLib.io_add_watch, resolve, fd, mask | self.ALL_ERRORS)
+        return self.future_create (GLib.io_add_watch, resolve, fd, mask | self.ERROR)
 
     #--------------------------------------------------------------------------#
     # Idle                                                                     #
@@ -73,21 +66,18 @@ class GCore (object):
     def Run (self):
         try:
             context = GLib.main_context_default ()
-            while self.uids:
+            while self.futures:
                 context.iteration (True)
         finally:
-            self.resolve_with_error (CoreError ('Core has terminated without resolving this future'))
+            self.Dispose (CoreError ('Core has terminated without resolving this future'))
 
-    def Stop (self):
-        self.resolve_with_error (CoreStopped ())
-            
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
     def wait (self, uids):
         context = GLib.main_context_default ()
-        uids = set (uids)
-        while not (uids - self.uids):
+        running = AnyFuture (uid () for uid in uids)
+        while not running.IsCompleted ():
             context.iteration (True)
 
     def future_create (self, enqueue, resolve, *args):
@@ -99,44 +89,42 @@ class GCore (object):
         # create future
         def cancel ():
             GLib.source_remove (source_id)
-            self.uids.discard (source_id)
             self.futures.discard (future)
             future.ErrorRaise (FutureCanceled ())
 
         def resolve_internal (*resolve_args):
-            self.uids.discard (source_id)
             self.futures.discard (future)
             resolve (future, *resolve_args)
+
             # remove from event loop
             return False
 
-        future  = Future (cancel = Cancel (cancel))
+        future = Future (Wait (lambda: future, self.wait), Cancel (cancel))
 
         # enqueue
         args = list (args)
         args.append (resolve_internal)
         source_id = enqueue (*args)
-        future.wait = Wait (source_id, self.wait)
 
         # update sets
-        self.uids.add (source_id)
         self.futures.add (future)
 
         return future
 
-    def resolve_with_error (self, error):
+    #--------------------------------------------------------------------------#
+    # Disposable                                                               #
+    #--------------------------------------------------------------------------#
+    def Dispose (self, error = None):
+        error = error or CoreStopped ()
+
         # resolve futures
         futures, self.futres = self.futures, set ()
         for future in list (futures):
             future.ErrorRaise (error)
 
         # clear queues
-        self.uids.clear ()
         self.futures.clear ()
 
-    #--------------------------------------------------------------------------#
-    # Context                                                                  #
-    #--------------------------------------------------------------------------#
     def __enter__ (self):
         return self
 
@@ -144,7 +132,7 @@ class GCore (object):
         if et is None:
             self.Run ()
         else:
-            self.resolve_with_error (CoreError ('Core\'s context raised an error: {}'.format (eo), eo))
+            self.Dispose (CoreError ('Core\'s context raised an error: {}'.format (eo), eo))
         return False
 
 # vim: nu ft=python columns=120 :
