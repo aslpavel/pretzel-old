@@ -268,7 +268,7 @@ def Main ():
     #--------------------------------------------------------------------------#
     # Output                                                                   #
     #--------------------------------------------------------------------------#
-    sys.stdout.write ('# -*- coding: utf-8 -*-\n' if main_path is None else '#! /usr/bin/python\n')
+    sys.stdout.write ('# -*- coding: utf-8 -*-\n' if main_path is None else '#! /usr/bin/env python\n')
     if args:
         sys.stdout.write (BootstrapModules (importlib.import_module (name) for name in args))
     else:

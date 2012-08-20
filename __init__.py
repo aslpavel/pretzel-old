@@ -19,4 +19,5 @@ def load_tests (loader, tests, pattern):
         suite.addTests (loader.loadTestsFromModule (test))
 
     return suite
+
 # vim: nu ft=python columns=120 :
