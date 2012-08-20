@@ -171,15 +171,11 @@ sys.meta_path.append (_bootstrap.Tomb.Load (binascii.a2b_base64 (b"{modules_data
 
 def BootstrapSource (name, source, filename):
     data = binascii.b2a_base64 (zlib.compress (source.encode ('utf-8'))).strip ().decode ('utf-8')
-    if sys.version_info [0] > 2:
-        execute = "exec (code, module.__dict__)"
-    else:
-        execute = "exec code in module.__dict__"
-
     return source_payload.format (**locals ())
 
 source_payload = r"""
 import sys, imp, zlib, binascii
+
 def load ():
     module = imp.new_module ("{name}")
     module.__file__    = "{filename}"
@@ -188,8 +184,12 @@ def load ():
     sys.modules ["{name}"] = module
     try:
         code = compile (zlib.decompress (binascii.a2b_base64 (b"{data}")), module.__file__, "exec")
-        {execute}
+        if sys.version_info [0] > 2:
+            exec (code, module.__dict__)
+        else:
+            exec ("exec code in module.__dict__")
         return module
+
     except Exception:
         sys.modules.pop ("{name}")
         raise
@@ -215,17 +215,19 @@ if sys.version_info [0] > 2:
         if value.__traceback__ is not tb:
             raise value.with_traceback (tb)
         raise value
+
 else:
     def Exec (code, globs=None, locs=None):
-        """Execute code in a namespace."""
         if globs is None:
             frame = sys._getframe (1)
             globs = frame.f_globals
             if locs is None:
                 locs = frame.f_locals
             del frame
+
         elif locs is None:
             locs = globs
+
         exec ("""exec code in globs, locs""")
 
     Exec ("""def Raise (tp, value, tb=None):
