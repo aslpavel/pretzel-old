@@ -47,6 +47,7 @@ class Process (object):
 
             self.result = self.result_worker (lalive)
             self.dispose += self.result
+
         else:
             # child
             try:
@@ -65,9 +66,11 @@ class Process (object):
                 else:
                     os.execvpe (self.command [0], self.command, self.environ)
 
-            except Exception: traceback.print_exc ()
             finally:
-                os.kill (os.getpid (), signal.SIGKILL)
+                exit = getattr (os, '_exit', None)
+                if exit: exit (255)
+                else:
+                    os.kill (os.getpid (), signal.SIGKILL)
 
     #--------------------------------------------------------------------------#
     # Properties                                                               #
