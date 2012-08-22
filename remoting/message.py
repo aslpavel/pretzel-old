@@ -51,7 +51,7 @@ class Message (object):
         dst_end = src_end + len (self.dst)
         size    = dst_end + len (self.data)
 
-        stream.WriteNoWait (self.header_struct.pack (self.type, src_end, dst_end, size) +
+        stream.Write (self.header_struct.pack (self.type, src_end, dst_end, size) +
             self.src + self.dst + self.data)
 
     @classmethod
