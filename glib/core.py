@@ -22,7 +22,7 @@ class GCore (object):
             return SucceededFuture (resume)
 
         return self.source_create (lambda source: source.ResultSet (resume),
-            cancel, GLib.timeout_add, int (delay * 1000))
+            cancel, GLib.timeout_add, (int (delay * 1000),))
 
     def SleepUntil (self, resume, cancel = None):
         return self.Sleep (resume - time.time (), cancel)
@@ -31,7 +31,7 @@ class GCore (object):
     # Idle                                                                     #
     #--------------------------------------------------------------------------#
     def Idle (self, cancel = None):
-        return self.source_create (lambda source: source.ResultSet (None), cancel, GLib.idle_add, resolve)
+        return self.source_create (lambda source: source.ResultSet (None), cancel, GLib.idle_add)
 
     #--------------------------------------------------------------------------#
     # Poll                                                                     #
@@ -49,7 +49,7 @@ class GCore (object):
             else:
                 source.ResultSet (cond)
 
-        return self.source_create (resolve, cancel, GLib.io_add_watch, fd, mask | self.ERROR)
+        return self.source_create (resolve, cancel, GLib.io_add_watch, (fd, mask | self.ERROR))
 
     #--------------------------------------------------------------------------#
     # Execute                                                                  #
@@ -77,7 +77,7 @@ class GCore (object):
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
-    def source_create (self, resolve, cancel, enqueue, args):
+    def source_create (self, resolve, cancel, enqueue, args = None):
         """Create and enqueue future
 
         enqueue (*args, resolve)        -> source_id
@@ -86,21 +86,21 @@ class GCore (object):
         source = FutureSource ()
 
         def resolve_internal (*resolve_args):
-            self.sources.discard (future)
+            self.sources.discard (source)
             resolve (source, *resolve_args)
 
             # remove from event loop
             return False
 
         if cancel:
-            def cancel_continuation ():
+            def cancel_continuation (future):
                 GLib.source_remove (source_id)
-                self.sources.discard (future)
+                self.sources.discard (source)
                 source.ErrorRaise (FutureCanceled ())
 
             cancel.Continue (cancel_continuation)
 
-        source_id = enqueue (*(args + (resolve_internal,)))
+        source_id = enqueue (*(args + (resolve_internal,))) if args else enqueue (resolve_internal)
         self.sources.add (source)
 
         return source.Future
