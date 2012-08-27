@@ -4,7 +4,7 @@ import os
 import signal
 import traceback
 
-from .async         import Core, AsyncFile, AsyncReturn
+from .async         import Async, AsyncReturn, AsyncFile, Core
 from .async.core.fd import FileCloseOnExec
 from .disposable    import CompositeDisposable
 
