@@ -2,9 +2,9 @@
 import io
 import pickle
 
-from .service import *
-from ...async import *
-from ...disposable import *
+from .service      import Service
+from ...async      import Future
+from ...disposable import Disposable
 
 __all__ = ('PersistenceService',)
 #------------------------------------------------------------------------------#

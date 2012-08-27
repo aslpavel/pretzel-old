@@ -7,9 +7,11 @@ import time
 import getopt
 import itertools
 
-from . import *
-from .message import *
-from ..app import *
+from ..app         import Application
+from ..async       import Async, Future
+from .domains.fork import ForkDomain
+from .domains.ssh  import SSHDomain
+from .message      import Message
 
 #------------------------------------------------------------------------------#
 # Remote Objects                                                               #
@@ -93,7 +95,7 @@ class Main (object):
             with app.Log.Pending ('Method'):
                 with Timer () as method_timer:
                     futures = [proxy.Method () for i in range (CallCount)]
-                    yield AllFuture (futures)
+                    yield Future.WhenAll (futures)
 
             if sorted (list (future.Result () for future in futures)) != list (range (CallCount)):
                 raise ValueError ('Method benchmark failed')
@@ -104,7 +106,7 @@ class Main (object):
             with app.Log.Pending ('Function'):
                 with Timer () as func_timer:
                     futures = [domain.Call (RemoteFunction) for i in range (CallCount)]
-                    yield AllFuture (futures)
+                    yield Future.WhenAll (futures)
 
             for future in futures:
                 if future.Result () != 1:

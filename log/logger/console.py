@@ -5,8 +5,8 @@ import fcntl
 import termios
 from contextlib import contextmanager
 
-from ..string import *
-from ...disposable import *
+from ..string      import String
+from ...disposable import Disposable
 
 __all__ = ('Console', 'ConsoleError')
 #------------------------------------------------------------------------------#

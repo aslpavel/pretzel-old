@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-from . import core, event
-from .core import *
-from .event import *
+from .core  import GCore
+from .event import GEvent
 
-__all__ = core.__all__ + event.__all__
+__all__ = ('GEvent', 'GCore')
 # vim: nu ft=python columns=120 :

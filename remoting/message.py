@@ -8,7 +8,7 @@ import struct
 import traceback
 import itertools
 
-from ..async import *
+from ..async import Async, AsyncReturn, DummyAsync
 
 __all__ = ('Message',)
 #------------------------------------------------------------------------------#
@@ -56,10 +56,10 @@ class Message (object):
 
     @classmethod
     @Async
-    def LoadAsync (cls, stream):
+    def LoadAsync (cls, stream, cancel = None):
         type, src_end, dst_end, size = cls.header_struct.unpack (
-            (yield stream.ReadExactly (cls.header_struct.size)))
-        body = yield stream.ReadExactly (size)
+            (yield stream.ReadExactly (cls.header_struct.size, cancel)))
+        body = yield stream.ReadExactly (size, cancel)
 
         if type == MESSAGE_RESULT:
             AsyncReturn (Message (body [src_end:dst_end], body [dst_end:], body [:src_end]))

@@ -3,9 +3,9 @@ import unittest
 import operator
 import itertools
 
-from .async import *
-from .event import *
-from .disposable import *
+from .async import FutureSource, FutureCanceled
+from .event import Event
+from .disposable import Disposable, CompositeDisposable
 #------------------------------------------------------------------------------#
 # Disposables                                                                  #
 #------------------------------------------------------------------------------#
@@ -112,24 +112,15 @@ class EventTests (unittest.TestCase):
         self.assertEqual (len (event.handlers), 0)
 
         # cancel
-        future = event.Await ()
+        cancel = FutureSource ()
+        future = event.Await (cancel.Future)
         self.assertEqual (len (event.handlers), 1)
         self.assertFalse (future.IsCompleted ())
 
-        future.Cancel ()
+        cancel.ResultSet (None)
         self.assertEqual (len (event.handlers), 0)
         self.assertTrue (future.IsCompleted ())
         with self.assertRaises (FutureCanceled):
             future.Result ()
-
-        # wait
-        future = event.Await ()
-        self.assertEqual (len (event.handlers), 1)
-        self.assertFalse (future.IsCompleted ())
-
-        with self.assertRaises (NotImplementedError):
-            future.Wait ()
-        self.assertEqual (len (event.handlers), 1)
-        self.assertFalse (future.IsCompleted ())
 
 # vim: nu ft=python columns=120 :

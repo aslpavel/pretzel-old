@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-from .queryable import *
-from ...async import *
+from ...async import Async, AsyncReturn, DummyAsync, LazyFuture
 
 __all__ = ('Proxy', 'ProxyQuery', 'ProxyProvider', 'LocalProxyProvider',)
 #------------------------------------------------------------------------------#
@@ -106,7 +105,7 @@ class LocalProxyProvider (ProxyProvider):
     @property
     def Instance (self):
         return self.instance
-        
+
     #--------------------------------------------------------------------------#
     # Proxy Provider Interface                                                 #
     #--------------------------------------------------------------------------#

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 import sys
 
-from .text_logger import *
-from .composite_logger import *
+from .text_logger      import TextLogger
+from .composite_logger import CompositeLogger
 try:
-    from .console_logger import *
+    from .console_logger import ConsoleLogger
 except ImportError:
     ConsoleLogger = TextLogger
 
@@ -17,4 +17,5 @@ def LoggerCreate (stream = None):
     if stream.isatty ():
         return ConsoleLogger (stream)
     return TextLogger (stream)
+
 # vim: nu ft=python columns=120 :

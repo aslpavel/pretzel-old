@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from ...async import *
-from ...disposable import *
+from ...async      import DummyAsync
+from ...disposable import CompositeDisposable
 
 __all__ = ('Service', 'ServiceError',)
 #------------------------------------------------------------------------------#
@@ -54,7 +54,7 @@ class Service (object):
 
     def __enter__ (self):
         return self
-    
+
     def __exit__ (self, et, eo, tb):
         self.Dispose ()
         return False

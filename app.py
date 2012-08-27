@@ -3,10 +3,11 @@ import io
 import traceback
 
 from . import async
-from .log import *
 from .async import *
-from .event import *
-from .disposable import *
+
+from .log        import Log, String, LoggerCreate, CompositeLogger, TextLogger
+from .event      import Event
+from .disposable import CompositeDisposable
 
 __all__ = async.__all__ + ('Application',)
 #------------------------------------------------------------------------------#
@@ -14,7 +15,7 @@ __all__ = async.__all__ + ('Application',)
 #------------------------------------------------------------------------------#
 class ApplicationError (Exception): pass
 class Application (object):
-    def __init__ (self, main, name = None, run = True, log_file = None, console = None, core = None):
+    def __init__ (self, main, name = None, excecute = True, log_file = None, console = None, core = None):
         """Application Object
 
         Options:
@@ -23,30 +24,34 @@ class Application (object):
             log_file: use log file
             console:  try to use console logger first
         """
-        self.main   = main
-        self.name   = main.__name__ if name is None else name
+        self.main      = main
+        self.name      = name or main.__name__
+        self.excecuted = False
+
+        # logging
+        self.log      = Log (name)
+        self.logger   = None
         self.log_file = log_file
-        self.runned = False
+        self.console  = True if console is None else console
 
-        self.log     = Log (name)
-        self.logger  = None
-        self.console = True if console is None else console
-
+        # core
         self.core = Core.Instance (lambda: core or Core ())
         if core and core != self.core:
             raise ApplicationError ('Core has already been initialized')
 
+        # quit
         self.OnQuit  = Event ()
-        if run:
-            self.Run ()
+        if excecute:
+            self.Execute ()
 
     #--------------------------------------------------------------------------#
     # Run                                                                      #
     #--------------------------------------------------------------------------#
-    def Run (self):
-        if self.runned:
+    def __call__ (self): self.Execute ()
+    def Execute (self):
+        if self.excecuted:
             raise RuntimeError ('Application has already been run')
-        self.runned = True
+        self.executed = True
 
         # create log and logger
         self.logger = CompositeLogger (LoggerCreate () if self.console else TextLogger ())
@@ -69,9 +74,10 @@ class Application (object):
                 #--------------------------------------------------------------#
                 try:
                     main_result = self.main (self)
-                    if isinstance (main_result, BaseFuture):
+                    if isinstance (main_result, Future):
                         with self.core:
                             self.Watch (main_result, name = self.name, critical = True)
+                            self.core.Execute ()
                 finally:
                     self.OnQuit (self)
         finally:

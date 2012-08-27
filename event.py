@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-from .async import *
-from .async.cancel import *
+from .async import Async, FutureSource, FutureCanceled
 
 __all__ = ('Event', 'AsyncEvent', 'DelegatedEvent')
 #------------------------------------------------------------------------------#
@@ -38,19 +37,25 @@ class BaseEvent (object):
     #--------------------------------------------------------------------------#
     # Await                                                                    #
     #--------------------------------------------------------------------------#
-    def Await (self):
-        def cancel ():
-            self.Remove (handler_id)
-            future.ErrorRaise (FutureCanceled ())
+    def Await (self, cancel = None):
+        source = FutureSource ()
 
+        # handler
         def handler (*args):
             self.Remove (handler_id)
-            future.ResultSet (args)
+            source.ResultSet (args)
 
-        future     = Future (cancel = Cancel (cancel))
         handler_id = self.Add (handler)
 
-        return future
+        # cancel
+        if cancel:
+            def cancel_continuation (future):
+                self.Remove (handler_id)
+                source.ErrorRaise (FutureCanceled ())
+
+            cancel.Continue (cancel_continuation)
+
+        return source.Future
 
 #------------------------------------------------------------------------------#
 # Event                                                                        #

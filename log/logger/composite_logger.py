@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from ...disposable import *
-from ...observer import *
+from ...disposable import Disposable
+from ...observer   import Observer, Observable
 
 __all__ = ('CompositeLogger',)
 #------------------------------------------------------------------------------#

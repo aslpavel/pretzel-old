@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from .channel import *
-from ..message import *
+from .channel import Channel
+from ..message import Message
 
 __all__ = ('FileChannel',)
 #------------------------------------------------------------------------------#
@@ -19,9 +19,9 @@ class FileChannel (Channel):
     def Send (self, message):
         return message.SaveAsync (self.ofile)
 
-    def Recv (self):
-        return Message.LoadAsync (self.ifile)
-    
+    def Recv (self, cancel = None):
+        return Message.LoadAsync (self.ifile, cancel)
+
     def FilesSet (self, ifile, ofile):
         self.ifile = ifile
         self.ofile = ofile

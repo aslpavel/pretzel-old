@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from .observable import *
-from ..disposable import *
+from .observable  import Observer, Observable
+from ..disposable import Disposable
 
 __all__ = ('Context', 'AnonymousObserver', 'AnonymousObservable',)
 #------------------------------------------------------------------------------#

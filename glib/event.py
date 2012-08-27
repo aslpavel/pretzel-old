@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-from .. import event
+from ..event import BaseEvent
 
 __all__ = ('GEvent',)
 #------------------------------------------------------------------------------#
 # GObject Event                                                                #
 #------------------------------------------------------------------------------#
-class GEvent (event.BaseEvent):
+class GEvent (BaseEvent):
     __slots__ = ('source', 'name', 'args',)
 
     def __init__ (self, source, name, *args):

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 import sys
 
-from ...event import *
-from ...async import *
-from ...async.wait import *
-from ...async.cancel import *
-from ...disposable import *
+from ...event import Event
+from ...async import (Async, DummyAsync,
+                     Core, CoreStopped, CoreDisconnectedError,
+                     FailedFuture, FutureSource, FutureCanceled)
+from ...disposable import Disposable
 
 __all__ = ('Channel', 'ChannelError',)
 #------------------------------------------------------------------------------#
@@ -19,7 +19,7 @@ class Channel (object):
         self.recv_handlers = {}
         self.recv_queue    = {}
         self.recv_worker   = None
-        self.recv_wait     = MutableWait ()
+        self.recv_cancel   = FutureSource ()
 
         self.OnDisconnect  = Event ()
 
@@ -29,11 +29,13 @@ class Channel (object):
     @Async
     def Connect (self):
         if not self.IsConnected:
-            try: yield self.connect ()
+            try:
+                self.recv_cancel = FutureSource ()
+                yield self.connect ()
             except Exception:
-                self.disconnect ()
+                self.Dispose ()
                 raise
-                
+
     @property
     def IsConnected (self):
         return False if self.recv_worker is None else not self.recv_worker.IsCompleted ()
@@ -44,30 +46,32 @@ class Channel (object):
     def Send (self, message):
         return FailedFuture (NotImplementedError ())
 
-    def Recv (self):
+    def Recv (self, cancel = None):
         return FailedFuture (NotImplementedError ())
 
-    def RecvTo (self, destination):
-        future = self.recv_queue.get (destination)
-        if future is None:
-            def cancel ():
-                self.recv_queue.pop (destination, None)
-                future.ErrorRaise (FutureCanceled ())
+    def RecvTo (self, destination, cancel = None):
+        source = self.recv_queue.get (destination)
+        if source is None:
+            source = FutureSource ()
 
-            future = MutableFuture ()
-            future.wait.Replace (self.recv_wait)
-            future.cancel.Replace (Cancel (cancel))
+            # cancel
+            if cancel:
+                def cancel (future):
+                    self.recv_queue.pop (destination, None)
+                    source.ErrorRaise (FutureCanceled ())
+                cancel.Continue (cancel)
 
-            self.recv_queue [destination] = future
+            # enqueue
+            self.recv_queue [destination] = source
 
-        return future
+        return source.Future
 
     def RecvToHandler (self, destination, handler):
         if self.recv_handlers.get (destination) is not None:
             raise ChannelError ('Handler has already been assigned')
         self.recv_handlers [destination] = handler
         return Disposable (lambda: self.recv_handlers.pop (destination))
-        
+
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
@@ -83,11 +87,10 @@ class Channel (object):
 
     @Async
     def recv_main (self):
+        cancel = self.recv_cancel.Future
         try:
             while True:
-                message_future = self.Recv ()
-                self.recv_wait.Replace (message_future.Wait)
-                self.recv_dispatch ((yield message_future))
+                self.recv_dispatch ((yield self.Recv (cancel)))
 
         except FutureCanceled: pass
         except CoreStopped: pass
@@ -106,31 +109,27 @@ class Channel (object):
 
     @Async
     def recv_dispatch (self, message):
-        untie_future = self.core.Idle ()
+        yield self.core.Idle ()
 
-        future = self.recv_queue.pop (message.dst, None)
-        if future is not None:
-            future.wait.Replace (untie_future.Wait)
-            yield untie_future
-            future.ResultSet (message)
+        source = self.recv_queue.pop (message.dst, None)
+        if source is not None:
+            source.ResultSet (message)
 
         handler = self.recv_handlers.get (message.dst, None)
         if handler is not None:
-            yield untie_future
             handler (message)
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
     def Dispose (self):
-        if self.recv_worker is not None:
-            self.recv_worker.Dispose ()
+        self.recv_cancel.ResultSet (None)
 
     def __enter__ (self):
         return self
-    
+
     def __exit__ (self, et, eo, tb):
         self.Dispose ()
         return False
-    
+
 # vim: nu ft=python columns=120 :

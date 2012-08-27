@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-from ..domains.fork import *
-from ...async import *
+from ..domains.fork import ForkDomain
+from ...async import Async, Core
 
 __all__ = ('LinkerTest',)
 #------------------------------------------------------------------------------#
@@ -19,6 +19,8 @@ class LinkerTest (unittest.TestCase):
         with Core.Instance () as core:
             run_future = run ()
             run_future.Continue (lambda future: core.Dispose ())
+            core ()
+
         run_future.Result ()
 
     def testProxy (self):
@@ -29,7 +31,7 @@ class LinkerTest (unittest.TestCase):
 
                 # create
                 proxy = yield domain.Call.Proxy (Remote, 'value')
-            
+
                 # method
                 self.assertEqual ((yield proxy.Value ()), 'value')
 
@@ -55,6 +57,8 @@ class LinkerTest (unittest.TestCase):
         with Core.Instance () as core:
             run_future = run ()
             run_future.Continue (lambda future: core.Dispose ())
+            core ()
+
         run_future.Result ()
 
 #------------------------------------------------------------------------------#

@@ -4,8 +4,8 @@ import os
 import sys
 import unittest
 
-from ..message import *
-from ...async import *
+from ..message import Message
+from ...async import Async, AsyncFile, Core
 
 __all__ = ('MessageTest',)
 #------------------------------------------------------------------------------#
@@ -29,7 +29,7 @@ class MessageTest (unittest.TestCase):
 
         with Core.Instance () as core:
             ra, wa = (AsyncFile (fd) for fd in os.pipe ())
-            
+
             @Async
             def test ():
                 yield core.Idle ()
@@ -42,8 +42,10 @@ class MessageTest (unittest.TestCase):
                 self.assertEqual (msg.src, msg_load.src)
                 self.assertEqual (msg.dst, msg_load.dst)
                 self.assertEqual (msg.data, msg_load.data)
-                
+
             test_future = test ()
+
+            core ()
 
         ra.Dispose ()
         wa.Dispose ()

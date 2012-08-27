@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
 import time
-
-from ..async import *
-from ..async.core.file import *
-from ..async.wait import *
-from ..async.cancel import *
-
 from gi.repository import GLib
+
+from ..async import (FutureSource, FutureCanceled, SucceededFuture,
+                     CoreError, CoreStopped, CoreDisconnectedError, CoreIOError)
 
 __all__ = ('GCore',)
 #------------------------------------------------------------------------------#
@@ -14,23 +11,27 @@ __all__ = ('GCore',)
 #------------------------------------------------------------------------------#
 class GCore (object):
     def __init__ (self, context = None):
-        self.futures = set ()
+        self.sources = set ()
 
     #--------------------------------------------------------------------------#
     # Sleep                                                                    #
     #--------------------------------------------------------------------------#
-    def Sleep (self, delay):
+    def Sleep (self, delay, cancel = None):
         resume = time.time () + delay
         if delay < 0:
             return SucceededFuture (resume)
 
-        # create future
-        def resolve (future):
-            future.ResultSet (resume)
-        return self.future_create (GLib.timeout_add, resolve, int (delay * 1000))
+        return self.source_create (lambda source: source.ResultSet (resume),
+            cancel, GLib.timeout_add, int (delay * 1000))
 
-    def SleepUntil (self, resume):
-        return self.Sleep (resume - time.time ())
+    def SleepUntil (self, resume, cancel = None):
+        return self.Sleep (resume - time.time (), cancel)
+
+    #--------------------------------------------------------------------------#
+    # Idle                                                                     #
+    #--------------------------------------------------------------------------#
+    def Idle (self, cancel = None):
+        return self.source_create (lambda source: source.ResultSet (None), cancel, GLib.idle_add, resolve)
 
     #--------------------------------------------------------------------------#
     # Poll                                                                     #
@@ -41,75 +42,68 @@ class GCore (object):
     DISCONNECT = GLib.IO_HUP
     ERROR      = GLib.IO_ERR | GLib.IO_NVAL | GLib.IO_HUP
 
-    def Poll (self, fd, mask):
-        # create future
-        def resolve (future, fd, cond):
+    def Poll (self, fd, mask, cancel = None):
+        def resolve (source, fd, cond):
             if cond & self.ERROR:
-                future.ErrorRaise (CoreDisconnectedError () if cond & self.DISCONNECT
-                    else CoreInvalidError () if cond & self.INVALID
-                    else CoreIOError ())
+                source.ErrorRaise (CoreDisconnectedError () if cond & self.DISCONNECT else CoreIOError ())
             else:
-                future.ResultSet (cond)
-        return self.future_create (GLib.io_add_watch, resolve, fd, mask | self.ERROR)
+                source.ResultSet (cond)
+
+        return self.source_create (resolve, cancel, GLib.io_add_watch, fd, mask | self.ERROR)
 
     #--------------------------------------------------------------------------#
-    # Idle                                                                     #
+    # Execute                                                                  #
     #--------------------------------------------------------------------------#
-    def Idle (self):
-        def resolve (future):
-            future.ResultSet (None)
-        return self.future_create (GLib.idle_add, resolve)
+    @property
+    def IsExecuting (self):
+        return bool (self.sources)
 
-    #--------------------------------------------------------------------------#
-    # Run | Stop                                                               #
-    #--------------------------------------------------------------------------#
-    def Run (self):
+    def __call__ (self): return self.Execute ()
+    def Execute  (self):
         try:
-            context = GLib.main_context_default ()
-            while self.futures:
-                context.iteration (True)
+            for none in self.Iterator ():
+                if not self.sources:
+                    return
         finally:
             self.Dispose (CoreError ('Core has terminated without resolving this future'))
+
+    def __iter__ (self): return self.Iterator ()
+    def Iterator (self, block = True):
+        context = GLib.main_context_default ()
+        while True:
+            context.iteration (block)
+            yield
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
-    def wait (self, uids):
-        context = GLib.main_context_default ()
-        running = AnyFuture (uid () for uid in uids)
-        while not running.IsCompleted ():
-            context.iteration (True)
-
-    def future_create (self, enqueue, resolve, *args):
+    def source_create (self, resolve, cancel, enqueue, args):
         """Create and enqueue future
 
         enqueue (*args, resolve)        -> source_id
-        resolve (future, *resolve_args) -> None
+        resolve (source, *resolve_args) -> None
         """
-        # create future
-        def cancel ():
-            GLib.source_remove (source_id)
-            self.futures.discard (future)
-            future.ErrorRaise (FutureCanceled ())
+        source = FutureSource ()
 
         def resolve_internal (*resolve_args):
-            self.futures.discard (future)
-            resolve (future, *resolve_args)
+            self.sources.discard (future)
+            resolve (source, *resolve_args)
 
             # remove from event loop
             return False
 
-        future = Future (Wait (lambda: future, self.wait), Cancel (cancel))
+        if cancel:
+            def cancel_continuation ():
+                GLib.source_remove (source_id)
+                self.sources.discard (future)
+                source.ErrorRaise (FutureCanceled ())
 
-        # enqueue
-        args = list (args)
-        args.append (resolve_internal)
-        source_id = enqueue (*args)
+            cancel.Continue (cancel_continuation)
 
-        # update sets
-        self.futures.add (future)
+        source_id = enqueue (*(args + (resolve_internal,)))
+        self.sources.add (source)
 
-        return future
+        return source.Future
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
@@ -118,21 +112,18 @@ class GCore (object):
         error = error or CoreStopped ()
 
         # resolve futures
-        futures, self.futres = self.futures, set ()
-        for future in list (futures):
-            future.ErrorRaise (error)
+        sources, self.sources = self.sources, set ()
+        for source in list (sources):
+            source.ErrorRaise (error)
 
-        # clear queues
-        self.futures.clear ()
+        # clear queue
+        self.sources.clear ()
 
     def __enter__ (self):
         return self
 
     def __exit__ (self, et, eo, tb):
-        if et is None:
-            self.Run ()
-        else:
-            self.Dispose (CoreError ('Core\'s context raised an error: {}'.format (eo), eo))
+        self.Dispose (eo)
         return False
 
 # vim: nu ft=python columns=120 :

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import collections
 
-from ...async import *
-from ...disposable import *
+from ...async import Async
+from ...disposable import Disposable, CompositeDisposable
 
 __all__ = ('Domain', 'DomainError',)
 #------------------------------------------------------------------------------#
@@ -69,10 +69,10 @@ class Domain (object):
         self.dispose.Dispose ()
         self.dispose = CompositeDisposable ()
         self.exports.clear ()
-    
+
     def __enter__ (self):
         return self
-    
+
     def __exit__ (self, et, eo, tb):
         self.Dispose ()
         return False

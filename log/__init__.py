@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from .string import *
-from .log import *
-from .logger import *
+from .log    import Log
+from .logger import TextLogger, ConsoleLogger, LoggerCreate, CompositeLogger
+from .string import String
 
 __all__ = ('Log', 'ConsoleLogger', 'TextLogger', 'LoggerCreate', 'CompositeLogger', 'String')
 #------------------------------------------------------------------------------#
@@ -16,4 +16,5 @@ def load_tests (loader, tests, pattern):
         suite.addTests (loader.loadTestsFromModule (test))
 
     return suite
+
 # vim: nu ft=python columns=120 :

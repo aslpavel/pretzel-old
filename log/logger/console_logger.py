@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 from .console import *
 
-from ..log import *
-from ..utils import *
-from ..string import *
-
-from ...observer import *
+from ..utils     import Cached
+from ..string    import String
+from ...observer import Observer
+from ..log       import (EVENT_MESSAGE, EVENT_PROGRESS, EVENT_DEBUG, EVENT_INFO,
+                        EVENT_WARN, EVENT_ERROR, EVENT_BAR, EVENT_PENDING)
 
 __all__ = ('ConsoleLogger',)
 #------------------------------------------------------------------------------#

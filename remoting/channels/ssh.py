@@ -4,10 +4,10 @@ import sys
 import struct
 import traceback
 
-from .file import *
-from .. import __name__ as remoting_name
-from ...async import *
-from ...bootstrap import *
+from .file        import FileChannel
+from ..           import __name__ as remoting_name
+from ...async     import Async, AsyncFile
+from ...bootstrap import Tomb, BootstrapBootstrap
 
 __all__ = ('SSHChannel',)
 #------------------------------------------------------------------------------#
@@ -127,10 +127,11 @@ def Main ():
         domain = domains.SSHRemoteDomain (core)
         domain.channel.OnDisconnect += core.Dispose
         domain.Connect ().Traceback ("remote::connect")
+        core ()
 
 if __name__ == "__main__":
     sys.stdout = sys.stderr
     Main ()
 '"""
-    
+
 # vim: nu ft=python columns=120 :

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-from ..domains.fork import *
-from ...async import *
+from ..domains.fork import ForkDomain
+from ...async import Async, FutureSource, SucceededFuture, RaisedFuture, Core
 
 __all__ = ('FutureTest',)
 #------------------------------------------------------------------------------#
@@ -54,6 +54,7 @@ class FutureTest (unittest.TestCase):
         with Core.Instance () as core:
             run_future = run ()
             run_future.Continue (lambda future: core.Dispose ())
+            core ()
         run_future.Result ()
 
 #------------------------------------------------------------------------------#
@@ -61,22 +62,22 @@ class FutureTest (unittest.TestCase):
 #------------------------------------------------------------------------------#
 class RemoteFuture (object):
     def __init__ (self):
-        self.future = None
+        self.source = None
 
     # future
     @property
     def Future (self):
-        return self.future
+        return None if self.source is None else self.source.Future
 
     def Create (self):
-        self.future = Future ()
+        self.source = FutureSource ()
 
     # resolve
     def Done (self, result):
-        self.future.ResultSet (result)
+        self.source.ResultSet (result)
 
     def Error (self, error):
-        self.future.ErrorRaise (error)
+        self.source.ErrorRaise (error)
 
     # completed
     def Succeeded (self):
@@ -87,6 +88,6 @@ class RemoteFuture (object):
 
     # compare
     def Equal (self, future):
-        return self.future == future
+        return False if self.source is None else self.source.Future == future
 
 # vim: nu ft=python columns=120 :

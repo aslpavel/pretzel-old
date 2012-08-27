@@ -2,9 +2,9 @@
 import unittest
 import operator
 
-from .log import *
-from ..observer import *
-from ..disposable import *
+from .log         import Log
+from ..observer   import Observer
+from ..disposable import MutableDisposable
 
 #------------------------------------------------------------------------------#
 # Log Tests                                                                    #

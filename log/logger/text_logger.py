@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import sys
 
-from ..log import *
-from ..string import *
-
-from ...observer import *
-
+from ..string    import String
+from ...observer import Observer
+from ..log       import (EVENT_MESSAGE, EVENT_PROGRESS, EVENT_DEBUG, EVENT_INFO,
+                        EVENT_WARN, EVENT_ERROR, EVENT_BAR, EVENT_PENDING)
 __all__ = ('TextLogger',)
 #------------------------------------------------------------------------------#
 # Text Logger                                                                  #

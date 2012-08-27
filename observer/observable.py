@@ -2,9 +2,8 @@
 import sys
 import operator
 
-from ..disposable import *
-from ..async import *
-from ..async.cancel import *
+from ..async      import FutureSource, FutureError, FutureCanceled
+from ..disposable import Disposable, CompositeDisposable, MutableDisposable
 
 __all__ = ('Observable', 'Observer', 'Subject',)
 #------------------------------------------------------------------------------#
@@ -28,26 +27,28 @@ class Observable (object):
     #--------------------------------------------------------------------------#
     # Await                                                                    #
     #--------------------------------------------------------------------------#
-    def Await (self):
-        # create future
-        def cancel ():
-            disposable.Dispose ()
-            future.ErrorRaise (FutureCanceled ())
+    def Await (self, cancel = None):
+        source = FutureSource ()
 
-        future = Future (cancel = Cancel (cancel))
+        if cancel:
+            def cancel (future):
+                disposable.Dispose ()
+                source.ErrorRaise (FutureCanceled ())
+
+            cancel.Continue (cancel)
 
         # create observer
         def onNext (value):
             disposable.Dispose ()
-            future.ResultSet (value)
+            source.ResultSet (value)
 
         def onError (error):
             disposable.Dispose ()
-            future.ErrorSet (error)
+            source.ErrorSet (error)
 
         def onCompleted ():
             disposable.Dispose ()
-            future.ErrorRaise (FutureError ('Observable has been completed'))
+            source.ErrorRaise (FutureError ('Observable has been completed'))
 
         disposable = self.Subscribe (AnonymousObserver (onNext, onError, onCompleted))
 

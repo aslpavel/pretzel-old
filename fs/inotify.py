@@ -6,8 +6,8 @@ import struct
 import ctypes
 import ctypes.util
 
-from ..async import *
-from ..event import *
+from ..async import Future, FutureSource, FutureCanceled, Async, AsyncReturn, AsyncFile, Core
+from ..event import Event
 
 __all__ = ['FileMonitor']
 #------------------------------------------------------------------------------#
@@ -108,6 +108,8 @@ class FileMonitor (object):
         self.event_struct = struct.Struct ('iIII')
         self.fd = self.inotify_impl.init ()
         self.file = AsyncFile (self.fd, core = self.core)
+
+        self.worker_cancel = FutureSource ()
         self.worker = self.worker_main ()
 
     @property
@@ -118,7 +120,7 @@ class FileMonitor (object):
     # Methods                                                                  #
     #--------------------------------------------------------------------------#
     def Watch (self, path, mask):
-        if self.worker is None or self.worker.IsCompleted ():
+        if self.worker.IsCompleted ():
             raise FileMonitorError ('Worker is dead: {}'.format (self.worker))
 
         desc = self.inotify_impl.add_watch (self.fd, path, mask)
@@ -139,10 +141,9 @@ class FileMonitor (object):
     #--------------------------------------------------------------------------#
     def Dispose (self):
         self.file.Dispose ()
-        if self.worker is not None:
-            try: self.worker.Dispose ()
-            except FutureCanceled:
-                pass
+        try: self.worker_cancel.ResultSet (None)
+        except FutureCanceled:
+            pass
 
     def __enter__ (self):
         return self
@@ -156,14 +157,15 @@ class FileMonitor (object):
     #--------------------------------------------------------------------------#
     @Async
     def worker_main (self):
+        cancel = self.worker_cancel.Future
         try:
             event_size = self.event_struct.size
             while True:
                 # receive
-                event_data = yield self.file.ReadExactly (event_size)
+                event_data = yield self.file.ReadExactly (event_size, cancel)
                 watch_desc, mask, cookie, name_length = self.event_struct.unpack (event_data)
                 if name_length > 0:
-                    name = (yield self.file.ReadExactly (name_length)).rstrip (b'\x00').decode ()
+                    name = (yield self.file.ReadExactly (name_length, cancel)).rstrip (b'\x00').decode ()
                 else:
                     name = ''
 
@@ -202,7 +204,7 @@ class FileMonitorWatch (object):
     @Async
     def Changed (self):
         changed, deleted = self.OnChanged.Await (), self.OnDeleted.Await ()
-        future = yield AnyFuture ((changed, deleted))
+        future = yield Future.WhenAny ((changed, deleted))
         if future is deleted:
             raise FileMonitorError ('Watch has been deleted')
 

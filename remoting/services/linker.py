@@ -3,12 +3,12 @@ import pickle
 import weakref
 import itertools
 
-from .service import *
-from ..utils.proxy import *
-from ..utils.queryable import *
-from ..message import *
-from ...async import *
-from ...disposable import *
+from .service          import Service
+from ..utils.proxy     import Proxy, ProxyQuery, ProxyProvider, LocalProxyProvider
+from ..utils.queryable import Queryable
+from ..message         import Message
+from ...async          import Async
+from ...disposable     import Disposable
 
 __all__ = ('LinkerService',)
 #------------------------------------------------------------------------------#
@@ -60,7 +60,7 @@ class LinkerService (Service):
     @Queryable
     def Call (self, args, keys, query):
         return self.domain.Request (self.CALL, args [0], args [1:], keys, query)
-        
+
     #--------------------------------------------------------------------------#
     # Marshal                                                                  #
     #--------------------------------------------------------------------------#
@@ -174,7 +174,7 @@ class RemoteProxyProvider (ProxyProvider):
 
     def __enter__ (self):
         return self
-    
+
     def __exit__ (self, et, eo, tb):
         self.Dispose ()
         return False

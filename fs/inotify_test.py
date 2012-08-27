@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import unittest
+import contextlib
 
-from .inotify import *
-from ..async import *
-from ..disposable import *
+from .inotify     import FileMonitor, FM_CLOSE_NOWRITE
+from ..async      import Async, Future, FutureSource, Core
+from ..disposable import CompositeDisposable
 
 __all__ = ('FileMonitorInotifyTest',)
 #------------------------------------------------------------------------------#
@@ -17,7 +18,7 @@ class FileMonitorInotifyTest (unittest.TestCase):
                 # stream
                 stream = open (__file__)
                 dispose += stream
-                Core.Instance ().Idle ().Continue (lambda future: stream.close ())
+                core.Idle ().Continue (lambda future: stream.close ())
 
                 # monitor
                 file_monitor = FileMonitor ()
@@ -28,21 +29,26 @@ class FileMonitorInotifyTest (unittest.TestCase):
                 dispose += file_watch
 
                 # init
-                try:
-                    changed, timeout = file_watch.Changed (), Core.Instance ().Sleep (1)
-                    self.assertFalse  (stream.closed, 'File has been closed too early')
-                    result = yield AnyFuture ((changed, timeout))
-                finally:
-                    timeout.Dispose ()
-                    changed.Dispose ()
+                with Timeout (1) as timeout:
+                    changed = file_watch.Changed ()
+                    result  = yield Future.WhenAny ((changed, timeout))
 
-                # check
-                self.assertTrue  (stream.closed, 'File was not closed')
-                self.assertEqual (result, changed, 'Test timeouted')
-                self.assertTrue  (result, result.Result () [1] & FM_CLOSE_NOWRITE)
+                    # check
+                    self.assertTrue  (stream.closed, 'File was not closed')
+                    self.assertEqual (result, changed, 'Test timeouted')
+                    self.assertTrue  (result, result.Result () [1] & FM_CLOSE_NOWRITE)
 
-        with Core.Instance ():
+        with Core.Instance () as core:
             main_future = main ()
+            core ()
         main_future.Result ()
+
+@contextlib.contextmanager
+def Timeout (time):
+    cancel  = FutureSource ()
+    try:
+        yield Core.Instance ().Sleep (time, cancel = cancel.Future)
+    finally:
+        cancel.ResultSet (None)
 
 # vim: nu ft=python columns=120 :

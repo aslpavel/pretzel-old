@@ -4,10 +4,10 @@ import sys
 import imp
 import pkgutil
 
-from .service import *
-from ..utils.compat import *
-from ...async import *
-from ...disposable import *
+from .service       import Service
+from ..utils.compat import Exec
+from ...async       import Async, DummyAsync
+from ...disposable  import Disposable
 
 __all__ = ('ImporterService',)
 #------------------------------------------------------------------------------#
@@ -22,7 +22,7 @@ class ImporterService (Service):
         Service.__init__ (self,
             exports = (('ModulePush', self.ModulePush),),
             handlers = ((self.FIND, self.find_handler), (self.PUSH, self.push_handler)))
-        
+
         self.insert = False if insert is None else insert
         self.containments = {} # name -> name, source, filename, ispkg
         self.dispose += Disposable (lambda: self.containments.clear ())
@@ -90,7 +90,7 @@ class ImporterService (Service):
             name, source, filename = response.Args
             self.containments [name] = name, source, filename, False
             self.load (name, source, filename, ispkg = False)
-            
+
     def load (self, name, source, filename, ispkg):
         module = imp.new_module (name)
         module.__file__   = filename
@@ -117,7 +117,15 @@ class ImporterService (Service):
                 # parent was loaded with different loader
                 containment = None
             else:
-                containment = ~self.domain.Request (self.FIND, name)
+                core   = self.domain.channel.core
+                future = self.domain.Request (self.FIND, name)
+
+                # wait for future to be resolved
+                for none in core:
+                    if future.IsCompleted ():
+                        break
+                containment = future.Result ()
+
             self.containments [name] = containment
 
         if containment is None and throw:

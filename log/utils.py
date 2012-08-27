@@ -13,4 +13,5 @@ def Cached (function):
             cache [args] = result
         return result
     return function_cached
+
 # vim: nu ft=python columns=120 :

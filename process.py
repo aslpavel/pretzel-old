@@ -4,9 +4,9 @@ import os
 import signal
 import traceback
 
-from .async import *
-from .async.core.fd import *
-from .disposable import *
+from .async         import Core, AsyncFile, AsyncReturn
+from .async.core.fd import FileCloseOnExec
+from .disposable    import CompositeDisposable
 
 __all__ = ('Process', 'ProcessCall', 'ProcessError')
 #------------------------------------------------------------------------------#
@@ -15,12 +15,12 @@ __all__ = ('Process', 'ProcessCall', 'ProcessError')
 class ProcessError (Exception): pass
 class Process (object):
     def __init__ (self, command, environ = None, check = None, buffer_size = None, core = None):
-        self.core    = core or Core.Instance ()
-        self.command = command
-        self.environ = environ
-        self.buffer_size = default_buffer_size if buffer_size is None else buffer_size
-        self.check   = True if check is None else check
-        self.dispose = CompositeDisposable ()
+        self.core        = core or Core.Instance ()
+        self.command     = command
+        self.environ     = environ
+        self.buffer_size = buffer_size or default_buffer_size
+        self.check       = True if check is None else check
+        self.dispose     = CompositeDisposable ()
 
         self.pid     = None
         self.stdin   = None
