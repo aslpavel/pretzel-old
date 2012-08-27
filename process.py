@@ -4,7 +4,7 @@ import os
 import signal
 import traceback
 
-from .async         import Async, AsyncReturn, AsyncFile, Core
+from .async         import Async, AsyncReturn, AsyncFile, ScopeFuture, Core, CoreDisconnectedError
 from .async.core.fd import FileCloseOnExec
 from .disposable    import CompositeDisposable
 
@@ -45,8 +45,10 @@ class Process (object):
             self.stdout.CloseOnExec (True)
             self.dispose += self.stdout
 
+            self.result_cancel = ScopeFuture ()
+            self.dispose += self.result_cancel
+
             self.result = self.result_worker (lalive)
-            self.dispose += self.result
 
         else:
             # child
@@ -111,7 +113,7 @@ class Process (object):
     def result_worker (self, fd):
         try:
             FileCloseOnExec (fd, True)
-            yield self.core.Poll (fd, self.core.READ)
+            yield self.core.Poll (fd, self.core.READ, self.result_cancel)
         except CoreDisconnectedError: pass
         except Exception:
             os.kill (self.pid, signal.SIGTERM)
@@ -129,7 +131,7 @@ class Process (object):
 #------------------------------------------------------------------------------#
 # Call Process                                                                 #
 #------------------------------------------------------------------------------#
-def ProcessCall (command, input = None, environ = None, check = None, buffer_size = None, core = None):
+def ProcessCall (command, input = None, environ = None, check = None, buffer_size = None, core = None, cancel = None):
     # helper
     def processCall ():
         with Process (command, environ, check, buffer_size, core) as proc:
@@ -143,7 +145,7 @@ def ProcessCall (command, input = None, environ = None, check = None, buffer_siz
             try:
                 output = io.BytesIO ()
                 while True:
-                    output.write ((yield proc.Stdout.Read (buffer_size)))
+                    output.write ((yield proc.Stdout.Read (buffer_size, cancel)))
             except CoreDisconnectedError: pass
 
             # return

@@ -3,7 +3,7 @@ import unittest
 import contextlib
 
 from .inotify     import FileMonitor, FM_CLOSE_NOWRITE
-from ..async      import Async, Future, FutureSource, Core
+from ..async      import Async, Future, FutureSource, ScopeFuture, Core
 from ..disposable import CompositeDisposable
 
 __all__ = ('FileMonitorInotifyTest',)
@@ -29,9 +29,9 @@ class FileMonitorInotifyTest (unittest.TestCase):
                 dispose += file_watch
 
                 # init
-                with Timeout (1) as timeout:
+                with ScopeFuture () as cancel:
                     changed = file_watch.Changed ()
-                    result  = yield Future.WhenAny ((changed, timeout))
+                    result  = yield Future.WhenAny ((changed, core.Sleep (1, cancel)))
 
                     # check
                     self.assertTrue  (stream.closed, 'File was not closed')
@@ -42,13 +42,5 @@ class FileMonitorInotifyTest (unittest.TestCase):
             main_future = main ()
             core ()
         main_future.Result ()
-
-@contextlib.contextmanager
-def Timeout (time):
-    cancel  = FutureSource ()
-    try:
-        yield Core.Instance ().Sleep (time, cancel = cancel.Future)
-    finally:
-        cancel.ResultSet (None)
 
 # vim: nu ft=python columns=120 :
