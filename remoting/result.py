@@ -83,7 +83,7 @@ class Result (object):
                 pid       = self.pid,
                 name      = error [0].__name__,
                 message   = str (error [1]),
-                traceback ='{}{}{}'.format (*format_exception (*error)))
+                traceback = ''.join (format_exception (*error)))
 
         # stack traceback
         traceback_prev = getattr (error [1], '_saved_traceback', None)
@@ -108,7 +108,7 @@ class Result (object):
         stream = file or string_type ()
 
         # normal
-        stream.write ('{}{}{}'.format (*format_exception (et, eo, tb)))
+        stream.write (''.join (format_exception (et, eo, tb)))
 
         # saved traceback
         traceback = getattr (eo, '_saved_traceback', None)
