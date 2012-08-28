@@ -36,13 +36,13 @@ class Message (Result):
         instance = cls (dst, src)
         instance.ErrorSet (error)
         return instance
-    
+
     #--------------------------------------------------------------------------#
     # Response                                                                 #
     #--------------------------------------------------------------------------#
     def Response (self):
         return Message (self.src, self.dst)
-    
+
     #--------------------------------------------------------------------------#
     # Save | Load                                                              #
     #--------------------------------------------------------------------------#
@@ -114,5 +114,5 @@ class Message (Result):
         result ='{}:{}'.format (type (error).__name__, error) if error else self.Value ()
 
         return '<Message [{}]: \x1b[38;01m{} -> {}\x1b[m: {}>'.format (os.getpid (), self.src, self.dst, result)
-    
+
 # vim: nu ft=python columns=120 :

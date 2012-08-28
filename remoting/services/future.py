@@ -7,7 +7,7 @@ from .service      import Service, ServiceError
 from ..message     import Message
 from ..result      import Result
 from ...disposable import Disposable
-from ...async      import Async, DummyAsync, Future, FutureSource, SucceededFuture, RaisedFuture
+from ...async      import Async, DummyAsync, Future, FutureSource, SucceededFuture, FailedFuture
 
 __all__ = ('FutureService',)
 #------------------------------------------------------------------------------#
@@ -15,13 +15,15 @@ __all__ = ('FutureService',)
 #------------------------------------------------------------------------------#
 class FutureServiceError (ServiceError): pass
 class FutureService (Service):
+    # service
     NAME    = b'future::'
     RESOLVE = b'future::resolve'
 
-    FUTURE_SUCCESS = 0
-    FUTURE_ERROR   = 1
-    FUTURE_WAIT    = 2
+    # persistence
+    FUTURE_DONE = 0
+    FUTURE_WAIT = 1
 
+    # resolve helper struct
     desc_struct = struct.Struct ('!Q')
 
     def __init__ (self):
@@ -53,10 +55,9 @@ class FutureService (Service):
     #--------------------------------------------------------------------------#
     def futurePack (self, future):
         if future.IsCompleted ():
-            error = future.Error ()
-            if error is None:
-                return self.FUTURE_SUCCESS, future.Result ()
-            return self.FUTURE_ERROR, error [1]
+            with Result () as result:
+                result (self.domain.Pack (future.Result ()))
+            return self.FUTURE_DONE, result.Save ()
 
         info = self.future_info.get (future)
         if info is None:
@@ -82,11 +83,11 @@ class FutureService (Service):
 
     def futureUnpack (self, state):
         type, value = state
-        if type == self.FUTURE_SUCCESS:
-            return SucceededFuture (value)
-
-        elif type == self.FUTURE_ERROR:
-            return RaisedFuture (value)
+        if type == self.FUTURE_DONE:
+            try:
+                return SucceededFuture (self.domain.Unpack (Result.Load (value).Value ()))
+            except Exception:
+                return FailedFuture (sys.exc_info ())
 
         elif type == self.FUTURE_WAIT:
             desc = value ^ 0x1

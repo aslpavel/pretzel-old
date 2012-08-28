@@ -72,7 +72,7 @@ class Result (object):
 
     def ValueSet (self, value):
         self.value = value
-    
+
     def Error (self):
         return self.error
 
@@ -134,7 +134,7 @@ class Result (object):
                 return b'1' + pickle.dumps ((self.error, self.traceback))
             except Exception:
                 return b'1' + pickle.dumps ((type (self.error) ('Failed to pack arguments'), self.traceback))
-    
+
     @classmethod
     def Load (cls, data):
         result = cls ()

@@ -2,7 +2,7 @@
 import unittest
 
 from ..domains.fork import ForkDomain
-from ...async import Async, FutureSource, SucceededFuture, RaisedFuture, Core
+from ...async import Async, FutureSource, SucceededFuture, FailedFuture, RaisedFuture, Core
 
 __all__ = ('FutureTest',)
 #------------------------------------------------------------------------------#
@@ -33,7 +33,7 @@ class FutureTest (unittest.TestCase):
                 future = yield proxy.Future
 
                 yield proxy.Error (ValueError ('test'))
-                self.assertEqual (type ((yield proxy.Future)), RaisedFuture)
+                self.assertEqual (type ((yield proxy.Future)), FailedFuture)
                 try:
                     yield future
                 except Exception as error:
@@ -49,7 +49,7 @@ class FutureTest (unittest.TestCase):
                 future = yield proxy.Failed ()
                 self.assertEqual (future.Error () [0], ValueError)
                 self.assertEqual (future.Error () [1].args, ('failed',))
-                self.assertEqual (type (future), RaisedFuture)
+                self.assertEqual (type (future), FailedFuture)
 
         with Core.Instance () as core:
             run_future = run ()
