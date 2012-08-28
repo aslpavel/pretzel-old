@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
+import sys
+import struct
 import itertools
 
 from .service      import Service, ServiceError
 from ..message     import Message
+from ..result      import Result
 from ...disposable import Disposable
 from ...async      import Async, DummyAsync, Future, FutureSource, SucceededFuture, RaisedFuture
 
@@ -18,6 +21,8 @@ class FutureService (Service):
     FUTURE_SUCCESS = 0
     FUTURE_ERROR   = 1
     FUTURE_WAIT    = 2
+
+    desc_struct = struct.Struct ('!Q')
 
     def __init__ (self):
         Service.__init__ (self,
@@ -63,15 +68,13 @@ class FutureService (Service):
                 if self.desc_info.pop (desc, None) is not None:
                     self.future_info.pop (future, None)
 
-                    # data
-                    error = future.Error ()
-                    if error is None:
-                        data = desc ^ 0x1, self.FUTURE_SUCCESS, future.Result ()
-                    else:
-                        data = desc ^ 0x1, self.FUTURE_ERROR, error [1]
+                    # result
+                    with Result () as result:
+                        result (self.domain.Pack (future.Result ()))
 
                     # send
-                    self.domain.channel.Send (Message (self.RESOLVE, self.domain.Pack (data)))
+                    value = self.desc_struct.pack (desc ^ 0x1) + result.Save ()
+                    self.domain.channel.Send (Message.FromValue (value, self.RESOLVE))
 
             future.Continue (resolve)
 
@@ -110,16 +113,16 @@ class FutureService (Service):
     #--------------------------------------------------------------------------#
     @DummyAsync
     def resolve_handler (self, message):
-        desc, type, value = self.domain.Unpack (message.Data)
+        value  = message.Value ()
+        desc   = self.desc_struct.unpack (value [:self.desc_struct.size]) [0]
+        result = Result.Load (value [self.desc_struct.size:])
 
         info = self.desc_info.get (desc)
         if info is not None:
-            if type == self.FUTURE_SUCCESS:
-                info.Source.ResultSet (value)
-            elif type == self.FUTURE_ERROR:
-                info.Source.ErrorRaise (value)
-            else:
-                assert False, 'Invalid future type: {}'.format (type)
+            try:
+                info.Source.ResultSet (self.domain.Unpack (result.Value ()))
+            except Exception:
+                info.Source.ErrorSet (sys.exc_info ())
 
 #------------------------------------------------------------------------------#
 # Future Info                                                                  #

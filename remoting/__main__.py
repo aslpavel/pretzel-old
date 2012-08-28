@@ -119,7 +119,7 @@ class Main (object):
                 stream = io.BytesIO ()
                 with Timer () as msg_timer:
                     for i in range (MsgCount):
-                        Message (b'dummy::', b'DATA').Save (stream)
+                        Message.FromValue (b'DATA', b'dummy::').Save (stream)
                         stream.seek (0)
                         Message.Load (stream)
                         stream.seek (0)

@@ -38,8 +38,8 @@ class LinkerService (Service):
 
         # marshal mappings
         self.desc      = itertools.count ()
-        self.desc2prov = {}
-        self.prov2desc = {}
+        self.desc_prov = {}
+        self.prov_desc = {}
         next (self.desc)
 
     @Async
@@ -47,8 +47,8 @@ class LinkerService (Service):
         yield Service.Connect (self, domain)
 
         def dispose ():
-            self.desc2prov.clear ()
-            self.prov2desc.clear ()
+            self.desc_prov.clear ()
+            self.prov_desc.clear ()
         self.dispose += Disposable (dispose)
 
     #--------------------------------------------------------------------------#
@@ -66,21 +66,21 @@ class LinkerService (Service):
     #--------------------------------------------------------------------------#
     def proxyPack (self, proxy):
         prov = proxy._provider
-        desc = self.prov2desc.get (prov)
+        desc = self.prov_desc.get (prov)
         if desc is None:
             desc = next (self.desc) << 1
-            self.desc2prov [desc], self.prov2desc [prov] = prov, desc
+            self.desc_prov [desc], self.prov_desc [prov] = prov, desc
 
         return desc
 
     def proxyUnpack (self, desc):
         desc ^= 0x1
         lock = None
-        prov  = self.desc2prov.get (desc)
+        prov  = self.desc_prov.get (desc)
         if prov is None:
             prov  = RemoteProxyProvider (self, desc)
             lock = prov.Lock ()
-            self.desc2prov [desc], self.prov2desc [prov] = prov, desc
+            self.desc_prov [desc], self.prov_desc [prov] = prov, desc
 
         return Proxy (prov, lock)
 
@@ -97,14 +97,14 @@ class LinkerService (Service):
     def method_handler (self, message):
         with self.domain.Response (message) as response:
             desc, name, args, keys, query = response.Args
-            prov = self.desc2prov.get (desc)
+            prov = self.desc_prov.get (desc)
             response ((yield prov.Call (name, args, keys, query)))
 
     @Async
     def get_handler (self, message):
         with self.domain.Response (message) as response:
             desc, name, query = response.Args
-            prov = self.desc2prov.get (desc)
+            prov = self.desc_prov.get (desc)
             if prov is None:
                 raise ValueError ('Unknown proxy provider: \'desc:{}\''.format (desc))
 
@@ -114,7 +114,7 @@ class LinkerService (Service):
     def set_handler (self, message):
         with self.domain.Response (message) as response:
             desc, name, value = response.Args
-            prov = self.desc2prov.get (desc)
+            prov = self.desc_prov.get (desc)
             if prov is None:
                 raise ValueError ('Unknown proxy provider: \'desc:{}\''.format (desc))
 
@@ -122,10 +122,10 @@ class LinkerService (Service):
 
     @Async
     def dispose_handler (self, message):
-        desc = pickle.loads (message.Data)
-        prov = self.desc2prov.pop (desc, None)
+        desc = pickle.loads (message.Value ())
+        prov = self.desc_prov.pop (desc, None)
         if prov is not None:
-            self.prov2desc.pop (prov, None)
+            self.prov_desc.pop (prov, None)
 
 #------------------------------------------------------------------------------#
 # Remote Proxy Provider                                                        #
@@ -168,9 +168,9 @@ class RemoteProxyProvider (ProxyProvider):
     def Dispose (self):
         yield self.linker.domain.channel.core.Idle ()
 
-        self.linker.desc2prov.pop (self.desc ^ 0x1, None)
-        self.linker.prov2desc.pop (self, None)
-        self.linker.domain.channel.Send (Message (LinkerService.DISPOSE, pickle.dumps (self.desc)))
+        self.linker.desc_prov.pop (self.desc ^ 0x1, None)
+        self.linker.prov_desc.pop (self, None)
+        self.linker.domain.channel.Send (Message.FromValue (pickle.dumps (self.desc), LinkerService.DISPOSE))
 
     def __enter__ (self):
         return self

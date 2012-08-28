@@ -1,13 +1,20 @@
 # -*- coding: utf-8 -*-
 import io
+import sys
 import traceback
 
 from . import async
 from .async import *
 
-from .log        import Log, String, LoggerCreate, CompositeLogger, TextLogger
-from .event      import Event
+from .log import Log, String, LoggerCreate, CompositeLogger, TextLogger
+from .event import Event
 from .disposable import CompositeDisposable
+from .remoting.result import *
+
+if sys.version_info [0] > 2:
+    string_type = io.StringIO
+else:
+    string_type = io.BytesIO
 
 __all__ = async.__all__ + ('Application',)
 #------------------------------------------------------------------------------#
@@ -93,16 +100,16 @@ class Application (object):
                 return future.Result ()
 
             except Exception:
+                # header
                 self.log.Error (String (('UNNAMED' if name is None else name, '17'), ' has terminated with error:'))
 
-                traceback_stream = io.StringIO ()
-                class TracebackStream (object):
-                    def write (self, data):
-                        traceback_stream.write (data.decode ('utf-8') if hasattr (data, 'decode') else data)
-                traceback.print_exc (file = TracebackStream ())
+                # error
+                stream = string_type ()
+                Result.PrintException (*sys.exc_info (), file = stream)
 
-                traceback_stream.seek (0)
-                for line in traceback_stream:
+                # output
+                stream.seek (0)
+                for line in stream:
                     self.log.Error (line.rstrip ('\n'))
 
                 raise

@@ -36,11 +36,11 @@ class DefaultDomain (Domain):
     #--------------------------------------------------------------------------#
     @Async
     def Request (self, destination, *args):
-        request  = Message (destination, self.Pack (args))
+        request  = Message.FromValue (self.Pack (args), destination)
         response = self.channel.RecvTo (request.src)
 
         self.channel.Send (request)
-        AsyncReturn (self.Unpack ((yield response).Data))
+        AsyncReturn (self.Unpack ((yield response).Value ()))
 
     def Response (self, message):
         return Response (self, message)
@@ -75,7 +75,7 @@ class Response (object):
     #--------------------------------------------------------------------------#
     @property
     def Args (self):
-        return self.domain.Unpack (self.message.Data)
+        return self.domain.Unpack (self.message.Value ())
 
     #--------------------------------------------------------------------------#
     # Return                                                                   #
@@ -87,14 +87,21 @@ class Response (object):
         return self
 
     def __exit__ (self, et, eo, tb):
+        response = self.message.Response ()
+
         if et is None:
-            self.domain.channel.Send (self.message.Response (self.domain.Pack (None)))
+            response.ValueSet (self.domain.Pack (None))
+
         elif et == ResponseReturn:
-            try: self.domain.channel.Send (self.message.Response (self.domain.Pack (eo.args [0])))
+            try: 
+                response.ValueSet (self.domain.Pack (eo.args [0]))
             except Exception:
-                self.domain.channel.Send (self.message.ErrorResponse (sys.exc_info ()))
+                response.ErrorSet (sys.exc_info ())
+
         else:
-            self.domain.channel.Send (self.message.ErrorResponse ((et, eo, tb)))
+            response.ErrorSet ((et, eo, tb))
+
+        self.domain.channel.Send (response)
         return True
 
 #------------------------------------------------------------------------------#

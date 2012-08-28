@@ -1,147 +1,118 @@
 # -*- coding: utf-8 -*-
 import os
-import io
-import sys
-import pickle
-
 import struct
-import traceback
 import itertools
 
+from .result import Result
 from ..async import Async, AsyncReturn, DummyAsync
 
 __all__ = ('Message',)
 #------------------------------------------------------------------------------#
 # Message                                                                      #
 #------------------------------------------------------------------------------#
-MESSAGE_RESULT = 0
-MESSAGE_ERROR  = 1
-
-class Message (object):
-    __slots__     = ('src', 'dst', 'data',)
-    header_struct = struct.Struct ('!BHHI')
+class Message (Result):
+    __slots__     = Result.__slots__ + ('src', 'dst',)
+    header_struct = struct.Struct ('!IHH')
     uid_struct    = struct.Struct ('!I')
     uid_iter      = itertools.count ()
-    type          = MESSAGE_RESULT
 
-    def __init__ (self, dst, data, src = None):
+    def __init__ (self, dst, src = None):
+        Result.__init__ (self)
+
         self.src = b'uid::' + self.uid_struct.pack (next (self.uid_iter)) if src is None else src
         self.dst = dst
-        self.data = data
 
     #--------------------------------------------------------------------------#
-    # Public                                                                   #
+    # Factories                                                                #
     #--------------------------------------------------------------------------#
-    @property
-    def Data (self):
-        return self.data
+    @classmethod
+    def FromValue (cls, value, dst, src = None):
+        instance = cls (dst, src)
+        instance.ValueSet (value)
+        return instance
 
-    def Response (self, data):
-        return Message (self.src, data, self.dst)
-
-    def ErrorResponse (self, error):
-        return ErrorMessage.FromError (self.src, error, self.dst)
-
+    @classmethod
+    def FromError (cls, error, dst, src = None):
+        instance = cls (dst, src)
+        instance.ErrorSet (error)
+        return instance
+    
+    #--------------------------------------------------------------------------#
+    # Response                                                                 #
+    #--------------------------------------------------------------------------#
+    def Response (self):
+        return Message (self.src, self.dst)
+    
     #--------------------------------------------------------------------------#
     # Save | Load                                                              #
     #--------------------------------------------------------------------------#
     @DummyAsync
     def SaveAsync (self, stream):
+        result  = Result.Save (self)
+
         src_end = len (self.src)
         dst_end = src_end + len (self.dst)
-        size    = dst_end + len (self.data)
+        size    = dst_end + len (result)
 
-        stream.Write (self.header_struct.pack (self.type, src_end, dst_end, size) +
-            self.src + self.dst + self.data)
+        stream.Write (self.header_struct.pack (size, src_end, dst_end) + self.src + self.dst + result)
 
     @classmethod
     @Async
     def LoadAsync (cls, stream, cancel = None):
-        type, src_end, dst_end, size = cls.header_struct.unpack (
-            (yield stream.ReadExactly (cls.header_struct.size, cancel)))
+        # header
+        header = yield stream.ReadExactly (cls.header_struct.size, cancel)
+        size, src_end, dst_end = cls.header_struct.unpack (header)
+
+        # body
         body = yield stream.ReadExactly (size, cancel)
+        src    = body [:src_end]
+        dst    = body [src_end:dst_end]
+        result = Result.Load (body [dst_end:])
 
-        if type == MESSAGE_RESULT:
-            AsyncReturn (Message (body [src_end:dst_end], body [dst_end:], body [:src_end]))
+        # instance
+        instance = cls (dst, src)
+        instance.error     = result.error
+        instance.value     = result.value
+        instance.traceback = result.traceback
 
-        elif type == MESSAGE_ERROR:
-            AsyncReturn (ErrorMessage (body [src_end:dst_end], body [dst_end:], body [:src_end]))
-
-        assert False, 'Unknown message type: {}'.format (type)
+        AsyncReturn (instance)
 
     def Save (self, stream):
+        result  = Result.Save (self)
+
         src_end = len (self.src)
         dst_end = src_end + len (self.dst)
-        size    = dst_end + len (self.data)
+        size    = dst_end + len (result)
 
-        stream.write (self.header_struct.pack (self.type, src_end, dst_end, size) +
-            self.src + self.dst + self.data)
+        stream.write (self.header_struct.pack (size, src_end, dst_end) + self.src + self.dst + result)
 
     @classmethod
     def Load (cls, stream):
-        type, src_end, dst_end, size = cls.header_struct.unpack (stream.read (cls.header_struct.size))
+        # header
+        size, src_end, dst_end = cls.header_struct.unpack (stream.read (cls.header_struct.size))
+
+        # body
         body = stream.read (size)
+        src    = body [:src_end]
+        dst    = body [src_end:dst_end]
+        result = Result.Load (body [dst_end:])
 
-        if type == MESSAGE_RESULT:
-            return Message (body [src_end:dst_end], body [dst_end:], body [:src_end])
+        # instance
+        instance = cls (dst, src)
+        instance.error     = result.error
+        instance.value     = result.value
+        instance.traceback = result.traceback
 
-        elif type == MESSAGE_ERROR:
-            return ErrorMessage (body [src_end:dst_end], body [dst_end:], body [:src_end])
-
-        assert False, 'Unknown message type: {}'.format (type)
-
-    #--------------------------------------------------------------------------#
-    # Private                                                                  #
-    #--------------------------------------------------------------------------#
-    def __str__ (self):
-        return '<Message [{}]: \x1b[38;01m{} -> {}\x1b[m: {}>'\
-            .format (os.getpid (), self.src, self.dst, self.data)
-
-    def __repr__ (self):
-        return slef.__str__ ()
-
-#------------------------------------------------------------------------------#
-# Error Message                                                                #
-#------------------------------------------------------------------------------#
-error_pattern = """
-`-------------------------------------------------------------------------------
-Path:  {src} -> {dst}
-Error: {name}: {message}
-
-{traceback}"""
-class ErrorMessage (Message):
-    __slots__ = Message.__slots__
-    type      = MESSAGE_ERROR
+        return instance
 
     #--------------------------------------------------------------------------#
-    # Public                                                                   #
+    # Repr                                                                     #
     #--------------------------------------------------------------------------#
-    @property
-    def Data (self):
-        info = pickle.loads (self.data)
-        error_type = info ['type']
-        error      = info ['error']
-        traceback  = info ['traceback']
+    def __repr__ (self): return self.__str__ ()
+    def __str__  (self):
+        error  = self.Error ()
+        result ='{}:{}'.format (type (error).__name__, error) if error else self.Value ()
 
-        raise error_type (error_pattern.format (
-            src       = self.src,
-            dst       = self.dst,
-            name      = error_type.__name__,
-            message   = str (error).split ('\n') [-1],
-            traceback = traceback))
-
-    @classmethod
-    def FromError (cls, dst, error, src):
-        traceback_stream = io.StringIO ()
-        class TracebackStream (object):
-            def write (self, data):
-                traceback_stream.write (data.decode ('utf-8') if hasattr (data, 'decode') else data)
-        traceback.print_exc (file = TracebackStream ())
-
-        return cls (dst, pickle.dumps ({
-            'type':      error [0],
-            'error':     error [1],
-            'message':   str (error [1]).split ('\n') [-1],
-            'traceback': traceback_stream.getvalue ().strip ('\n')}), src)
-
+        return '<Message [{}]: \x1b[38;01m{} -> {}\x1b[m: {}>'.format (os.getpid (), self.src, self.dst, result)
+    
 # vim: nu ft=python columns=120 :

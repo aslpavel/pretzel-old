@@ -5,7 +5,7 @@ import sys
 import unittest
 
 from ..message import Message
-from ...async import Async, AsyncFile, Core
+from ...async import Async, AsyncFile, ScopeFuture, Core
 
 __all__ = ('MessageTest',)
 #------------------------------------------------------------------------------#
@@ -13,19 +13,23 @@ __all__ = ('MessageTest',)
 #------------------------------------------------------------------------------#
 class MessageTest (unittest.TestCase):
     def testSerialize (self):
-        msg = Message (b'dst', b'data')
+        msg = Message.FromValue (b'value', b'dst')
 
         stream = io.BytesIO ()
         msg.Save (stream)
         stream.seek (0)
-        msg_load = Message.Load (stream)
+        try:
+            msg_load = Message.Load (stream)
+        except Exception:
+            import pdb; pdb.post_mortem ()
+            raise
 
         self.assertEqual (msg.src, msg_load.src)
         self.assertEqual (msg.dst, msg_load.dst)
-        self.assertEqual (msg.data, msg_load.data)
+        self.assertEqual (msg.Value (), msg_load.Value ())
 
     def testSerializeAsync (self):
-        msg = Message (b'dst', b'data')
+        msg = Message.FromValue (b'value', b'dst')
 
         with Core.Instance () as core:
             ra, wa = (AsyncFile (fd) for fd in os.pipe ())
@@ -33,19 +37,19 @@ class MessageTest (unittest.TestCase):
             @Async
             def test ():
                 yield core.Idle ()
-                msg_load_future = Message.LoadAsync (ra)
-                self.assertFalse (msg_load_future.IsCompleted ())
+                with ScopeFuture () as cancel:
+                    msg_load_future = Message.LoadAsync (ra, core.Sleep (1, cancel))
+                    self.assertFalse (msg_load_future.IsCompleted ())
 
-                yield msg.SaveAsync (wa)
-                msg_load = yield msg_load_future
+                    yield msg.SaveAsync (wa)
+                    msg_load = yield msg_load_future
 
                 self.assertEqual (msg.src, msg_load.src)
                 self.assertEqual (msg.dst, msg_load.dst)
-                self.assertEqual (msg.data, msg_load.data)
-
+                self.assertEqual (msg.Value (), msg_load.Value ())
             test_future = test ()
 
-            core ()
+            core.Execute ()
 
         ra.Dispose ()
         wa.Dispose ()
@@ -53,37 +57,34 @@ class MessageTest (unittest.TestCase):
         test_future.Result ()
 
     def testError (self):
-        msg = Message (b'dst', b'data')
+        msg = Message (b'dst', b'src')
         try: raise ValueError ('test error')
         except Exception:
-            msg_error = msg.ErrorResponse (sys.exc_info ())
+            msg.ErrorSet (sys.exc_info ())
 
-        self.assertEqual (msg_error.src, msg.dst)
-        self.assertEqual (msg_error.dst, msg.src)
+        with self.assertRaises (ValueError):
+            msg.Value ()
 
+        # serialize
         stream = io.BytesIO ()
-        msg_error.Save (stream)
+        msg.Save (stream)
         stream.seek (0)
         msg_load = Message.Load (stream)
 
-        self.assertEqual (msg_load.src, msg_error.src)
-        self.assertEqual (msg_load.dst, msg_error.dst)
-        self.assertEqual (type (msg_load), type (msg_error))
-
-        with self.assertRaises (ValueError): msg_error.Data
-        with self.assertRaises (ValueError): msg_load.Data
+        self.assertEqual (msg_load.src, msg.src)
+        self.assertEqual (msg_load.dst, msg.dst)
+        with self.assertRaises (ValueError):
+            msg_load.Value ()
 
     def testResponse (self):
-        msg = Message (b'dst', b'data', b'src')
+        msg = Message (b'dst', b'src')
 
         self.assertEqual (msg.dst, b'dst')
         self.assertEqual (msg.src, b'src')
-        self.assertEqual (msg.data, b'data')
 
-        msg_resp = msg.Response (b'new_data')
+        msg_resp = msg.Response ()
 
         self.assertEqual (msg_resp.dst, msg.src)
         self.assertEqual (msg_resp.src, msg.dst)
-        self.assertEqual (msg_resp.data, b'new_data')
 
 # vim: nu ft=python columns=120 :
