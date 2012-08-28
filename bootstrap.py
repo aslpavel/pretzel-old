@@ -144,6 +144,7 @@ class Tomb (object):
                     match = encoding_pattern.search (line)
                     if match:
                         encoding = match.group (1).decode ()
+                        source.write (b'\n')
                         continue
                 source.write (line)
 
