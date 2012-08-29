@@ -93,7 +93,7 @@ class Response (object):
             response.ValueSet (self.domain.Pack (None))
 
         elif et == ResponseReturn:
-            try: 
+            try:
                 response.ValueSet (self.domain.Pack (eo.args [0]))
             except Exception:
                 response.ErrorSet (sys.exc_info ())

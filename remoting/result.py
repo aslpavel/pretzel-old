@@ -8,9 +8,11 @@ from traceback import format_exception
 if sys.version_info [0] > 2:
     import pickle
     string_type = io.StringIO
+    PY2 = False
 else:
     import cPickle as pickle
     string_type = io.BytesIO
+    PY2 = True
 
 __all__ = ('Result',)
 #------------------------------------------------------------------------------#
@@ -77,7 +79,7 @@ class Result (object):
         return self.error
 
     def ErrorSet (self, error):
-        # create traceback
+        # traceback
         traceback = traceback_template.format (
                 hostname  = self.hostname,
                 pid       = self.pid,
@@ -85,13 +87,13 @@ class Result (object):
                 message   = str (error [1]),
                 traceback = ''.join (format_exception (*error)))
 
-        # stack traceback
-        traceback_prev = getattr (error [1], '_saved_traceback', None)
-        if traceback_prev is not None:
-            traceback = traceback_prev + traceback
+        # saved traceback
+        traceback_saved = getattr (error [1], '_saved_traceback', None)
+        if traceback_saved is not None:
+            traceback += traceback_saved
 
-        # create error
-        error = error [0] (*error [1].args)
+        # error
+        error = error [1]
         error._saved_traceback = traceback
 
         self.error     = error
@@ -107,13 +109,14 @@ class Result (object):
     def PrintException (et, eo, tb, file = None):
         stream = file or string_type ()
 
-        # normal
-        stream.write (''.join (format_exception (et, eo, tb)))
+        # traceback
+        traceback = ''.join (format_exception (et, eo, tb))
+        stream.write (traceback.encode ('utf-8') if PY2 else traceback)
 
         # saved traceback
-        traceback = getattr (eo, '_saved_traceback', None)
-        if traceback is not None:
-            stream.write (traceback)
+        traceback_saved = getattr (eo, '_saved_traceback', None)
+        if traceback_saved is not None:
+            stream.write (traceback_saved)
 
         # flush
         stream.flush ()

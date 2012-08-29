@@ -49,9 +49,9 @@ class Tomb (object):
                     name     = modname if os.path.samefile (path, root) else \
                         '.'.join ((modname, os.path.relpath (path, root).replace ('/', '.')))
                     if file.lower () == '__init__.py':
-                        self.containments [name] = source, filename, True 
+                        self.containments [name] = source, filename, True
                     else:
-                        self.containments ['.'.join ((name, file [:-3]))] = source, filename, False 
+                        self.containments ['.'.join ((name, file [:-3]))] = source, filename, False
         else:
             self.containments [modname] = self.read_source (filename), filename, False
 
@@ -148,7 +148,11 @@ class Tomb (object):
                         continue
                 source.write (line)
 
-        return source.getvalue ().decode (encoding)
+        if PY2:
+            # unicode misbehave when creating traceback
+            return source.getvalue ()
+        else:
+            return source.getvalue ().decode (encoding)
 
 #------------------------------------------------------------------------------#
 # Bootstrap                                                                    #
@@ -217,6 +221,8 @@ if sys.version_info [0] > 2:
             raise value.with_traceback (tb)
         raise value
 
+    PY2 = False
+
 else:
     def Exec (code, globs=None, locs=None):
         if globs is None:
@@ -233,6 +239,8 @@ else:
 
     Exec ("""def Raise (tp, value, tb=None):
         raise tp, value, tb""")
+
+    PY2 = True
 
 #------------------------------------------------------------------------------#
 # Main                                                                         #
