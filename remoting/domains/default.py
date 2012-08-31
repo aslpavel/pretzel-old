@@ -24,7 +24,7 @@ class DefaultDomain (Domain):
     DOMAIN_NAME  = b'domain::'
     CHANNEL_NAME = b'channel::'
 
-    def __init__ (self, channel, insert_importer = None):
+    def __init__ (self, channel, insert_importer):
         Domain.__init__ (self, channel, [
             PersistenceService (),
             ImporterService (insert = insert_importer),
@@ -108,10 +108,10 @@ class Response (object):
 # Local Domain                                                                 #
 #------------------------------------------------------------------------------#
 class LocalDomain (DefaultDomain):
-    def __init__ (self, channel, push_main = None):
+    def __init__ (self, channel, push_main):
         DefaultDomain.__init__ (self, channel, insert_importer = False)
 
-        self.push_main = True if push_main is None else push_main
+        self.push_main = push_main is None or push_main
 
     @Async
     def Connect (self):

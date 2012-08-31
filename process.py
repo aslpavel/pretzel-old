@@ -47,13 +47,13 @@ class Process (object):
         #----------------------------------------------------------------------#
         # Pipes                                                                #
         #----------------------------------------------------------------------#
-        stdin       = self.fd_get (stdin, STDIN)
+        stdin       = self.to_fd (stdin, STDIN)
         stdin_pipe  = Pipe (None if stdin is None else (stdin, None), self)
 
-        stdout      = self.fd_get (stdout, STDOUT)
+        stdout      = self.to_fd (stdout, STDOUT)
         stdout_pipe = Pipe (None if stdout is None else (None, stdout), self)
 
-        stderr      = self.fd_get (stderr, STDERR)
+        stderr      = self.to_fd (stderr, STDERR)
         stderr_pipe = Pipe (None if stderr is None else (None, stderr), self)
 
         alive_pipe  = Pipe (None, self)
@@ -64,20 +64,20 @@ class Process (object):
         self.pid = os.fork ()
         if self.pid:
             # pipes
-            self.stdin  = stdin_pipe.WriteAsync ()
-            self.stdout = stdout_pipe.ReadAsync ()
-            self.stderr = stderr_pipe.ReadAsync ()
+            self.stdin  = stdin_pipe.DetachWriteAsync ()
+            self.stdout = stdout_pipe.DetachReadAsync ()
+            self.stderr = stderr_pipe.DetachReadAsync ()
 
             # result
-            self.result = self.result_worker (alive_pipe.ReadAsync ())
+            self.result = self.result_worker (alive_pipe.DetachReadAsync ())
 
         else:
             try:
                 # pipes
-                stdin_pipe.Read (0)
-                stdout_pipe.Write (1)
-                stderr_pipe.Write (2)
-                alive_pipe.Write ()
+                stdin_pipe.DetachRead (0)
+                stdout_pipe.DetachWrite (1)
+                stderr_pipe.DetachWrite (2)
+                alive_pipe.DetachWrite ()
 
                 # exec
                 if self.environ is None:
@@ -138,7 +138,7 @@ class Process (object):
 
         AsyncReturn (result)
 
-    def fd_get (self, file, default):
+    def to_fd (self, file, default):
         if file is None:
             return default
 
@@ -174,77 +174,73 @@ class Pipe (object):
         self.process = process
         if fds:
             self.piped = False
-            self.read_fd, self.write_fd = fds
+            self.fds   = fds
         else:
             self.piped = True
-            self.read_fd, self.write_fd = os.pipe ()
+            self.fds   = os.pipe ()
 
         # dispose
         process.dispose += self
 
     #--------------------------------------------------------------------------#
-    # Read Side                                                                #
+    # Detach                                                                   #
     #--------------------------------------------------------------------------#
-    def Read (self, fd = None):
-        read_fd, write_fd = self.fds ()
-        self.close (write_fd)
-        return self.dup (read_fd, fd)
+    def DetachRead (self, fd = None):
+        self.detach (True, fd)
 
-    def ReadAsync (self):
-        return self.async (self.Read ())
+    def DetachReadAsync (self):
+        return self.detach_async (True)
 
-    #--------------------------------------------------------------------------#
-    # Write Side                                                               #
-    #--------------------------------------------------------------------------#
-    def Write (self, fd = None):
-        read_fd, write_fd = self.fds ()
-        self.close (read_fd)
-        return self.dup (write_fd, fd)
+    def DetachWrite (self, fd = None):
+        self.detach (False, fd)
 
-    def WriteAsync (self):
-        return self.async (self.Write ())
+    def DetachWriteAsync (self):
+        return self.detach_async (False)
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
-    def fds (self):
-        if self.read_fd is None and self.write_fd is None:
-            raise ProcessError ('Pipe has already been consumed')
+    def detach (self, read, fd = None):
+        if self.fds is None:
+            raise ProcessError ('Pipe has already been detached')
 
-        read_fd, self.read_fd = self.read_fd, None
-        write_fd, self.write_fd = self.write_fd, None
+        fds, self.fds = self.fds, None
+        to_return, to_close = fds if read else reversed (fds)
 
-        return read_fd, write_fd
+        if self.piped and to_close is not None:
+            os.close (to_close)
 
-    def async (self, fd):
+        if fd is None or fd == to_return:
+            return to_return
+        else:
+            os.dup2  (to_return, fd)
+            os.close (to_return)
+            return fd
+
+    def detach_async (self, read):
+        fd = self.detach (read)
         if fd is None:
             return
 
-        file  = AsyncFile (fd, buffer_size = self.process.buffer_size, closefd = self.piped, core = self.process.core)
+        file  = AsyncFile (fd, buffer_size = self.process.buffer_size,
+                           closefd = self.piped, core = self.process.core)
         self.process.dispose += file
         if self.piped:
             file.CloseOnExec (True)
 
         return file
 
-    def dup (self, src, dst):
-        if dst is None or src == dst:
-            return src
-        else:
-            os.dup2 (src, dst)
-            os.close (src)
-            return dst
-
-    def close (self, fd):
-        if self.piped and fd is not None:
-            os.close (fd)
-
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
     def Dispose (self):
-        self.close (self.read_fd)
-        self.close (self.write_fd)
+        if self.fds is None:
+            return
+
+        fds, self.fds = self.fds, None
+        for fd in fds:
+            if self.piped and fd is not None:
+                os.close (fd)
 
     def __enter__ (self):
         return self

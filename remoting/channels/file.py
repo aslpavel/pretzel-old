@@ -10,33 +10,33 @@ class FileChannel (Channel):
     def __init__ (self, core = None):
         Channel.__init__ (self, core = core)
 
-        self.ifile = None
-        self.ofile = None
+        self.in_file     = None
+        self.out_file    = None
 
     #--------------------------------------------------------------------------#
     # Methods                                                                  #
     #--------------------------------------------------------------------------#
     def Send (self, message):
-        return message.SaveAsync (self.ofile)
+        return message.SaveAsync (self.out_file)
 
     def Recv (self, cancel = None):
-        return Message.LoadAsync (self.ifile, cancel)
+        return Message.LoadAsync (self.in_file, cancel)
 
-    def FilesSet (self, ifile, ofile):
-        self.ifile = ifile
-        self.ofile = ofile
+    def FilesSet (self, in_file, out_file):
+        self.in_file  = in_file
+        self.out_file = out_file
 
-        self.ifile.CloseOnExec (True)
-        self.ofile.CloseOnExec (True)
+        self.in_file.CloseOnExec (True)
+        self.out_file.CloseOnExec (True)
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
     def disconnect (self):
-        if self.ifile is not None:
-            self.ifile.Dispose ()
-        if self.ofile is not None:
-            self.ofile.Dispose ()
+        if self.in_file is not None:
+            self.in_file.Dispose ()
+        if self.out_file is not None:
+            self.out_file.Dispose ()
 
         Channel.disconnect (self)
 

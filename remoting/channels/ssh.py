@@ -5,22 +5,25 @@ import struct
 import traceback
 
 from .file        import FileChannel
-from ..           import __name__ as remoting_name
-from ...async     import Async, AsyncFile
+from .pipe        import Pipe
+from ...async     import Async
 from ...bootstrap import Tomb, BootstrapBootstrap
+from ..           import __name__ as remoting_name
 
 __all__ = ('SSHChannel',)
 #------------------------------------------------------------------------------#
 # SSH Channel                                                                  #
 #------------------------------------------------------------------------------#
 class SSHChannel (FileChannel):
-    def __init__ (self, host, port = None, identity_file = None, ssh_exec = None, py_exec = None, core = None):
-        self.pid           = None
+    def __init__ (self, host, port = None, identity_file = None, ssh_exec = None, py_exec = None,
+            buffer_size = None, core = None):
+
         self.host          = host
         self.port          = port
+        self.identity_file = identity_file
         self.ssh_exec      = 'ssh' if ssh_exec is None else ssh_exec
         self.py_exec       = sys.executable if py_exec is None else py_exec
-        self.identity_file = identity_file
+        self.buffer_size   = buffer_size
 
         # ssh command
         self.command = [
@@ -33,8 +36,11 @@ class SSHChannel (FileChannel):
         self.command.extend (('-i', self.identity_file) if self.identity_file else [])
         self.command.extend (('-p', self.port)          if self.port          else [])
         self.command.extend (('-c', payload_template.format (
-            bootstrap = BootstrapBootstrap ('_bootstrap'),
-            remoting_name = remoting_name)))
+            bootstrap     = BootstrapBootstrap ('_bootstrap'),
+            remoting_name = remoting_name,
+            buffer_size   = buffer_size)))
+
+        self.pid = None
 
         # base .ctor
         FileChannel.__init__ (self, core = core)
@@ -44,30 +50,18 @@ class SSHChannel (FileChannel):
     #--------------------------------------------------------------------------#
     @Async
     def connect (self):
-        # create ssh connection
-        lr, rw = os.pipe ()
-        rr, lw = os.pipe ()
+        in_pipe  = Pipe (self.buffer_size, self.core)
+        out_pipe = Pipe (self.buffer_size, self.core)
 
         # create child
         self.pid = os.fork ()
-        if self.pid:
-            # parent
-            os.close (rr)
-            os.close (rw)
-
-        else:
-            # child
+        if not self.pid:
             try:
-                os.close (lr)
-                os.close (lw)
-
                 sys.stdin.close ()
-                os.dup2 (rr, 0)
-                os.close (rr)
+                in_pipe.DetachRead (0)   # -> incoming
 
                 sys.stdout.close ()
-                os.dup2 (rw, 1)
-                os.close (rw)
+                out_pipe.DetachWrite (1) # <- outgoing
 
                 os.execvp (self.command [0], self.command)
 
@@ -75,16 +69,19 @@ class SSHChannel (FileChannel):
             finally:
                 sys.exit (1)
 
+        # set files
+        in_stream = in_pipe.DetachWriteAsync ()
+        self.FilesSet (out_pipe.DetachReadAsync (), in_stream)
+
         # send payload
         tomb    = Tomb ()
         tomb   += sys.modules [(__package__ if __package__ else __name__).split ('.') [0]]
         payload = tomb.Save ()
-        os.write (lw, struct.pack ('!L', len (payload)))
-        os.write (lw, payload)
 
-        # set files
-        self.FilesSet (AsyncFile (lr, core = self.core), AsyncFile (lw, core = self.core))
+        yield in_stream.Write (struct.pack ('!L', len (payload)))
+        yield in_stream.Write (payload)
 
+        # parent connect
         yield FileChannel.connect (self)
 
     def disconnect (self):
@@ -124,7 +121,7 @@ def Main ():
     domains  = import_module (".domains.ssh", "{remoting_name}")
 
     with async.Core.Instance () as core:
-        domain = domains.SSHRemoteDomain (core)
+        domain = domains.SSHRemoteDomain ({buffer_size}, core)
         domain.channel.OnDisconnect += core.Dispose
         domain.Connect ().Traceback ("remote::connect")
         core ()

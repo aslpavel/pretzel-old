@@ -4,17 +4,20 @@ import os
 import traceback
 
 from .file        import FileChannel
-from ..           import __name__ as remoting_name
-from ...async     import Async, AsyncFile
+from .pipe        import Pipe
+from ...async     import Async
 from ...bootstrap import BootstrapModules
+from ..           import __name__ as remoting_name
 
 __all__ = ('ForkChannel',)
 #------------------------------------------------------------------------------#
 # ForkChannel                                                                  #
 #------------------------------------------------------------------------------#
 class ForkChannel (FileChannel):
-    def __init__ (self, command = None, core = None):
-        FileChannel.__init__ (self, core = core)
+    def __init__ (self, command = None, buffer_size = None, core = None):
+        FileChannel.__init__ (self, core)
+
+        self.buffer_size = buffer_size
         self.command = [sys.executable, '-'] if command is None else command
 
     #--------------------------------------------------------------------------#
@@ -22,28 +25,17 @@ class ForkChannel (FileChannel):
     #--------------------------------------------------------------------------#
     @Async
     def connect (self):
-        # create pipes
-        lr, rw = os.pipe ()
-        rr, lw = os.pipe ()
-        payload_in, payload_out = os.pipe ()
+        in_pipe   = Pipe (self.buffer_size, self.core)
+        out_pipe  = Pipe (self.buffer_size, self.core)
+        load_pipe = Pipe (self.buffer_size, self.core)
 
         # create child
         self.pid = os.fork ()
-        if self.pid:
-            # parent
-            os.close (rr)
-            os.close (rw)
-            os.close (payload_in)
-
-        else:
-            # child
+        if not self.pid:
             try:
-                os.close (lr)
-                os.close (lw)
-                os.close (payload_out)
-
-                os.dup2 (payload_in, 0)
-                os.close (payload_in)
+                in_pipe.DetachRead ()    # <- incoming
+                out_pipe.DetachWrite ()  # -> outgoing
+                load_pipe.DetachRead (0) # <- stdin
 
                 os.execvp (self.command [0], self.command)
 
@@ -52,14 +44,17 @@ class ForkChannel (FileChannel):
                 sys.exit (1)
 
         # set files
-        self.FilesSet (AsyncFile (lr, core = self.core), AsyncFile (lw, core = self.core))
+        in_fd, out_fd = in_pipe.Read, out_pipe.Write
+        self.FilesSet (out_pipe.DetachReadAsync (), in_pipe.DetachWriteAsync ())
 
         # send payload
-        try:
-            os.write (payload_out, payload.format (bootstrap = BootstrapModules (),
-                remoting_name = remoting_name, rr = rr, rw = rw).encode ())
-        finally:
-            os.close (payload_out)
+        with load_pipe.DetachWriteAsync () as load_stream:
+            yield load_stream.Write (payload.format (
+                bootstrap     = BootstrapModules (),
+                remoting_name = remoting_name,
+                in_fd         = in_fd,
+                out_fd        = out_fd,
+                buffer_size   = self.buffer_size).encode ())
 
         yield FileChannel.connect (self)
 
@@ -86,7 +81,7 @@ def Main ():
     domains = import_module (".domains.fork", "{remoting_name}")
 
     with async.Core.Instance () as core:
-        domain = domains.ForkRemoteDomain ({rr}, {rw}, core = core)
+        domain = domains.ForkRemoteDomain ({in_fd}, {out_fd}, {buffer_size}, core)
         domain.channel.OnDisconnect += core.Dispose
         domain.Connect ().Traceback ("remote::connect")
         core ()
