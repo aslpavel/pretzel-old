@@ -91,15 +91,15 @@ class Response (object):
 
         if et is None:
             response.ValueSet (self.domain.Pack (None))
-
         elif et == ResponseReturn:
             try:
                 response.ValueSet (self.domain.Pack (eo.args [0]))
             except Exception:
                 response.ErrorSet (sys.exc_info ())
-
-        else:
+        elif issubclass (et, Exception):
             response.ErrorSet ((et, eo, tb))
+        else:
+            return False
 
         self.domain.channel.Send (response)
         return True

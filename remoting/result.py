@@ -31,7 +31,7 @@ class Result (object):
         self.traceback = None
 
     #--------------------------------------------------------------------------#
-    # Factories                                                               #
+    # Factories                                                                #
     #--------------------------------------------------------------------------#
     @classmethod
     def FromError (cls, error):
@@ -59,8 +59,10 @@ class Result (object):
         if et is not None:
             if et is ResultReturn:
                 self.ValueSet (eo.args [0])
-            else:
+            elif issubclass (et, Exception):
                 self.ErrorSet ((et, eo, tb))
+            else:
+                return False
         return True
 
     #--------------------------------------------------------------------------#
