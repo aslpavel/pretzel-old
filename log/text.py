@@ -16,25 +16,31 @@ class TextLogger (object):
     #--------------------------------------------------------------------------#
     # Message                                                                  #
     #--------------------------------------------------------------------------#
-    def Info (self, *texts): self.write ('[info] ', *texts)
-    def Warning (self, *texts): self.write ('[warn] ', *texts)
-    def Error (self, *texts): self.write ('[error] ', *texts)
+    def Info (self, *args, **keys): self.message ('[info] ', args, keys)
+    def Warning (self, *args, **keys): self.message ('[warn] ', args, keys)
+    def Error (self, *args, **keys): self.message ('[error] ', args, keys)
 
     #--------------------------------------------------------------------------#
     # Observe                                                                  #
     #--------------------------------------------------------------------------#
     def Observe (self, future, *args, **keys):
-        self.write ('[busy] ', *args)
-        start = time.time ()
+        source = keys.get ('source')
+        if source is None:
+            self.write ('[busy] ', *args)
+        else:
+            self.write ('[busy] [{}] '.format (source), *args)
+
+        begin = time.time ()
 
         def continuation (future):
             # elapsed
-            seconds = time.time () - start
+            seconds = time.time () - begin
             hours,   seconds = divmod (seconds, 3600)
             minutes, seconds = divmod (seconds, 60)
+            elapsed = '[{:0>2.0f}:{:0>2.0f}:{:0>4.1f}] '.format (hours, minutes, seconds)
 
             # output
-            texts  = ['[{:0>2.0f}:{:0>2.0f}:{:0>4.1f}] '.format (hours, minutes, seconds)]
+            texts = [] if source is None else ['[{}] '.format (source)]
             error = future.Error ()
             if error is None:
                 texts.insert (0, '[done] ')
@@ -66,6 +72,15 @@ class TextLogger (object):
 
         self.stream.write ('\n')
         self.stream.flush ()
+
+    def message (self, tag, args, keys):
+        self.stream.write (tag)
+
+        source = keys.get ('source')
+        if source is not None:
+            self.stream.write ('[{}] '.format (source))
+
+        self.write (*args)
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #

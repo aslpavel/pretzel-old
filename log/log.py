@@ -83,7 +83,7 @@ class LogType (object):
 
         def call (*args, **keys):
             if not self.loggers:
-                self.LoggerAttach (self.logger_default)
+                self.LoggerCreate (self.logger_default)
             for logger in self.loggers:
                 method (logger) (*args, **keys)
 

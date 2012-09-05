@@ -6,7 +6,7 @@ from .draw import (BarDrawer, TimeDrawer, TagDrawer,
 
 from ..log import Log
 from ...console import Console
-from ...console import COLOR_RED, COLOR_GREEN, COLOR_YELLOW
+from ...console import COLOR_RED, COLOR_GREEN, COLOR_YELLOW, COLOR_BLUE
 
 __all__ = ('ConsoleLogger',)
 #------------------------------------------------------------------------------#
@@ -23,6 +23,7 @@ class ConsoleLogger (object):
         self.info_draw = TagDrawer (self.console, COLOR_GREEN)
         self.warn_draw = TagDrawer (self.console, COLOR_YELLOW)
         self.error_draw = TagDrawer (self.console, COLOR_RED)
+        self.source_draw = TagDrawer (self.console, COLOR_BLUE)
 
         # pending
         self.pending_draw = PendingDrawer (self.console)
@@ -34,20 +35,29 @@ class ConsoleLogger (object):
     #--------------------------------------------------------------------------#
     # Message                                                                  #
     #--------------------------------------------------------------------------#
-    def Info (self, *texts):
+    def Info (self, *args, **keys):
         with self.console.Line ():
             self.info_draw ('info')
-            self.console.Write (' ', *texts)
+            source = keys.get ('source')
+            if source is not None:
+                self.source_draw (source)
+            self.console.Write (' ', *args)
 
-    def Warning (self, *texts):
+    def Warning (self, *args, **keys):
         with self.console.Line ():
             self.warn_draw ('warn')
-            self.console.Write (' ', *texts)
+            source = keys.get ('source')
+            if source is not None:
+                self.source_draw (source)
+            self.console.Write (' ', *args)
 
-    def Error (self, *texts):
+    def Error (self, *args, **keys):
         with self.console.Line ():
             self.error_draw ('erro')
-            self.console.Write (' ', *texts)
+            source = keys.get ('source')
+            if source is not None:
+                self.source_draw (source)
+            self.console.Write (' ', *args)
 
     #--------------------------------------------------------------------------#
     # Observe                                                                  #
@@ -60,6 +70,9 @@ class ConsoleLogger (object):
         begin = time.time ()
         with label.Update ():
             self.pending_draw  (PENDING_BUSY)
+            source = keys.get ('source')
+            if source is not None:
+                self.source_draw (source)
             self.console.Write (' ', *args)
 
         #----------------------------------------------------------------------#
@@ -84,6 +97,8 @@ class ConsoleLogger (object):
                 error = future.Error ()
                 if error is None:
                     self.pending_draw (PENDING_DONE)
+                    if source is not None:
+                        self.source_draw (source)
                     self.time_draw (elapsed)
                     self.console.Write (' ', *args)
 
@@ -92,6 +107,8 @@ class ConsoleLogger (object):
                         self.console.Write (': ', result)
                 else:
                     self.pending_draw (PENDING_FAIL)
+                    if source is not None:
+                        self.source_draw (source)
                     self.time_draw (elapsed)
                     self.console.Write (' ', *args)
                     self.console.Write (': ', error [1])

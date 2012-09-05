@@ -7,10 +7,11 @@ from importlib import import_module
 from .domain import Domain
 
 from ..message import Message
-from ..services.future import FutureService
-from ..services.linker import LinkerService
-from ..services.importer import ImporterService
 from ..services.persistence import PersistenceService
+from ..services.future import FutureService
+from ..services.importer import ImporterService
+from ..services.linker import LinkerService
+from ..services.logger import LoggerService
 
 from ...async import Async, AsyncReturn
 from ...bootstrap import Tomb
@@ -24,12 +25,13 @@ class DefaultDomain (Domain):
     DOMAIN_NAME  = b'domain::'
     CHANNEL_NAME = b'channel::'
 
-    def __init__ (self, channel, insert_importer):
+    def __init__ (self, channel, insert_importer, attach_logger):
         Domain.__init__ (self, channel, [
             PersistenceService (),
             ImporterService (insert = insert_importer),
             LinkerService (),
-            FutureService ()])
+            FutureService (),
+            LoggerService (attach = attach_logger)])
 
     #--------------------------------------------------------------------------#
     # Request | Response                                                       #
@@ -109,7 +111,7 @@ class Response (object):
 #------------------------------------------------------------------------------#
 class LocalDomain (DefaultDomain):
     def __init__ (self, channel, push_main):
-        DefaultDomain.__init__ (self, channel, insert_importer = False)
+        DefaultDomain.__init__ (self, channel, insert_importer = False, attach_logger = False)
 
         self.push_main = push_main is None or push_main
 
@@ -153,7 +155,7 @@ class LocalDomain (DefaultDomain):
 #------------------------------------------------------------------------------#
 class RemoteDomain (DefaultDomain):
     def __init__ (self, channel):
-        DefaultDomain.__init__ (self, channel, insert_importer = True)
+        DefaultDomain.__init__ (self, channel, insert_importer = True, attach_logger = True)
 
 #-----------------------------------------------------------------------------#
 # Helpers                                                                     #
