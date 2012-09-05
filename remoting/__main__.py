@@ -7,11 +7,13 @@ import time
 import getopt
 import itertools
 
-from ..app         import Application
-from ..async       import Async, Future
+from .message      import Message
 from .domains.fork import ForkDomain
 from .domains.ssh  import SSHDomain
-from .message      import Message
+
+from ..app         import Application
+from ..async       import Async, Future
+from ..log         import Log
 
 #------------------------------------------------------------------------------#
 # Remote Objects                                                               #
@@ -82,7 +84,7 @@ class Main (object):
         elif domain_type == 'ssh':
             domain = SSHDomain  (self.domain_args [0] if self.domain_args else 'localhost')
         else:
-            app.Log.Error ('Unknown domain type: \'{}\''.format (domain_type))
+            Log.Error ('Unknown domain type: \'{}\''.format (domain_type))
             Usage ()
             sys.exit (1)
 
@@ -92,7 +94,7 @@ class Main (object):
             # Method                                                               #
             #----------------------------------------------------------------------#
             proxy = yield domain.Call.Proxy (Remote)
-            with app.Log.Pending ('Method'):
+            with Log ('Method'):
                 with Timer () as method_timer:
                     futures = [proxy.Method () for i in range (CallCount)]
                     yield Future.WhenAll (futures)
@@ -103,7 +105,7 @@ class Main (object):
             #----------------------------------------------------------------------#
             # Function                                                             #
             #----------------------------------------------------------------------#
-            with app.Log.Pending ('Function'):
+            with Log ('Function'):
                 with Timer () as func_timer:
                     futures = [domain.Call (RemoteFunction) for i in range (CallCount)]
                     yield Future.WhenAll (futures)
@@ -115,7 +117,7 @@ class Main (object):
             #----------------------------------------------------------------------#
             # Message                                                              #
             #----------------------------------------------------------------------#
-            with app.Log.Pending ('Message'):
+            with Log ('Message'):
                 stream = io.BytesIO ()
                 with Timer () as msg_timer:
                     for i in range (MsgCount):
@@ -128,7 +130,7 @@ class Main (object):
         #--------------------------------------------------------------------------#
         # Output                                                                   #
         #--------------------------------------------------------------------------#
-        app.Log.Info ('Elapsed:{:.1f}s'.format (method_timer.Elapsed + func_timer.Elapsed + msg_timer.Elapsed))
+        Log.Info ('Elapsed:{:.1f}s'.format (method_timer.Elapsed + func_timer.Elapsed + msg_timer.Elapsed))
         sys.stdout.write (OutputTemplate.format (
             method_timer.Elapsed, method_timer.Elapsed / CallCount, int (CallCount / method_timer.Elapsed),
             func_timer.Elapsed,   func_timer.Elapsed / CallCount,   int (CallCount / func_timer.Elapsed),

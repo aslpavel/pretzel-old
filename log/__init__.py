@@ -1,20 +1,9 @@
 # -*- coding: utf-8 -*-
-from .log    import Log
-from .logger import TextLogger, ConsoleLogger, LoggerCreate, CompositeLogger
-from .string import String
+from . import text
+from . import file
+from . import console
 
-__all__ = ('Log', 'ConsoleLogger', 'TextLogger', 'LoggerCreate', 'CompositeLogger', 'String')
-#------------------------------------------------------------------------------#
-# Load Test Protocol                                                           #
-#------------------------------------------------------------------------------#
-def load_tests (loader, tests, pattern):
-    from unittest import TestSuite
-    from . import tests
+from .log import Log
 
-    suite = TestSuite ()
-    for test in (tests,):
-        suite.addTests (loader.loadTestsFromModule (test))
-
-    return suite
-
+__all__ = ('Log',)
 # vim: nu ft=python columns=120 :

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from .async import Async, FutureSource, FutureCanceled
 
-__all__ = ('Event', 'AsyncEvent', 'DelegatedEvent')
+__all__ = ('Event', 'AsyncEvent', 'DelegatedEvent',)
 #------------------------------------------------------------------------------#
 # Base Event                                                                   #
 #------------------------------------------------------------------------------#
@@ -69,9 +69,9 @@ class Event (BaseEvent):
     #--------------------------------------------------------------------------#
     # Fire                                                                     #
     #--------------------------------------------------------------------------#
-    def __call__ (self, *args, **keys):
+    def __call__ (self, *args):
         for handler in tuple (self.handlers):
-            handler (*args, **keys)
+            handler (*args)
 
     #--------------------------------------------------------------------------#
     # Add | Remove                                                             #
@@ -97,9 +97,9 @@ class AsyncEvent (Event):
     # Fire                                                                     #
     #--------------------------------------------------------------------------#
     @Async
-    def __call__ (self, *args, **keys):
+    def __call__ (self, *args):
         for handler in tuple (self.handlers):
-            future = handler (*args, **keys)
+            future = handler (*args)
             if isinstance (future, BaseFuture):
                 yield future
 
@@ -121,4 +121,5 @@ class DelegatedEvent (BaseEvent):
 
     def Remove (self, handler_id):
         return self.remove (handler_id)
+
 # vim: nu ft=python columns=120 :
