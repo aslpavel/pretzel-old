@@ -26,7 +26,7 @@ class TextLogger (object):
     def Observe (self, future, *args, **keys):
         self.write ('[busy] ', *args)
         start = time.time ()
-        
+
         def continuation (future):
             # elapsed
             seconds = time.time () - start
@@ -66,20 +66,20 @@ class TextLogger (object):
 
         self.stream.write ('\n')
         self.stream.flush ()
-    
+
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
     def Dispose (self):
         pass
-    
+
     def __enter__ (self):
         return self
-    
+
     def __exit__ (self, et, eo, tb):
         self.Dispose ()
         return False
-    
+
 # register
 Log.LoggerRegister ('text', TextLogger)
 

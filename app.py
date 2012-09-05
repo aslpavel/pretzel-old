@@ -6,9 +6,10 @@ if sys.version_info [0] > 2:
     string_type = io.StringIO
 else:
     string_type = io.BytesIO
-    
+
 from .async import Future, Core
-from .log   import Log
+from .console import Text, Color, COLOR_YELLOW, ATTR_BOLD
+from .log import Log
 
 __all__ = ('Application', 'ApplicationError',)
 #------------------------------------------------------------------------------#
@@ -26,7 +27,8 @@ class Application (object):
             raise ApplicationError ('Core has already been initialized')
 
         # log
-        Log.LoggerAttach ('console')
+        if not Log.Loggers:
+            Log.LoggerCreate ('console')
 
         # execute
         if execute is None or execute:
@@ -37,7 +39,7 @@ class Application (object):
     #--------------------------------------------------------------------------#
     Core = property (lambda self: self.core)
     Name = property (lambda self: self.name)
-    
+
     #--------------------------------------------------------------------------#
     # Execute                                                                  #
     #--------------------------------------------------------------------------#
@@ -46,6 +48,7 @@ class Application (object):
         try:
             result = self.main (self)
             if isinstance (result, Future):
+                result.Continue (lambda future: self.core.Dispose ())
                 self.core ()
                 return result.Result ()
             else:
@@ -57,14 +60,15 @@ class Application (object):
             traceback_saved = getattr (error, '_saved_traceback', None)
             if traceback_saved is not None:
                 stream.write (traceback_saved)
-            
+
             stream.seek (0)
+            Log.Error (Text (('[Main]', Color (COLOR_YELLOW, None, ATTR_BOLD))), ' has terminated with error:')
             for line in stream:
                 Log.Error (line.rstrip ())
 
         finally:
             self.Dispose ()
-            
+
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
@@ -73,9 +77,9 @@ class Application (object):
 
     def __enter__ (self):
         return self
-    
+
     def __exit__ (self, et, eo, tb):
         self.Dispose ()
         return False
-    
+
 # vim: nu ft=python columns=120 :

@@ -7,7 +7,7 @@ from .service          import Service
 from ..utils.proxy     import Proxy, ProxyQuery, ProxyProvider, LocalProxyProvider
 from ..utils.queryable import Queryable
 from ..message         import Message
-from ...async          import Async
+from ...async          import Async, DummyAsync
 from ...disposable     import Disposable
 
 __all__ = ('LinkerService',)
@@ -120,7 +120,7 @@ class LinkerService (Service):
 
             response ((yield prov.PropertySet (name, value)))
 
-    @Async
+    @DummyAsync
     def dispose_handler (self, message):
         desc = pickle.loads (message.Value ())
         prov = self.desc_prov.pop (desc, None)

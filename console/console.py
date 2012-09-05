@@ -131,7 +131,7 @@ class Console (object):
     #--------------------------------------------------------------------------#
     def Dispose (self):
         # destroy labels
-        for label in self.labels:
+        for label in tuple (self.labels):
             label.Dispose ()
 
         # restore flags

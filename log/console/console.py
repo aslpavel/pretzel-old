@@ -72,13 +72,13 @@ class ConsoleLogger (object):
                     self.console.Move (None, self.console.Size () [1] - self.bar_draw.width + 1)
                     self.bar_draw (value)
             on_report += report
-        
+
         #----------------------------------------------------------------------#
         # Continuation                                                         #
         #----------------------------------------------------------------------#
         def continuation (future):
             elapsed = time.time () - begin
-                
+
             label.Dispose ()
             with self.console.Line ():
                 error = future.Error ()
@@ -104,10 +104,10 @@ class ConsoleLogger (object):
     #--------------------------------------------------------------------------#
     def Dispose (self):
         self.console.Dispose ()
-    
+
     def __enter__ (self):
         return self
-    
+
     def __exit__ (self, et, eo, tb):
         self.Dispose ()
         return False

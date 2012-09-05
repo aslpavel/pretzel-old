@@ -15,7 +15,7 @@ class LogType (object):
 
     def __init__ (self):
         self.loggers = None
-            
+
         # Observe
         self.observe = self.caller ('Observe')
 
@@ -27,18 +27,17 @@ class LogType (object):
     #--------------------------------------------------------------------------#
     # Logger                                                                   #
     #--------------------------------------------------------------------------#
-    def LoggerAttach (self, name, *args, **keys):
-        logger_type = self.logger_types.get (name)
-        if logger_type is None:
-            raise ValueError ('Uknown logger name: {}'.format (name))
+    @property
+    def Loggers (self):
+        return self.loggers
 
+    def LoggerAttach (self, logger):
         # attach
-        logger = logger_type (*args, **keys)
         if self.loggers is None:
             self.loggers = [logger]
         else:
             self.loggers.append (logger)
-        
+
         # detach
         def detach ():
             try:
@@ -48,18 +47,25 @@ class LogType (object):
 
         return Disposable (detach)
 
+    def LoggerCreate (self, name, *args, **keys):
+        logger_type = self.logger_types.get (name)
+        if logger_type is None:
+            raise ValueError ('Uknown logger name: {}'.format (name))
+
+        return self.LoggerAttach (logger_type (*args, **keys))
+
     @classmethod
     def LoggerRegister (cls, name, logger_type):
         if logger_type != cls.logger_types.setdefault (name, logger_type):
             raise ValueError ('Name has already been registred: {}', name)
-    
+
     #--------------------------------------------------------------------------#
     # Observe                                                                  #
     #--------------------------------------------------------------------------#
     def Observe (self, future, *args, **keys):
         self.observe (future, *args, **keys)
         return future
-    
+
     #--------------------------------------------------------------------------#
     # Scope                                                                    #
     #--------------------------------------------------------------------------#
@@ -83,7 +89,7 @@ class LogType (object):
 
         call.__name__ = name
         return call
-        
+
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
@@ -94,10 +100,10 @@ class LogType (object):
         loggers, self.loggers = self.loggers, None
         for logger in loggers:
             logger.Dispose ()
-    
+
     def __enter__ (self):
         return self
-    
+
     def __exit__ (self, et, eo, tb):
         self.Dispose ()
         return False

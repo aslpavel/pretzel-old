@@ -16,7 +16,7 @@ class FileLogger (TextLogger):
     def Dispose (self):
         TextLogger.Dispose (self)
         self.stream.close ()
-    
+
 # register
 Log.LoggerRegister ('file', FileLogger)
 
