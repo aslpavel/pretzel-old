@@ -68,7 +68,7 @@ class ConsoleLogger (object):
     #--------------------------------------------------------------------------#
     def Observe (self, future, *args, **keys):
         #----------------------------------------------------------------------#
-        # Begin                                                                #
+        # Busy                                                                 #
         #----------------------------------------------------------------------#
         label = self.console.Label ()
         begin = time.time ()
@@ -83,16 +83,17 @@ class ConsoleLogger (object):
         #----------------------------------------------------------------------#
         # Report                                                               #
         #----------------------------------------------------------------------#
-        on_report = getattr (future, 'OnReport', None)
-        if on_report:
-            def report (value):
+        report       = getattr (future, 'OnReport', None)
+        report_value = [None]
+        if report:
+            def report_callback (value):
+                report_value [0] = value
                 with label.Update (False):
-                    self.console.Move (None, self.console.Size () [1] - self.bar_draw.width + 1)
-                    self.bar_draw (value)
-            on_report += report
+                    self.progress_draw (value)
+            report += report_callback
 
         #----------------------------------------------------------------------#
-        # Continuation                                                         #
+        # Done                                                                 #
         #----------------------------------------------------------------------#
         def continuation (future):
             label.Dispose ()
@@ -116,6 +117,8 @@ class ConsoleLogger (object):
                     self.console.Write (' ', *args)
                     self.console.Write (': ', error [1])
 
+                self.progress_draw (report_value [0])
+
         future.Continue (continuation)
         return future
 
@@ -124,6 +127,12 @@ class ConsoleLogger (object):
     #--------------------------------------------------------------------------#
     def elapsed_draw (self):
         self.time_draw (time.time () - self.start_time)
+
+    def progress_draw (self, value):
+        if value is not None and 0 <= value <= 1:
+            self.console.Move (None, self.console.Size () [1] - self.bar_draw.width - 4)
+            self.bar_draw (value)
+            self.console.Write ('{:>3.0f}%'.format (value * 100))
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
