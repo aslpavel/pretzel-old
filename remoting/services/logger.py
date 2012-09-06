@@ -41,7 +41,7 @@ class LoggerService (Service):
     #--------------------------------------------------------------------------#
     def Info (self, *args, **keys):    self.message_send (self.MESSAGE_INFO, args, keys)
     def Warning (self, *args, **keys): self.message_send (self.MESSAGE_WARN, args, keys)
-    def Error (self, *args,  **keys):  self.message_send (self.MESSAGE_ERRO, args, keys)
+    def Error (self, *args, **keys):   self.message_send (self.MESSAGE_ERRO, args, keys)
 
     def Observe (self, future, *args, **keys):
         source = keys.get ('source')
@@ -68,7 +68,7 @@ class LoggerService (Service):
         if type == self.MESSAGE_INFO:
             Log.Info (*args, **keys)
         elif type == self.MESSAGE_WARN:
-            Log.Warn (*args, **keys)
+            Log.Warning (*args, **keys)
         elif type == self.MESSAGE_ERRO:
             Log.Error (*args, **keys)
 

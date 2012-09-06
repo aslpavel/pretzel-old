@@ -14,7 +14,8 @@ __all__ = ('ConsoleLogger',)
 #------------------------------------------------------------------------------#
 class ConsoleLogger (object):
     def __init__ (self, stream = None, noecho = None):
-        self.console = Console (stream)
+        self.console    = Console (stream)
+        self.start_time = time.time ()
 
         if noecho is None or noecho:
             self.console.NoEcho ()
@@ -38,6 +39,7 @@ class ConsoleLogger (object):
     def Info (self, *args, **keys):
         with self.console.Line ():
             self.info_draw ('info')
+            self.elapsed_draw ()
             source = keys.get ('source')
             if source is not None:
                 self.source_draw (source)
@@ -46,6 +48,7 @@ class ConsoleLogger (object):
     def Warning (self, *args, **keys):
         with self.console.Line ():
             self.warn_draw ('warn')
+            self.elapsed_draw ()
             source = keys.get ('source')
             if source is not None:
                 self.source_draw (source)
@@ -54,6 +57,7 @@ class ConsoleLogger (object):
     def Error (self, *args, **keys):
         with self.console.Line ():
             self.error_draw ('erro')
+            self.elapsed_draw ()
             source = keys.get ('source')
             if source is not None:
                 self.source_draw (source)
@@ -69,7 +73,8 @@ class ConsoleLogger (object):
         label = self.console.Label ()
         begin = time.time ()
         with label.Update ():
-            self.pending_draw  (PENDING_BUSY)
+            self.pending_draw (PENDING_BUSY)
+            self.elapsed_draw ()
             source = keys.get ('source')
             if source is not None:
                 self.source_draw (source)
@@ -90,16 +95,14 @@ class ConsoleLogger (object):
         # Continuation                                                         #
         #----------------------------------------------------------------------#
         def continuation (future):
-            elapsed = time.time () - begin
-
             label.Dispose ()
             with self.console.Line ():
                 error = future.Error ()
                 if error is None:
                     self.pending_draw (PENDING_DONE)
+                    self.elapsed_draw ()
                     if source is not None:
                         self.source_draw (source)
-                    self.time_draw (elapsed)
                     self.console.Write (' ', *args)
 
                     result = future.Result ()
@@ -107,14 +110,20 @@ class ConsoleLogger (object):
                         self.console.Write (': ', result)
                 else:
                     self.pending_draw (PENDING_FAIL)
+                    self.elapsed_draw ()
                     if source is not None:
                         self.source_draw (source)
-                    self.time_draw (elapsed)
                     self.console.Write (' ', *args)
                     self.console.Write (': ', error [1])
 
         future.Continue (continuation)
         return future
+
+    #--------------------------------------------------------------------------#
+    # Private                                                                  #
+    #--------------------------------------------------------------------------#
+    def elapsed_draw (self):
+        self.time_draw (time.time () - self.start_time)
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #

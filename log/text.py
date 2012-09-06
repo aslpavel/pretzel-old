@@ -12,50 +12,62 @@ __all__ = ('TextLogger',)
 class TextLogger (object):
     def __init__ (self, stream = None):
         self.stream = stream or sys.stderr
+        self.start_time = time.time ()
 
     #--------------------------------------------------------------------------#
     # Message                                                                  #
     #--------------------------------------------------------------------------#
-    def Info (self, *args, **keys): self.message ('[info] ', args, keys)
-    def Warning (self, *args, **keys): self.message ('[warn] ', args, keys)
-    def Error (self, *args, **keys): self.message ('[error] ', args, keys)
+    def Info (self, *args, **keys):
+        self.write_prefix ('info', keys)
+        self.write (*args)
+
+        self.stream.write ('\n')
+        self.stream.flush ()
+
+    def Warning (self, *args, **keys):
+        self.write_prefix ('warn', keys)
+        self.write (*args)
+
+        self.stream.write ('\n')
+        self.stream.flush ()
+
+    def Error (self, *args, **keys):
+        self.write_prefix ('erro', keys)
+        self.write (*args)
+
+        self.stream.write ('\n')
+        self.stream.flush ()
 
     #--------------------------------------------------------------------------#
     # Observe                                                                  #
     #--------------------------------------------------------------------------#
     def Observe (self, future, *args, **keys):
-        source = keys.get ('source')
-        if source is None:
-            self.write ('[busy] ', *args)
-        else:
-            self.write ('[busy] [{}] '.format (source), *args)
+        self.write_prefix ('busy', keys)
+        self.write (*args)
 
-        begin = time.time ()
+        self.stream.write ('\n')
+        self.stream.flush ()
 
         def continuation (future):
-            # elapsed
-            seconds = time.time () - begin
-            hours,   seconds = divmod (seconds, 3600)
-            minutes, seconds = divmod (seconds, 60)
-            elapsed = '[{:0>2.0f}:{:0>2.0f}:{:0>4.1f}] '.format (hours, minutes, seconds)
-
-            # output
-            texts = [] if source is None else ['[{}] '.format (source)]
             error = future.Error ()
             if error is None:
-                texts.insert (0, '[done] ')
-                texts.extend (args)
+                self.write_prefix ('done', keys)
+                self.write (*args)
 
-                # result
                 result = future.Result ()
                 if result is not None:
-                    texts.extend ((': ', result))
-            else:
-                texts.insert (0, '[fail] ')
-                texts.extend (args)
-                texts.extend ((': ', str (error [1])))
+                    self.stream.write (': ')
+                    self.stream.write (str (result))
 
-            self.write (*texts)
+            else:
+                self.write_prefix ('fail', keys)
+                self.write (*args)
+
+                self.stream.write (': {}')
+                self.stream.write (str (error [1]))
+
+            self.stream.write ('\n')
+            self.stream.flush ()
 
         future.Continue (continuation)
         return future
@@ -70,17 +82,17 @@ class TextLogger (object):
             else:
                 self.stream.write (str (text))
 
-        self.stream.write ('\n')
-        self.stream.flush ()
-
-    def message (self, tag, args, keys):
-        self.stream.write (tag)
+    def write_prefix (self, tag, keys):
+        seconds = time.time () - self.start_time
+        hours,   seconds = divmod (seconds, 3600)
+        minutes, seconds = divmod (seconds, 60)
+        elapsed_string = '{:0>2.0f}:{:0>2.0f}:{:0>4.1f}'.format (hours, minutes, seconds)
 
         source = keys.get ('source')
-        if source is not None:
-            self.stream.write ('[{}] '.format (source))
-
-        self.write (*args)
+        if source is None:
+            self.stream.write ('[{}] [{}] '.format (tag, elapsed_string))
+        else:
+            self.stream.write ('[{}] [{}] [{}] '.format (tag, elapsed_string, source))
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
