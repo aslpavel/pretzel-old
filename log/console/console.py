@@ -132,7 +132,7 @@ class ConsoleLogger (object):
         if value is not None and 0 <= value <= 1:
             self.console.Move (None, self.console.Size () [1] - self.bar_draw.width - 4)
             self.bar_draw (value)
-            self.console.Write ('{:>3.0f}%'.format (value * 100))
+            self.console.Write (' {:>3.0f}%'.format (value * 100))
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
