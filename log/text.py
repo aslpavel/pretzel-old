@@ -63,7 +63,7 @@ class TextLogger (object):
                 self.write_prefix ('fail', keys)
                 self.write (*args)
 
-                self.stream.write (': {}')
+                self.stream.write (': ')
                 self.stream.write (str (error [1]))
 
             self.stream.write ('\n')

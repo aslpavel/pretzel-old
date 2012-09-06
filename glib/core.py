@@ -43,6 +43,9 @@ class GCore (object):
     ERROR      = GLib.IO_ERR | GLib.IO_NVAL | GLib.IO_HUP
 
     def Poll (self, fd, mask, cancel = None):
+        if mask is None:
+            return # no cleanup for closed file descriptors
+
         def resolve (source, fd, cond):
             if cond & self.ERROR:
                 source.ErrorRaise (CoreDisconnectedError () if cond & self.DISCONNECT else CoreIOError ())
@@ -88,9 +91,7 @@ class GCore (object):
         def resolve_internal (*resolve_args):
             self.sources.discard (source)
             resolve (source, *resolve_args)
-
-            # remove from event loop
-            return False
+            return False # remove from event loop
 
         if cancel:
             def cancel_continuation (future):
