@@ -281,17 +281,17 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
     def process ():
         with Process (command, stdin, stdout, stderr, shell, environ, check, buffer_size, core) as proc:
             # input
-            if input is not None:
-                proc.Stdin.Write (input).Continue (lambda future: proc.Stdin.Dispose ())
-            else:
+            if input is None:
                 proc.Stdin.Dispose ()
+            else:
+                proc.Stdin.Write (input).Continue (lambda future: proc.Stdin.Dispose ())
 
-            # out
+            # output
             out = read (proc.Stdout)
             err = read (proc.Stderr)
             yield Future.WhenAll ((out, err))
 
-            # return
+            # result
             yield proc.Result
 
             AsyncReturn ((out.Result (), err.Result ()))
