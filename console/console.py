@@ -139,6 +139,7 @@ class Console (object):
             pass
 
         self.stream.write (CursorVisible (True))
+        self.stream.flush ()
 
     def __enter__ (self):
         return self
