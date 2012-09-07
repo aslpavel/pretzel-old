@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from .async import Async, FutureSource, FutureCanceled
 
-__all__ = ('Event', 'AsyncEvent', 'DelegatedEvent',)
+__all__ = ('Event', 'AsyncEvent', 'DelegatedEvent', 'AccumulativeEvent',)
 #------------------------------------------------------------------------------#
 # Base Event                                                                   #
 #------------------------------------------------------------------------------#
@@ -11,7 +11,8 @@ class BaseEvent (object):
     #--------------------------------------------------------------------------#
     # Fire                                                                     #
     #--------------------------------------------------------------------------#
-    def __call__ (self, *args):
+    def __call__ (self, *args): return self.Fire (*args)
+    def Fire     (self, *args):
         raise NotImplementedError ()
 
     #--------------------------------------------------------------------------#
@@ -38,7 +39,8 @@ class BaseEvent (object):
     # Await                                                                    #
     #--------------------------------------------------------------------------#
     def Await (self, cancel = None):
-        source = FutureSource ()
+        source     = FutureSource ()
+        handler_id = None
 
         # handler
         def handler (*args):
@@ -69,7 +71,7 @@ class Event (BaseEvent):
     #--------------------------------------------------------------------------#
     # Fire                                                                     #
     #--------------------------------------------------------------------------#
-    def __call__ (self, *args):
+    def Fire (self, *args):
         for handler in tuple (self.handlers):
             handler (*args)
 
@@ -97,7 +99,7 @@ class AsyncEvent (Event):
     # Fire                                                                     #
     #--------------------------------------------------------------------------#
     @Async
-    def __call__ (self, *args):
+    def Fire (self, *args):
         for handler in tuple (self.handlers):
             future = handler (*args)
             if isinstance (future, BaseFuture):
@@ -121,5 +123,30 @@ class DelegatedEvent (BaseEvent):
 
     def Remove (self, handler_id):
         return self.remove (handler_id)
+
+#------------------------------------------------------------------------------#
+# Accumulative Evet                                                            #
+#------------------------------------------------------------------------------#
+class AccumulativeEvent (Event):
+    __slots__ = Event.__slots__ + ('values',)
+
+    def __init__ (self):
+        Event.__init__ (self)
+        self.values = []
+
+    #--------------------------------------------------------------------------#
+    # Fire                                                                     #
+    #--------------------------------------------------------------------------#
+    def Fire (self, *args):
+        Event.Fire (self, *args)
+        self.values.append (args)
+
+    #--------------------------------------------------------------------------#
+    # Add | Remove                                                             #
+    #--------------------------------------------------------------------------#
+    def Add (self, handler):
+        for args in self.values:
+            handler (*args)
+        return Event.Add (self, handler)
 
 # vim: nu ft=python columns=120 :
