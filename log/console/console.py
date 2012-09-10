@@ -115,7 +115,7 @@ class ConsoleLogger (object):
                     if source is not None:
                         self.source_draw (source)
                     self.console.Write (' ', *args)
-                    self.console.Write (': ', error [1])
+                    self.console.Write (': {}: {}'.format (error [0].__name__, error [1]))
 
                 self.progress_draw (report_value [0])
 
