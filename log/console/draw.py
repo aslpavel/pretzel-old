@@ -57,7 +57,7 @@ class BarDrawer (object):
         if value > 1:
             raise ValueError ('Bad bar value: {}'.format (value))
 
-        filled = round (value * (self.width - 2))
+        filled = int (round (value * (self.width - 2)))
         bar = self.bar_cache.get ((self.width, filled))
         if bar is None:
             text = Text ()
