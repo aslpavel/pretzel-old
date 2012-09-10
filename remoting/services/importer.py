@@ -24,7 +24,9 @@ class ImporterService (Service):
             handlers = ((self.FIND, self.find_handler), (self.PUSH, self.push_handler)))
 
         self.insert = False if insert is None else insert
+        self.pid = os.getpid ()
         self.containments = {} # name -> name, source, filename, ispkg
+
         self.dispose += Disposable (lambda: self.containments.clear ())
 
     #--------------------------------------------------------------------------#
@@ -45,7 +47,10 @@ class ImporterService (Service):
     # Importer Interface                                                       #
     #--------------------------------------------------------------------------#
     def find_module (self, name, path = None):
-        return None if self.containment (name, False) is None else self
+        if (self.pid != os.getpid () or
+            self.containment (name, False) is None):
+               return None
+        return self
 
     def load_module (self, name):
         module = sys.modules.get (name)
