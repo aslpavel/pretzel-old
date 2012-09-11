@@ -89,9 +89,9 @@ class TextLogger (object):
 
         source = keys.get ('source')
         if source is None:
-            self.stream.write ('[{}] [{}] '.format (tag, elapsed_string))
+            self.stream.write ('[{}][{}] '.format (tag, elapsed_string))
         else:
-            self.stream.write ('[{}] [{}] [{}] '.format (tag, elapsed_string, source))
+            self.stream.write ('[{}][{}] [{}] '.format (tag, elapsed_string, source))
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #

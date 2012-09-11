@@ -42,6 +42,7 @@ class ConsoleLogger (object):
             self.elapsed_draw ()
             source = keys.get ('source')
             if source is not None:
+                self.console.Write (' ')
                 self.source_draw (source)
             self.console.Write (' ', *args)
 
@@ -51,6 +52,7 @@ class ConsoleLogger (object):
             self.elapsed_draw ()
             source = keys.get ('source')
             if source is not None:
+                self.console.Write (' ')
                 self.source_draw (source)
             self.console.Write (' ', *args)
 
@@ -60,6 +62,7 @@ class ConsoleLogger (object):
             self.elapsed_draw ()
             source = keys.get ('source')
             if source is not None:
+                self.console.Write (' ')
                 self.source_draw (source)
             self.console.Write (' ', *args)
 
@@ -77,6 +80,7 @@ class ConsoleLogger (object):
             self.elapsed_draw ()
             source = keys.get ('source')
             if source is not None:
+                self.console.Write (' ')
                 self.source_draw (source)
             self.console.Write (' ', *args)
 
@@ -103,6 +107,7 @@ class ConsoleLogger (object):
                     self.pending_draw (PENDING_DONE)
                     self.elapsed_draw ()
                     if source is not None:
+                        self.console.Write (' ')
                         self.source_draw (source)
                     self.console.Write (' ', *args)
 
@@ -113,6 +118,7 @@ class ConsoleLogger (object):
                     self.pending_draw (PENDING_FAIL)
                     self.elapsed_draw ()
                     if source is not None:
+                        self.console.Write (' ')
                         self.source_draw (source)
                     self.console.Write (' ', *args)
                     self.console.Write (': {}: {}'.format (error [0].__name__, error [1]))

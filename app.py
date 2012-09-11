@@ -26,10 +26,6 @@ class Application (object):
         if core and core != self.core:
             raise ApplicationError ('Core has already been initialized')
 
-        # log
-        if not Log.Loggers:
-            Log.LoggerCreate ('console')
-
         # execute
         if execute is None or execute:
             self.Execute ()

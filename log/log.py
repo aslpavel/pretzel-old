@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import sys
 import atexit
 import operator
 
@@ -11,7 +12,7 @@ __all__ = ('Log',)
 #------------------------------------------------------------------------------#
 class LogType (object):
     logger_types   = {}
-    logger_default = 'text'
+    logger_default = 'console' if sys.stderr.isatty () else 'text'
 
     def __init__ (self):
         self.loggers = None
@@ -84,6 +85,7 @@ class LogType (object):
         def call (*args, **keys):
             if not self.loggers:
                 self.LoggerCreate (self.logger_default)
+
             for logger in self.loggers:
                 method (logger) (*args, **keys)
 
