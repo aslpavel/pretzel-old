@@ -45,7 +45,8 @@ class Application (object):
             result = self.main (self)
             if isinstance (result, Future):
                 result.Continue (lambda future: self.core.Dispose ())
-                self.core ()
+                if not result.IsCompleted ():
+                    self.core.Execute ()
                 return result.Result ()
             else:
                 return result
