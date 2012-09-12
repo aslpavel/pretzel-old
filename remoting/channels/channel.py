@@ -82,6 +82,7 @@ class Channel (object):
             self.recv_worker.Result ()
             raise ChannelError ('Receive worker has terminated immediately')
 
+    @DummyAsync
     def disconnect (self):
         self.OnDisconnect ()
 
@@ -105,7 +106,7 @@ class Channel (object):
                 else:
                     future.ErrorSet (error)
 
-            self.disconnect ()
+            yield self.disconnect ()
 
     @Async
     def recv_dispatch (self, message):

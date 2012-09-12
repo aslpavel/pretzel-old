@@ -49,17 +49,19 @@ class ForkChannel (FileChannel):
 
         # send payload
         with load_pipe.DetachWriteAsync () as load_stream:
-            yield load_stream.Write (payload.format (
+            load_stream.Write (payload.format (
                 bootstrap     = BootstrapModules (),
                 remoting_name = remoting_name,
                 in_fd         = in_fd,
                 out_fd        = out_fd,
                 buffer_size   = self.buffer_size).encode ())
+            yield load_stream.Flush ()
 
         yield FileChannel.connect (self)
 
+    @Async
     def disconnect (self):
-        FileChannel.disconnect (self)
+        yield FileChannel.disconnect (self)
 
         pid, self.pid = self.pid, None
         if pid is not None:

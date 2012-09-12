@@ -185,12 +185,13 @@ class ConsoleLabel (object):
     def Dispose (self):
         if self.index < 0:
             return
+        index, self.index = self.index, -1
 
-        del self.console.labels [self.index]
-        for label in self.console.labels [self.index:]:
+        del self.console.labels [index]
+        for label in self.console.labels [index:]:
             label.index -= 1
 
-        position = len (self.console.labels) - self.index + 1
+        position = len (self.console.labels) - index + 1
         write    = self.console.stream.write
         # cursor -> label
         write (MoveUp (position))

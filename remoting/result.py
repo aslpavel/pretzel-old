@@ -3,6 +3,7 @@ import os
 import io
 import sys
 import socket
+import struct
 
 from traceback import format_exception
 if sys.version_info [0] > 2:
@@ -14,6 +15,8 @@ else:
     string_type = io.BytesIO
     PY2 = True
 
+from ..async import Async, AsyncReturn
+
 __all__ = ('Result',)
 #------------------------------------------------------------------------------#
 # Result                                                                       #
@@ -21,9 +24,9 @@ __all__ = ('Result',)
 class ResultReturn (BaseException): pass
 class Result (object):
     __slots__ = ('value', 'error', 'traceback',)
-    hostname  = socket.gethostname ()
-    pid       = os.getpid ()
-    value_tag = b'0' [0]
+    hostname      = socket.gethostname ()
+    pid           = os.getpid ()
+    result_struct = struct.Struct ('!BI')
 
     def __init__ (self):
         self.value     = None
@@ -43,6 +46,13 @@ class Result (object):
     def FromValue (cls, value):
         instance = cls ()
         instance.ValueSet (value)
+        return instance
+
+    @classmethod
+    def FromBytes (cls, data):
+        stream   = io.BytesIO (data)
+        instance = cls ()
+        instance.Load (stream)
         return instance
 
     #--------------------------------------------------------------------------#
@@ -131,29 +141,66 @@ class Result (object):
     #--------------------------------------------------------------------------#
     # Save | Load                                                              #
     #--------------------------------------------------------------------------#
-    def Save (self):
-        if self.error is None:
-            return b'0' + (b'' if self.value is None else self.value)
-        else:
-            try:
-                return b'1' + pickle.dumps ((self.error, self.traceback))
-            except Exception:
-                return b'1' + pickle.dumps ((type (self.error) ('Failed to pack arguments'), self.traceback))
+    def SaveAsync (self, stream):
+        self.save_result (stream.Write)
 
-    @classmethod
-    def Load (cls, data):
-        result = cls ()
+    @Async
+    def LoadAsync (self, stream, cancel = None):
+        is_value, size = self.result_struct.unpack ((yield stream.ReadExactly (self.result_struct.size, cancel)))
+        data = (yield stream.ReadExactly (size, cancel)) if size else None
 
-        if data [0] == cls.value_tag:
-            result.value = data [1:] if len (data) > 1 else None
+        if is_value:
+            self.value = data
         else:
-            error, traceback = pickle.loads (data [1:])
+            error, traceback = pickle.loads (data)
             error._saved_traceback = traceback
 
-            result.error     = error
-            result.traceback = traceback
+            self.error     = error
+            self.traceback = traceback
 
-        return result
+        AsyncReturn (self)
+
+    def Save (self, stream):
+        self.save_result (stream.write)
+
+    def Load (self, stream):
+        is_value, size = self.result_struct.unpack (stream.read (self.result_struct.size))
+        data = stream.read (size) if size else None
+
+        if is_value:
+            self.value = data
+        else:
+            error, traceback = pickle.loads (data)
+            error._saved_traceback = traceback
+
+            self.error     = error
+            self.traceback = traceback
+
+        return self
+
+    def ToBytes (self):
+        stream = io.BytesIO ()
+        self.Save (stream)
+        return stream.getvalue ()
+
+    #--------------------------------------------------------------------------#
+    # Private                                                                  #
+    #--------------------------------------------------------------------------#
+    def save_result (self, write):
+        if self.error is None:
+            if self.value is None:
+                write (self.result_struct.pack (1, 0))
+            else:
+                write (self.result_struct.pack (1, len (self.value)))
+                write (self.value)
+        else:
+            try:
+                error_value = pickle.dumps ((self.error, self.traceback))
+            except Exception:
+                error_value = pickle.dumps ((type (self.error) ('Failed to pack arguments'), self.traceback))
+
+            write (self.result_struct.pack (0, len (error_value)))
+            write (error_value)
 
 #------------------------------------------------------------------------------#
 # Saved Traceback Template                                                     #

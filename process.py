@@ -284,7 +284,8 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
             if input is None:
                 proc.Stdin.Dispose ()
             else:
-                proc.Stdin.Write (input).Continue (lambda future: proc.Stdin.Dispose ())
+                proc.Stdin.Write (input)
+                proc.Stdin.Flush ().Continue (lambda future: proc.Stdin.Dispose ())
 
             # output
             out = read (proc.Stdout)

@@ -57,7 +57,7 @@ class FutureService (Service):
         if future.IsCompleted ():
             with Result () as result:
                 result (self.domain.Pack (future.Result ()))
-            return self.FUTURE_DONE, result.Save ()
+            return self.FUTURE_DONE, result.ToBytes ()
 
         info = self.future_info.get (future)
         if info is None:
@@ -74,7 +74,7 @@ class FutureService (Service):
                         result (self.domain.Pack (future.Result ()))
 
                     # send
-                    value = self.desc_struct.pack (desc ^ 0x1) + result.Save ()
+                    value = self.desc_struct.pack (desc ^ 0x1) + result.ToBytes ()
                     self.domain.channel.Send (Message.FromValue (value, self.RESOLVE))
 
             future.Continue (resolve)
@@ -85,7 +85,7 @@ class FutureService (Service):
         type, value = state
         if type == self.FUTURE_DONE:
             try:
-                return SucceededFuture (self.domain.Unpack (Result.Load (value).Value ()))
+                return SucceededFuture (self.domain.Unpack (Result.FromBytes (value).Value ()))
             except Exception:
                 return FailedFuture (sys.exc_info ())
 
@@ -116,7 +116,7 @@ class FutureService (Service):
     def resolve_handler (self, message):
         value  = message.Value ()
         desc   = self.desc_struct.unpack (value [:self.desc_struct.size]) [0]
-        result = Result.Load (value [self.desc_struct.size:])
+        result = Result.FromBytes (value [self.desc_struct.size:])
 
         info = self.desc_info.get (desc)
         if info is not None:

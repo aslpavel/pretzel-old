@@ -148,7 +148,7 @@ class LogScope (object):
         return future.OnReport
 
     def __exit__ (self, et, eo, tb):
-        if et is None:
+        if et is None or not issubclass (et, Exception):
             self.source.ResultSet (None)
         else:
             self.source.ErrorSet ((et, eo, tb))

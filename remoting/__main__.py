@@ -123,7 +123,7 @@ class Main (object):
                     for i in range (MsgCount):
                         Message.FromValue (b'DATA', b'dummy::').Save (stream)
                         stream.seek (0)
-                        Message.Load (stream)
+                        Message.FromStream (stream)
                         stream.seek (0)
                         stream.truncate ()
 

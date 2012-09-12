@@ -78,14 +78,16 @@ class SSHChannel (FileChannel):
         tomb   += sys.modules [(__package__ if __package__ else __name__).split ('.') [0]]
         payload = tomb.Save ()
 
-        yield in_stream.Write (struct.pack ('!L', len (payload)))
-        yield in_stream.Write (payload)
+        in_stream.Write (struct.pack ('!L', len (payload)))
+        in_stream.Write (payload)
+        yield in_stream.Flush ()
 
         # parent connect
         yield FileChannel.connect (self)
 
+    @Async
     def disconnect (self):
-        FileChannel.disconnect (self)
+        yield FileChannel.disconnect (self)
 
         pid, self.pid = self.pid, None
         if pid is not None:

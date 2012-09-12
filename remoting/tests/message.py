@@ -18,11 +18,7 @@ class MessageTest (unittest.TestCase):
         stream = io.BytesIO ()
         msg.Save (stream)
         stream.seek (0)
-        try:
-            msg_load = Message.Load (stream)
-        except Exception:
-            import pdb; pdb.post_mortem ()
-            raise
+        msg_load = Message.FromStream (stream)
 
         self.assertEqual (msg.src, msg_load.src)
         self.assertEqual (msg.dst, msg_load.dst)
@@ -38,10 +34,12 @@ class MessageTest (unittest.TestCase):
             def test ():
                 yield core.Idle ()
                 with ScopeFuture () as cancel:
-                    msg_load_future = Message.LoadAsync (ra, core.Sleep (1, cancel))
+                    msg_load_future = Message.FromAsyncStream (ra, core.Sleep (1, cancel))
                     self.assertFalse (msg_load_future.IsCompleted ())
 
-                    yield msg.SaveAsync (wa)
+                    msg.SaveAsync (wa)
+                    yield wa.Flush ()
+
                     msg_load = yield msg_load_future
 
                 self.assertEqual (msg.src, msg_load.src)
@@ -69,7 +67,7 @@ class MessageTest (unittest.TestCase):
         stream = io.BytesIO ()
         msg.Save (stream)
         stream.seek (0)
-        msg_load = Message.Load (stream)
+        msg_load = Message.FromStream (stream)
 
         self.assertEqual (msg_load.src, msg.src)
         self.assertEqual (msg_load.dst, msg.dst)
