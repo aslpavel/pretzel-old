@@ -51,7 +51,7 @@ class Disposable (BaseDisposable):
     def Dispose (self):
         if self.dispose is not None:
             self.dispose, dispose = None, self.dispose
-            dispose ()
+            return dispose ()
 
     #--------------------------------------------------------------------------#
     # Status                                                                   #
