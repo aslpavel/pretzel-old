@@ -158,7 +158,7 @@ class RemoteProxyProvider (ProxyProvider):
         lock = self.lock ()
         if lock is None:
             lock = RemoteProxyProviderLock ()
-            self.lock = weakref.ref (lock, lambda ref: self.Dispose ())
+            self.lock = weakref.ref (lock, lambda _: self.Dispose ())
         return lock
 
     #--------------------------------------------------------------------------#

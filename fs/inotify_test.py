@@ -18,7 +18,7 @@ class FileMonitorInotifyTest (unittest.TestCase):
                 # stream
                 stream = open (__file__)
                 dispose += stream
-                core.Idle ().Continue (lambda future: stream.close ())
+                core.Idle ().Continue (lambda _: stream.close ())
 
                 # monitor
                 file_monitor = FileMonitor ()
