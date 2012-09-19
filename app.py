@@ -22,9 +22,7 @@ class Application (object):
         self.name = name
 
         # core
-        self.core = Core.Instance (lambda: core or Core ())
-        if core and core != self.core:
-            raise ApplicationError ('Core has already been initialized')
+        self.core = Core.InstanceSet (core) if core else Core.Instance ()
 
         # execute
         if execute is None or execute:
