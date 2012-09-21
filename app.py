@@ -1,23 +1,25 @@
 # -*- coding: utf-8 -*-
 import sys
 import io
+import inspect
 import traceback
 if sys.version_info [0] > 2:
     string_type = io.StringIO
 else:
     string_type = io.BytesIO
 
-from .async import Future, Core
+from .async import Async, Future, Core
+from .threading import ThreadPool
 from .console import Text, Color, COLOR_YELLOW, ATTR_BOLD
 from .log import Log
 
-__all__ = ('Application', 'ApplicationError',)
+__all__ = ('Application', 'ApplicationType', 'ApplicationError',)
 #------------------------------------------------------------------------------#
-# Application                                                                  #
+# Application Type                                                             #
 #------------------------------------------------------------------------------#
 class ApplicationError (Exception): pass
-class Application (object):
-    def __init__ (self, main, name = None, execute = None, core = None):
+class ApplicationType  (object):
+    def __init__ (self, main, name = None, core = None, execute = None):
         self.main = main
         self.name = name
 
@@ -31,8 +33,9 @@ class Application (object):
     #--------------------------------------------------------------------------#
     # Properties                                                               #
     #--------------------------------------------------------------------------#
-    Core = property (lambda self: self.core)
     Name = property (lambda self: self.name)
+    Core = property (lambda self: self.core)
+    ThreadPool = property (lambda self: ThreadPool.Instance ())
 
     #--------------------------------------------------------------------------#
     # Execute                                                                  #
@@ -77,4 +80,13 @@ class Application (object):
         self.Dispose ()
         return False
 
+#------------------------------------------------------------------------------#
+# Application                                                                  #
+#------------------------------------------------------------------------------#
+def Application (name = None, core = None):
+    def application (main):
+        if inspect.isgeneratorfunction (main):
+            main = Async (main)
+        return ApplicationType (main, name or main.__name__, core, False)
+    return application
 # vim: nu ft=python columns=120 :

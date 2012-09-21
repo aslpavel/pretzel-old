@@ -7,13 +7,13 @@ import time
 import getopt
 import itertools
 
-from .message      import Message
+from .message import Message
 from .domains.fork import ForkDomain
 from .domains.ssh  import SSHDomain
 
-from ..app         import Application
-from ..async       import Async, Future
-from ..log         import Log
+from ..app import ApplicationType
+from ..async import Async, Future
+from ..log import Log
 
 #------------------------------------------------------------------------------#
 # Remote Objects                                                               #
@@ -170,7 +170,7 @@ if __name__ == '__main__':
     #--------------------------------------------------------------------------#
     if '-p' in sys.argv:
         from cProfile import runctx
-        runctx ('Application (main, \'benchmark\')', globals (), locals (), sort = 'time')
+        runctx ('ApplicationType (main, \'benchmark\')', globals (), locals (), sort = 'time')
     else:
-        Application (main, 'benchmark')
+        ApplicationType (main, 'benchmark')
 # vim: nu ft=python columns=120 :
