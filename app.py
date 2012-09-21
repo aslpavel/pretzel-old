@@ -19,12 +19,12 @@ __all__ = ('Application', 'ApplicationType', 'ApplicationError',)
 #------------------------------------------------------------------------------#
 class ApplicationError (Exception): pass
 class ApplicationType  (object):
-    def __init__ (self, main, name = None, core = None, execute = None):
+    def __init__ (self, main, name = None, core = None, pool = None, execute = None):
         self.main = main
         self.name = name
 
-        # core
         self.core = Core.InstanceSet (core) if core else Core.Instance ()
+        self.pool = ThreadPool.Instance (pool) if pool else ThreadPool.Instance ()
 
         # execute
         if execute is None or execute:
@@ -35,7 +35,7 @@ class ApplicationType  (object):
     #--------------------------------------------------------------------------#
     Name = property (lambda self: self.name)
     Core = property (lambda self: self.core)
-    ThreadPool = property (lambda self: ThreadPool.Instance ())
+    Pool = property (lambda self: self.pool)
 
     #--------------------------------------------------------------------------#
     # Execute                                                                  #
@@ -83,10 +83,10 @@ class ApplicationType  (object):
 #------------------------------------------------------------------------------#
 # Application                                                                  #
 #------------------------------------------------------------------------------#
-def Application (name = None, core = None):
+def Application (name = None, core = None, pool = None):
     def application (main):
         if inspect.isgeneratorfunction (main):
             main = Async (main)
-        return ApplicationType (main, name or main.__name__, core, False)
+        return ApplicationType (main, name or main.__name__, core, pool, False)
     return application
 # vim: nu ft=python columns=120 :
