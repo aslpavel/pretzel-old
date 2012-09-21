@@ -198,7 +198,7 @@ class FileMonitorWatch (object):
     # Methods                                                                  #
     #--------------------------------------------------------------------------#
     def Update (self, mask):
-        if slef.disposed is True:
+        if self.disposed is True:
             raise FileMonitorError ('Watch is deleted')
 
     @Async
