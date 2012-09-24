@@ -2,7 +2,7 @@
 import os
 import threading
 from collections import deque
-from ..async import Async, AsyncReturn, Core, CoreDisconnectedError
+from ..async import Async, AsyncReturn, Core, CoreDisconnectedError, CoreStopped
 from ..async.core.fd import FileBlocking
 
 __all__ = ('CoreQueue', 'CoreQueueError',)
@@ -46,6 +46,8 @@ class CoreQueue (object):
             try:
                 yield self.core.Poll (self.get_pipe, self.core.READ)
                 while len (os.read (self.get_pipe, 65536)) == 65536: pass
+
+            except CoreStopped:           break
             except CoreDisconnectedError: break
             except OSError:               break
 

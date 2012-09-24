@@ -11,8 +11,8 @@ class FileChannel (Channel):
     def __init__ (self, core = None):
         Channel.__init__ (self, core = core)
 
-        self.in_file     = None
-        self.out_file    = None
+        self.in_file  = None
+        self.out_file = None
 
     #--------------------------------------------------------------------------#
     # Methods                                                                  #
