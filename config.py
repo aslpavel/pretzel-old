@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
-from .udb import sack
 
-__all__ = ('Config', 'FileConfig', 'SackConfig')
+__all__ = ('Config', 'FileConfig', 'StoreConfig')
 #------------------------------------------------------------------------------#
 # Config Node                                                                  #
 #------------------------------------------------------------------------------#
@@ -172,25 +171,24 @@ class Config (ConfigDict):
         raise NotImplementedError ()
 
 #------------------------------------------------------------------------------#
-# Sack Config                                                                  #
+# Store Config                                                                 #
 #------------------------------------------------------------------------------#
-class SackConfig (Config):
-    __slots__ = ('Root', 'Target', 'Location', 'Sack')
+class StoreConfig (Config):
+    __slots__ = ('Root', 'Target', 'Location', 'Store')
 
-    def __init__ (self, sack, cell, factory = None):
-        self.Sack = sack
+    def __init__ (self, store, name, factory = None):
+        self.Store = store
 
-        Config.__init__ (self, cell, factory)
+        Config.__init__ (self, name, factory)
 
     #--------------------------------------------------------------------------#
     # Storage Interface                                                        #
     #--------------------------------------------------------------------------#
     def LoadState (self):
-        return self.Sack.Cell [self.Location]
+        return self.Store [self.Location]
 
     def SaveState (self, state):
-        self.Sack.Cell [self.Location] = state
-        self.Sack.Flush ()
+        self.Store [self.Location] = state
 
 #------------------------------------------------------------------------------#
 # File Config                                                                  #
