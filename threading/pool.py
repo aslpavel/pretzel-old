@@ -13,6 +13,10 @@ __all__ = ('ThreadPool', 'ThreadPoolError',)
 class ThreadPoolError (Exception): pass
 class ThreadPoolExit (BaseException): pass
 class ThreadPool (object):
+    """Thread pool
+
+    Execute action asynchronously inside thread pool.
+    """
     instance_lock = threading.Lock ()
     instance = None
 
@@ -35,6 +39,8 @@ class ThreadPool (object):
     #--------------------------------------------------------------------------#
     @classmethod
     def Instance (cls):
+        """Get global thread pool instance, creates it if it's None
+        """
         with cls.instance_lock:
             if cls.instance is None:
                 cls.instance = ThreadPool (4)
@@ -42,6 +48,8 @@ class ThreadPool (object):
 
     @classmethod
     def InstanceSet (cls, instance):
+        """Set global thread pool instance
+        """
         with cls.instance_lock:
             instance_prev, cls.instance = cls.instance, instance
         if instance_prev is not None and instance_prev != instance:
@@ -51,8 +59,14 @@ class ThreadPool (object):
     #--------------------------------------------------------------------------#
     # Execute                                                                  #
     #--------------------------------------------------------------------------#
-    def __call__ (self, action, *args, **keys): return self.Execute (action, *args, **keys)
+    def __call__ (self, action, *args, **keys):
+        """Same as Execute
+        """
+        return self.Execute (action, *args, **keys)
+
     def Execute  (self, action, *args, **keys):
+        """Execute action asynchronously inside thread pool
+        """
         if self.disposed:
             return RaisedFuture (ThreadPoolError ('Thread pool has been disposed'))
 
@@ -75,6 +89,8 @@ class ThreadPool (object):
     # Size                                                                     #
     #--------------------------------------------------------------------------#
     def Size (self, size = None):
+        """Maximum number of worker threads
+        """
         if size is None:
             return self.threads_max
         elif size <= 0:
@@ -91,6 +107,8 @@ class ThreadPool (object):
     #--------------------------------------------------------------------------#
     @Async
     def core_main (self):
+        """Main core coroutine
+        """
         try:
             while True:
                 source, result, error = yield self.core_queue.Get ()
@@ -108,6 +126,8 @@ class ThreadPool (object):
             self.Dispose ()
 
     def thread_exit (self, count = None):
+        """Leave only count thread running. Terminate all if count is None.
+        """
         def action_exit (): raise ThreadPoolExit ()
         with self.threads_lock:
             count = count or len (self.threads)
@@ -115,6 +135,8 @@ class ThreadPool (object):
             self.threads_cond.notify (count)
 
     def thread_main (self):
+        """Main thread function
+        """
         try:
             while True:
                 with self.threads_lock:
@@ -144,6 +166,8 @@ class ThreadPool (object):
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
     def Dispose (self):
+        """Dispose thread pool
+        """
         with self.threads_lock:
             if self.disposed:
                 return

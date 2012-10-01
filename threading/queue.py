@@ -11,20 +11,30 @@ __all__ = ('CoreQueue', 'CoreQueueError',)
 #------------------------------------------------------------------------------#
 class CoreQueueError (Exception): pass
 class CoreQueue (object):
+    """Core queue
+
+    You can put item from any thread inside queue and asynchronously get this
+    item in core thread.
+    """
     def __init__ (self, core = None):
         self.core  = core or Core.Instance ()
 
+        # queue
         self.queue = deque ()
         self.queue_wait = False
         self.queue_lock = threading.RLock ()
 
+        # pipe
         self.get_pipe, self.put_pipe = os.pipe ()
         self.disposed = False
+        FileBlocking (self.get_pipe, False)
 
     #--------------------------------------------------------------------------#
     # Put | Get                                                                #
     #--------------------------------------------------------------------------#
     def Put (self, item):
+        """Put item thread safely in queue
+        """
         if self.disposed:
             raise CoreQueueError ('Queue has been disposed')
 
@@ -37,6 +47,8 @@ class CoreQueue (object):
 
     @Async
     def Get (self):
+        """Asynchronously get item from queue
+        """
         while not self.disposed:
             with self.queue_lock:
                 if self.queue:
@@ -57,6 +69,8 @@ class CoreQueue (object):
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
     def Dispose (self):
+        """Dispose queue
+        """
         with self.queue_lock:
             if self.disposed:
                 return

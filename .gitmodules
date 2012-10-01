@@ -3,4 +3,4 @@
 	url = git://github.com/aslpavel/async.git
 [submodule "store"]
 	path = store
-	url = git@github.com:aslpavel/store.git
+    url = git://github.com/aslpavel/store.git
