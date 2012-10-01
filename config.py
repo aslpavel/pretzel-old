@@ -185,10 +185,10 @@ class StoreConfig (Config):
     # Storage Interface                                                        #
     #--------------------------------------------------------------------------#
     def LoadState (self):
-        return self.Store [self.Location]
+        return self.Store.LoadByName (self.Location)
 
     def SaveState (self, state):
-        self.Store [self.Location] = state
+        self.Store.SaveByName (self.Location, state)
 
 #------------------------------------------------------------------------------#
 # File Config                                                                  #
