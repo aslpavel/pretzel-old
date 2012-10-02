@@ -16,7 +16,7 @@ __all__ = ('Tomb', 'BootstrapModules', 'BootstrapSource', 'BootstrapBootstrap',)
 class Tomb (object):
     """Tomb importer
 
-    Serializable importer. Capable to import all previous added modules.
+    Serializable importer. Capable to import all previously added modules.
     """
     UID = '1f43bbd9-36e0-4084-84e5-b7fb14fdb1bd'
 
