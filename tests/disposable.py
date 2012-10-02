@@ -3,17 +3,19 @@ import unittest
 import operator
 import itertools
 
-from .async import FutureSource, FutureCanceled
-from .event import Event
-from .disposable import Disposable, CompositeDisposable
+from ..disposable import Disposable, CompositeDisposable
 #------------------------------------------------------------------------------#
 # Disposables                                                                  #
 #------------------------------------------------------------------------------#
 class DisposablesTests (unittest.TestCase):
+    """Disposable unite tests
+    """
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
     def testDisposable (self):
+        """Test disposable
+        """
         ctx = [0]
         def dispose ():
             ctx [0] += 1
@@ -33,6 +35,8 @@ class DisposablesTests (unittest.TestCase):
     # Composite Disposable                                                     #
     #--------------------------------------------------------------------------#
     def testCompositeDisposable (self):
+        """Test composite disposable
+        """
         ctx = [0, 0, 0, 0]
         d0, d1, d2, d3 = map (Disposable, (
             lambda: operator.setitem (ctx, 0, 1),
@@ -54,6 +58,8 @@ class DisposablesTests (unittest.TestCase):
         self.assertEqual (ctx, [1, 1, 0, 1])
 
     def testCompsiteDisposableOrder (self):
+        """Test dispose order
+        """
         ctx, count = [0, 0, 0, 0], itertools.count ()
         next (count)
         d0, d1, d2, d3 = map (Disposable, (
@@ -70,57 +76,5 @@ class DisposablesTests (unittest.TestCase):
             self.assertEqual (ctx, [0, 0, 0, 0])
 
         self.assertEqual (ctx, [4, 2, 3, 1])
-
-#------------------------------------------------------------------------------#
-# Event                                                                        #
-#------------------------------------------------------------------------------#
-class EventTests (unittest.TestCase):
-    def testAddRemove (self):
-        values = []
-        def handler (value):
-            values.append (value)
-
-        # create
-        event = Event ()
-        event (0)
-
-        # add
-        event.Add (handler)
-        event (1)
-        self.assertEqual (values, [1])
-
-        # remove
-        self.assertTrue (event.Remove (handler))
-        event (2)
-        self.assertEqual (values, [1])
-
-        # double remove
-        self.assertFalse (event.Remove (handler))
-        event (3)
-        self.assertEqual (values, [1])
-
-    def testAwait (self):
-        event = Event ()
-
-        # resolve
-        future = event.Await ()
-        self.assertEqual (len (event.handlers), 1)
-        self.assertFalse (future.IsCompleted ())
-
-        event (1)
-        self.assertEqual (future.Result (), (1,))
-        self.assertEqual (len (event.handlers), 0)
-
-        # cancel
-        cancel = FutureSource ()
-        future = event.Await (cancel.Future)
-        self.assertEqual (len (event.handlers), 1)
-        self.assertFalse (future.IsCompleted ())
-
-        cancel.ResultSet (None)
-        self.assertEqual (len (event.handlers), 0)
-        self.assertTrue (future.IsCompleted ())
-        with self.assertRaises (FutureCanceled):
-            future.Result ()
 
 # vim: nu ft=python columns=120 :

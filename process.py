@@ -22,6 +22,8 @@ STDERR  = sys.stderr.fileno ()
 #------------------------------------------------------------------------------#
 class ProcessError (Exception): pass
 class Process (object):
+    """Create child process
+    """
     def __init__ (self, command, stdin = None, stdout = None, stderr = None,
             shell = None, environ = None, check = None, buffer_size = None, core = None):
 
@@ -68,7 +70,7 @@ class Process (object):
             self.stderr = stderr_pipe.DetachReadAsync ()
 
             # result
-            self.result = self.result_worker (alive_pipe.DetachReadAsync ())
+            self.result = self.result_main (alive_pipe.DetachReadAsync ())
 
         else:
             try:
@@ -95,29 +97,41 @@ class Process (object):
     #--------------------------------------------------------------------------#
     @property
     def Stdin (self):
+        """Standard input asynchronous stream
+        """
         return self.stdin
 
     @property
     def Stdout (self):
+        """Standard output asynchronous stream
+        """
         return self.stdout
 
     @property
     def Stderr (self):
+        """Standard error asynchronous stream
+        """
         return self.stderr
 
     @property
     def Result (self):
+        """Future object for return code of the process
+        """
         return self.result
 
     @property
     def Pid (self):
+        """Pid of the process
+        """
         return self.pid
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
     @Async
-    def result_worker (self, alive_stream):
+    def result_main (self, alive_stream):
+        """Result coroutine main
+        """
         try:
             with ScopeFuture () as cancel:
                 self.dispose += cancel
@@ -138,6 +152,8 @@ class Process (object):
         AsyncReturn (result)
 
     def to_fd (self, file, default):
+        """Convert file object to file descriptor
+        """
         if file is None:
             return default
 
@@ -156,6 +172,8 @@ class Process (object):
     # Dispose                                                                  #
     #--------------------------------------------------------------------------#
     def Dispose (self):
+        """Terminate process and dispose associated resources
+        """
         self.dispose.Dispose ()
 
     def __enter__ (self):
@@ -169,6 +187,8 @@ class Process (object):
 # Pipe                                                                         #
 #------------------------------------------------------------------------------#
 class Pipe (object):
+    """Pipe helper type
+    """
     def __init__ (self, fds, process):
         self.process = process
         if fds:
@@ -185,21 +205,34 @@ class Pipe (object):
     # Detach                                                                   #
     #--------------------------------------------------------------------------#
     def DetachRead (self, fd = None):
+        """Detach read side
+        """
         self.detach (True, fd)
 
     def DetachReadAsync (self):
+        """Detach read side and create asynchronous stream out of it
+        """
         return self.detach_async (True)
 
     def DetachWrite (self, fd = None):
+        """Detach write side
+        """
         self.detach (False, fd)
 
     def DetachWriteAsync (self):
+        """Detach write side and create asynchronous stream out of it
+        """
         return self.detach_async (False)
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
     def detach (self, read, fd = None):
+        """Detach from the pipe
+
+        Detaches requested side of the pipe, and close the other one. Returns
+        detached file descriptor.
+        """
         if self.fds is None:
             raise ProcessError ('Pipe has already been detached')
 
@@ -217,6 +250,11 @@ class Pipe (object):
             return fd
 
     def detach_async (self, read):
+        """Detach from the pipe
+
+        Detaches requested side of the pipe, and close the other one. Returns
+        asynchronous file stream for detached side.
+        """
         fd = self.detach (read)
         if fd is None:
             return
@@ -233,6 +271,8 @@ class Pipe (object):
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
     def Dispose (self):
+        """Dispose pipe
+        """
         if self.fds is None:
             return
 
@@ -253,6 +293,10 @@ class Pipe (object):
 #------------------------------------------------------------------------------#
 def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = None,
         shell = None, environ = None, check = None, buffer_size = None, core = None, cancel = None):
+    """Asynchronously run command
+
+    Asynchronously returns standard output, standard error and return code tuple.
+    """
 
     # vars
     if input is not None and stdin is not None:
@@ -291,10 +335,7 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
             err = read (proc.Stderr)
             yield Future.WhenAll ((out, err))
 
-            # result
-            yield proc.Result
-
-            AsyncReturn ((out.Result (), err.Result ()))
+            AsyncReturn ((out.Result (), err.Result (), (yield proc.Result)))
 
     return process ()
 
