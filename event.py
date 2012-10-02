@@ -1,27 +1,43 @@
 # -*- coding: utf-8 -*-
-from .async import Async, FutureSource, FutureCanceled
+from .async import Future, FutureSource, FutureCanceled, Async
 
 __all__ = ('Event', 'AsyncEvent', 'DelegatedEvent', 'AccumulativeEvent',)
 #------------------------------------------------------------------------------#
 # Base Event                                                                   #
 #------------------------------------------------------------------------------#
 class BaseEvent (object):
+    """Base Event Type
+    """
     __slots__ = tuple ()
 
     #--------------------------------------------------------------------------#
     # Fire                                                                     #
     #--------------------------------------------------------------------------#
-    def __call__ (self, *args): return self.Fire (*args)
+    def __call__ (self, *args):
+        """Fire event
+        """
+        return self.Fire (*args)
+
     def Fire     (self, *args):
+        """Fire event
+        """
         raise NotImplementedError ()
 
     #--------------------------------------------------------------------------#
     # Add                                                                      #
     #--------------------------------------------------------------------------#
     def Add (self, handler):
+        """Add new event handler
+
+        Returns event handler identifier.
+        """
         raise NotImplementedError ()
 
     def __iadd__ (self, handler):
+        """Add new event handler
+
+        Returns event handler identifier.
+        """
         self.Add (handler)
         return self
 
@@ -29,9 +45,13 @@ class BaseEvent (object):
     # Remove                                                                   #
     #--------------------------------------------------------------------------#
     def Remove (self, handler_id):
+        """Remove existing event handler by its identifier
+        """
         raise NotImplementedError ()
 
     def __isub__ (self, handler_id):
+        """Remove existing event handler by its identifier
+        """
         self.Remove (handler_id)
         return self
 
@@ -39,6 +59,8 @@ class BaseEvent (object):
     # Await                                                                    #
     #--------------------------------------------------------------------------#
     def Await (self, cancel = None):
+        """Asynchronously await next event
+        """
         source     = FutureSource ()
         handler_id = None
 
@@ -63,6 +85,8 @@ class BaseEvent (object):
 # Event                                                                        #
 #------------------------------------------------------------------------------#
 class Event (BaseEvent):
+    """List based event
+    """
     __slots__ = ('handlers',)
 
     def __init__ (self):
@@ -71,6 +95,7 @@ class Event (BaseEvent):
     #--------------------------------------------------------------------------#
     # Fire                                                                     #
     #--------------------------------------------------------------------------#
+
     def Fire (self, *args):
         for handler in tuple (self.handlers):
             handler (*args)
@@ -78,6 +103,7 @@ class Event (BaseEvent):
     #--------------------------------------------------------------------------#
     # Add | Remove                                                             #
     #--------------------------------------------------------------------------#
+
     def Add (self, handler):
         self.handlers.append (handler)
         return handler
@@ -90,25 +116,30 @@ class Event (BaseEvent):
         return False
 
 #------------------------------------------------------------------------------#
-# Async Event                                                                  #
+# Asynchronous Event                                                           #
 #------------------------------------------------------------------------------#
 class AsyncEvent (Event):
+    """Asynchronous list based event
+    """
     __slots__ = Event.__slots__
 
     #--------------------------------------------------------------------------#
     # Fire                                                                     #
     #--------------------------------------------------------------------------#
+
     @Async
     def Fire (self, *args):
         for handler in tuple (self.handlers):
             future = handler (*args)
-            if isinstance (future, BaseFuture):
+            if isinstance (future, Future):
                 yield future
 
 #------------------------------------------------------------------------------#
 # Delegated Event                                                              #
 #------------------------------------------------------------------------------#
 class DelegatedEvent (BaseEvent):
+    """Delegated event
+    """
     __slots__ = ('add', 'remove')
 
     def __init__ (self, add, remove):
@@ -118,6 +149,7 @@ class DelegatedEvent (BaseEvent):
     #--------------------------------------------------------------------------#
     # Add | Remove                                                             #
     #--------------------------------------------------------------------------#
+
     def Add (self, handler):
         return self.add (handler)
 
@@ -125,9 +157,13 @@ class DelegatedEvent (BaseEvent):
         return self.remove (handler_id)
 
 #------------------------------------------------------------------------------#
-# Accumulative Evet                                                            #
+# Accumulative Event                                                           #
 #------------------------------------------------------------------------------#
 class AccumulativeEvent (Event):
+    """Accumulative event
+
+    Accumulate events and fire them all for newly added handlers
+    """
     __slots__ = Event.__slots__ + ('values',)
 
     def __init__ (self):
@@ -137,6 +173,7 @@ class AccumulativeEvent (Event):
     #--------------------------------------------------------------------------#
     # Fire                                                                     #
     #--------------------------------------------------------------------------#
+
     def Fire (self, *args):
         Event.Fire (self, *args)
         self.values.append (args)
@@ -144,6 +181,7 @@ class AccumulativeEvent (Event):
     #--------------------------------------------------------------------------#
     # Add | Remove                                                             #
     #--------------------------------------------------------------------------#
+
     def Add (self, handler):
         for args in self.values:
             handler (*args)
