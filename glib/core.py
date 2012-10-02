@@ -44,7 +44,7 @@ class GCore (object):
 
     def Poll (self, fd, mask, cancel = None):
         if mask is None:
-            return # no cleanup for closed file descriptors
+            return # no clean up for closed file descriptors
 
         def resolve (source, fd, cond):
             if cond & self.ERROR:

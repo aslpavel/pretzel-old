@@ -76,7 +76,7 @@ class SSHChannel (FileChannel):
         # send payload
         tomb    = Tomb ()
         tomb   += sys.modules [(__package__ if __package__ else __name__).split ('.') [0]]
-        payload = tomb.Save ()
+        payload = tomb.ToBytes ()
 
         in_stream.Write (struct.pack ('!L', len (payload)))
         in_stream.Write (payload)
@@ -99,10 +99,10 @@ class SSHChannel (FileChannel):
 payload_template = r"""'# -*- coding: utf-8 -*-
 {bootstrap}
 
+import io, struct
 #------------------------------------------------------------------------------#
 # Pretzel                                                                      #
 #------------------------------------------------------------------------------#
-import io, sys, struct
 with io.open (0, "rb", buffering = 0, closefd = False) as stream:
     size = struct.unpack ("!L", stream.read (struct.calcsize ("!L"))) [0]
     data = io.BytesIO ()
@@ -111,11 +111,12 @@ with io.open (0, "rb", buffering = 0, closefd = False) as stream:
         if not chunk:
             raise ValueError ("Payload is incomplete")
         data.write (chunk)
-    sys.meta_path.append (_bootstrap.Tomb.Load (data.getvalue ()))
+    _bootstrap.Tomb.FromBytes (data.getvalue ()).Install ()
 
 #------------------------------------------------------------------------------#
 # Main                                                                         #
 #------------------------------------------------------------------------------#
+import sys
 from importlib import import_module
 def Main ():
     import_module ("{remoting_name}")

@@ -14,6 +14,10 @@ __all__ = ('Tomb', 'BootstrapModules', 'BootstrapSource', 'BootstrapBootstrap',)
 # Tomb                                                                         #
 #------------------------------------------------------------------------------#
 class Tomb (object):
+    """Tomb importer
+
+    Serializable importer. Capable to import all previous added modules.
+    """
     UID = '1f43bbd9-36e0-4084-84e5-b7fb14fdb1bd'
 
     def __init__ (self, containments = None):
@@ -23,6 +27,11 @@ class Tomb (object):
     # Methods                                                                  #
     #--------------------------------------------------------------------------#
     def Add (self, module):
+        """Add module or package
+
+        Only capable to add top level packages or modules witch reside on disk
+        as plain python files or in tomb.
+        """
         modname = module.__name__
         if modname.find ('.') > 0:
             raise ValueError ('Module isn\'t a top level: \'{}\''.format (modname))
@@ -56,19 +65,27 @@ class Tomb (object):
             self.containments [modname] = self.read_source (filename), filename, False
 
     def __iadd__ (self, module):
+        """Add module or package
+        """
         self.Add (module)
         return self
 
     def __iter__ (self):
+        """Iterate over available module names
+        """
         return iter (self.containments.keys ())
 
     #--------------------------------------------------------------------------#
     # Importer Protocol                                                        #
     #--------------------------------------------------------------------------#
     def find_module (self, name, path = None):
+        """Find module by its name and path
+        """
         return self if name in self.containments else None
 
     def load_module (self, name):
+        """Load module by its name
+        """
         module = sys.modules.get (name)
         if module is not None:
             return module
@@ -96,44 +113,56 @@ class Tomb (object):
             raise
 
     def is_package (self, name):
+        """Is module identified by name a package
+        """
         containment = self.containments.get (name)
         if containment is None:
             raise ImportError ('No such module: \'{}\''.format (name))
         return containment [2]
 
     def get_code (self, name):
+        """Get code for module identified by name
+        """
         containment = self.containments.get (name)
         if containment is None:
             raise ImportError ('No such module: \'{}\''.format (name))
         return compile (containment [0], containment [1], 'exec')
 
     def get_source (self, name):
+        """Get source for module identified by name
+        """
         containment = self.containments.get (name)
         if containment is None:
             raise ImportError ('No such module: \'{}\''.format (name))
         return containment [0]
 
     #--------------------------------------------------------------------------#
-    # Save | Load                                                              #
+    # Serialization                                                            #
     #--------------------------------------------------------------------------#
-    def Save (self):
+    def ToBytes (self):
+        """Save tomb as bytes
+        """
         return zlib.compress (pickle.dumps (self.containments, 2), 9)
 
     @classmethod
-    def Load (cls, data):
+    def FromBytes (cls, data):
+        """Load tomb from bytes
+        """
         return cls (pickle.loads (zlib.decompress (data)))
 
     def __getstate__ (self):
-        return self.Save ()
+        return self.ToBytes ()
 
     def __setstate__ (self, state):
-        self.containments = dict (Tomb.Load (state).containments)
+        self.containments = dict (Tomb.FromBytes (state).containments)
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
     #--------------------------------------------------------------------------#
     @staticmethod
     def read_source (filename):
+        """Read source from file name
+        """
         source   = io.BytesIO ()
         encoding = 'utf-8'
         encoding_pattern = re.compile (b'coding[:=]\s*([-\w.]+)') # PEP: 0263
@@ -154,10 +183,41 @@ class Tomb (object):
         else:
             return source.getvalue ().decode (encoding)
 
+    #--------------------------------------------------------------------------#
+    # Install                                                                  #
+    #--------------------------------------------------------------------------#
+    def Install (self):
+        """Install tomb to meta_path
+        """
+        if self in sys.meta_path:
+            return
+        sys.meta_path.append (self)
+
+    #--------------------------------------------------------------------------#
+    # Dispose                                                                  #
+    #--------------------------------------------------------------------------#
+    def Dispose (self):
+        """Dispose tomb
+        """
+        if self in sys.meta_path:
+            self.meta_path.remove ()
+
+    def __enter__ (self):
+        return self
+
+    def __exit__ (self):
+        self.Dispose ()
+        return False
+
 #------------------------------------------------------------------------------#
 # Bootstrap                                                                    #
 #------------------------------------------------------------------------------#
 def BootstrapModules (modules = None):
+    """Bootstrap modules
+
+    Returns python source, witch when executed allows to import
+    specified modules.
+    """
     # bootstrap payload
     bootstrap = BootstrapBootstrap ('_bootstrap')
 
@@ -166,15 +226,20 @@ def BootstrapModules (modules = None):
     modules = modules if modules else (sys.modules [(__package__ if __package__ else __name__).split ('.') [0]],)
     for module in modules:
         tomb.Add (module)
-    modules_data = binascii.b2a_base64 (tomb.Save ()).strip ().decode ('utf-8')
+    modules_data = binascii.b2a_base64 (tomb.ToBytes ()).strip ().decode ('utf-8')
 
     return module_payload.format (bootstrap = bootstrap, modules_data = modules_data)
 
 module_payload = """{bootstrap}\
-sys.meta_path.append (_bootstrap.Tomb.Load (binascii.a2b_base64 (b"{modules_data}")))
+_bootstrap.Tomb.FromBytes (binascii.a2b_base64 (b"{modules_data}")).Install ()
 """
 
 def BootstrapSource (name, source, filename):
+    """Bootstrap python source
+
+    Returns python source, witch when executed allows to import specified
+    "source" as module with specified "name".
+    """
     data = binascii.b2a_base64 (zlib.compress (source.encode ('utf-8'))).strip ().decode ('utf-8')
     return source_payload.format (name = name, filename = filename, data = data)
 
@@ -205,6 +270,11 @@ finally:
 """
 
 def BootstrapBootstrap (name):
+    """Bootstrap module by name
+
+    Returns python source, witch when executed allows to import
+    specified "module".
+    """
     module  = sys.modules [__name__]
     return BootstrapSource (name, inspect.getsource (module), inspect.getsourcefile (module))
 
@@ -217,6 +287,8 @@ if sys.version_info [0] > 2:
     del builtins
 
     def Raise (tp, value, tb=None):
+        """Raise exception
+        """
         if value.__traceback__ is not tb:
             raise value.with_traceback (tb)
         raise value
@@ -225,6 +297,8 @@ if sys.version_info [0] > 2:
 
 else:
     def Exec (code, globs=None, locs=None):
+        """Execute code
+        """
         if globs is None:
             frame = sys._getframe (1)
             globs = frame.f_globals
@@ -246,6 +320,8 @@ else:
 # Main                                                                         #
 #------------------------------------------------------------------------------#
 def Usage ():
+    """Print usage message
+    """
     usage_pattern = '''Usage: {name} [options] [<modules>]
     -h|?      : print this help message
     -m <file> : use file as main
@@ -253,6 +329,8 @@ def Usage ():
     sys.stderr.write (usage_pattern.format (name = os.path.basename (sys.argv [0])))
 
 def Main ():
+    """Main for this module
+    """
     import getopt
     import importlib
 
