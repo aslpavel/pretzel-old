@@ -2,72 +2,67 @@
 import unittest
 
 from ..domains.fork import ForkDomain
-from ...async import Async, Core
+from ...tests import AsyncTest
 
 __all__ = ('LinkerTest',)
 #------------------------------------------------------------------------------#
 # Linker Test                                                                  #
 #------------------------------------------------------------------------------#
 class LinkerTest (unittest.TestCase):
+    """Linker service unit tests
+    """
+
+    @AsyncTest
     def testCall (self):
-        @Async
-        def run ():
-            with ForkDomain (push_main = False) as domain:
-                yield domain.Connect ()
-                self.assertEqual ((yield domain.Call (RemoteIncrease, 1)), 2)
+        """Test remote remote function call
+        """
+        with ForkDomain (push_main = False) as domain:
+            yield domain.Connect ()
+            self.assertEqual ((yield domain.Call (RemoteIncrease, 1)), 2)
 
-        with Core.Instance () as core:
-            run_future = run ()
-            run_future.Continue (lambda _: core.Dispose ())
-            core ()
-
-        run_future.Result ()
-
+    @AsyncTest
     def testProxy (self):
-        @Async
-        def run ():
-            with ForkDomain (push_main = False) as domain:
-                yield domain.Connect ()
+        """Test remote proxy object
+        """
+        with ForkDomain (push_main = False) as domain:
+            yield domain.Connect ()
 
-                # create
-                proxy = yield domain.Call.Proxy (Remote, 'value')
+            # create
+            proxy = yield domain.Call.Proxy (Remote, 'value')
 
-                # method
-                self.assertEqual ((yield proxy.Value ()), 'value')
+            # method
+            self.assertEqual ((yield proxy.Value ()), 'value')
 
-                # property
-                self.assertEqual ((yield proxy.value), 'value')
-                yield proxy._provider.PropertySet ('value', 'new value')
-                self.assertEqual ((yield proxy.value), 'new value')
+            # property
+            self.assertEqual ((yield proxy.value), 'value')
+            yield proxy._provider.PropertySet ('value', 'new value')
+            self.assertEqual ((yield proxy.value), 'new value')
 
-                # error
-                with self.assertRaises (ValueError):
-                    yield proxy.Error (ValueError ())
+            # error
+            with self.assertRaises (ValueError):
+                yield proxy.Error (ValueError ())
 
-                # lambda proxy
-                lambda_proxy = yield proxy.Lambda.Proxy ()
-                yield lambda_proxy ('new new value')
-                self.assertEqual ((yield proxy.value), 'new new value')
+            # lambda proxy
+            lambda_proxy = yield proxy.Lambda.Proxy ()
+            yield lambda_proxy ('new new value')
+            self.assertEqual ((yield proxy.value), 'new new value')
 
-                # proxy mapping
-                obj = yield proxy.ObjectCreate (domain)
-                self.assertTrue ((yield proxy.ObjectEqual (obj)))
-                self.assertEqual ((yield proxy.obj), obj)
-
-        with Core.Instance () as core:
-            run_future = run ()
-            run_future.Continue (lambda _: core.Dispose ())
-            core ()
-
-        run_future.Result ()
+            # proxy mapping
+            obj = yield proxy.ObjectCreate (domain)
+            self.assertTrue ((yield proxy.ObjectEqual (obj)))
+            self.assertEqual ((yield proxy.obj), obj)
 
 #------------------------------------------------------------------------------#
 # Helpers                                                                      #
 #------------------------------------------------------------------------------#
 def RemoteIncrease (value):
+    """Remote test function
+    """
     return value + 1
 
 class Remote (object):
+    """Remote test type
+    """
     def __init__ (self, value):
         self.value = value
         self.obj = None

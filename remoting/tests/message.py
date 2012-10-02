@@ -12,7 +12,12 @@ __all__ = ('MessageTest',)
 # Message Test                                                                 #
 #------------------------------------------------------------------------------#
 class MessageTest (unittest.TestCase):
+    """Message unit tests
+    """
+
     def testSerialize (self):
+        """Test serialization
+        """
         msg = Message.FromValue (b'value', b'dst')
 
         stream = io.BytesIO ()
@@ -25,6 +30,8 @@ class MessageTest (unittest.TestCase):
         self.assertEqual (msg.Value (), msg_load.Value ())
 
     def testSerializeAsync (self):
+        """Test asynchronous serialization
+        """
         msg = Message.FromValue (b'value', b'dst')
 
         with Core.Instance () as core:
@@ -55,6 +62,8 @@ class MessageTest (unittest.TestCase):
         test_future.Result ()
 
     def testError (self):
+        """Test error value
+        """
         msg = Message (b'dst', b'src')
         try: raise ValueError ('test error')
         except Exception:
@@ -75,6 +84,8 @@ class MessageTest (unittest.TestCase):
             msg_load.Value ()
 
     def testResponse (self):
+        """Test response
+        """
         msg = Message (b'dst', b'src')
 
         self.assertEqual (msg.dst, b'dst')

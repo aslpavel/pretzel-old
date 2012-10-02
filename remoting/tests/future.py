@@ -2,65 +2,65 @@
 import unittest
 
 from ..domains.fork import ForkDomain
-from ...async import Async, FutureSource, SucceededFuture, FailedFuture, RaisedFuture, Core
+from ...tests import AsyncTest
+from ...async import FutureSource, SucceededFuture, FailedFuture, RaisedFuture
 
 __all__ = ('FutureTest',)
 #------------------------------------------------------------------------------#
 # Future Test                                                                  #
 #------------------------------------------------------------------------------#
 class FutureTest (unittest.TestCase):
+    """Future service unit tests
+    """
+    @AsyncTest
     def testFuture (self):
-        @Async
-        def run ():
-            with ForkDomain (push_main = False) as domain:
-                yield domain.Connect ()
-                proxy = yield domain.Call.Proxy (RemoteFuture)
+        """Future tests
+        """
+        with ForkDomain (push_main = False) as domain:
+            yield domain.Connect ()
+            proxy = yield domain.Call.Proxy (RemoteFuture)
 
-                # done future
-                yield proxy.Create ()
-                future = yield proxy.Future
-                self.assertFalse (future.IsCompleted ())
-                self.assertEqual (future, (yield proxy.Future))
-                self.assertTrue  ((yield proxy.Equal (future)))
+            # done future
+            yield proxy.Create ()
+            future = yield proxy.Future
+            self.assertFalse (future.IsCompleted ())
+            self.assertEqual (future, (yield proxy.Future))
+            self.assertTrue  ((yield proxy.Equal (future)))
 
-                yield proxy.Done ('result')
+            yield proxy.Done ('result')
+            yield future
+            self.assertEqual (future.Result (), 'result')
+            self.assertEqual (type ((yield proxy.Future)), SucceededFuture)
+
+            # error future
+            yield proxy.Create ()
+            future = yield proxy.Future
+
+            yield proxy.Error (ValueError ('test'))
+            self.assertEqual (type ((yield proxy.Future)), FailedFuture)
+            try:
                 yield future
-                self.assertEqual (future.Result (), 'result')
-                self.assertEqual (type ((yield proxy.Future)), SucceededFuture)
+            except Exception as error:
+                self.assertEqual (type (error), ValueError)
+                self.assertEqual (error.args, ('test',))
 
-                # error future
-                yield proxy.Create ()
-                future = yield proxy.Future
+            # succeeded future
+            future = yield proxy.Succeeded ()
+            self.assertEqual (future.Result (), 'success')
+            self.assertEqual (type (future), SucceededFuture)
 
-                yield proxy.Error (ValueError ('test'))
-                self.assertEqual (type ((yield proxy.Future)), FailedFuture)
-                try:
-                    yield future
-                except Exception as error:
-                    self.assertEqual (type (error), ValueError)
-                    self.assertEqual (error.args, ('test',))
-
-                # succeeded future
-                future = yield proxy.Succeeded ()
-                self.assertEqual (future.Result (), 'success')
-                self.assertEqual (type (future), SucceededFuture)
-
-                # failed future
-                future = yield proxy.Failed ()
-                self.assertEqual (future.Error () [0], ValueError)
-                self.assertEqual (future.Error () [1].args, ('failed',))
-                self.assertEqual (type (future), FailedFuture)
-
-        with Core.Instance () as core:
-            run_future = run ()
-            run_future.Continue (lambda _: core.Dispose ())
-            core ()
-        run_future.Result ()
+            # failed future
+            future = yield proxy.Failed ()
+            self.assertEqual (future.Error () [0], ValueError)
+            self.assertEqual (future.Error () [1].args, ('failed',))
+            self.assertEqual (type (future), FailedFuture)
 
 #------------------------------------------------------------------------------#
 # Helpers                                                                      #
 #------------------------------------------------------------------------------#
 class RemoteFuture (object):
+    """Remote helper
+    """
     def __init__ (self):
         self.source = None
 
