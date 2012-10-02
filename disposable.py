@@ -5,17 +5,23 @@ __all__ = ('Disposable', 'MutableDisposable', 'CompositeDisposable')
 # Base Disposable                                                              #
 #------------------------------------------------------------------------------#
 class BaseDisposable (object):
+    """Base disposable object
+    """
     __slots__ = tuple ()
     #--------------------------------------------------------------------------#
     # Call                                                                     #
     #--------------------------------------------------------------------------#
     def __call__ (self):
+        """Dispose object
+        """
         self.Dispose ()
 
     #--------------------------------------------------------------------------#
     # Dispose                                                                  #
     #--------------------------------------------------------------------------#
     def Dispose (self):
+        """Dispose object
+        """
         raise NotImplementedError ()
 
     def __enter__ (self):
@@ -29,6 +35,8 @@ class BaseDisposable (object):
     # Status                                                                   #
     #--------------------------------------------------------------------------#
     def IsDisposed (self):
+        """Is object disposed
+        """
         raise NotImplementedError ()
 
     def __bool__ (self):
@@ -41,6 +49,8 @@ class BaseDisposable (object):
 # Disposable                                                                   #
 #------------------------------------------------------------------------------#
 class Disposable (BaseDisposable):
+    """Call "dispose" function on Dispose
+    """
     __slots__ = ('dispose',)
     def __init__ (self, dispose = None):
         self.dispose = dispose
@@ -49,6 +59,8 @@ class Disposable (BaseDisposable):
     # Dispose                                                                  #
     #--------------------------------------------------------------------------#
     def Dispose (self):
+        """Dispose
+        """
         if self.dispose is not None:
             self.dispose, dispose = None, self.dispose
             return dispose ()
@@ -57,12 +69,16 @@ class Disposable (BaseDisposable):
     # Status                                                                   #
     #--------------------------------------------------------------------------#
     def IsDisposed (self):
+        """Is disposed
+        """
         return self.dispose is None
 
 #------------------------------------------------------------------------------#
 # Mutable Disposable                                                           #
 #------------------------------------------------------------------------------#
 class MutableDisposable (BaseDisposable):
+    """Mutable disposable
+    """
     __slots__ = ('disposable', 'disposed')
 
     def __init__ (self, disposable = None):
@@ -75,6 +91,8 @@ class MutableDisposable (BaseDisposable):
     # Replace                                                                  #
     #--------------------------------------------------------------------------#
     def Replace (self, disposable = None):
+        """Replace disposable object and dispose old one if any
+        """
         if disposable is not None:
             disposable.__enter__ ()
 
@@ -88,6 +106,8 @@ class MutableDisposable (BaseDisposable):
     # Dispose                                                                  #
     #--------------------------------------------------------------------------#
     def Dispose (self):
+        """Dispose disposable object if any
+        """
         if self.disposed:
             return
         self.disposed = True
@@ -99,12 +119,18 @@ class MutableDisposable (BaseDisposable):
     # Status                                                                   #
     #--------------------------------------------------------------------------#
     def IsDisposed (self):
+        """Is disposed
+        """
         return self.disposed
 
 #------------------------------------------------------------------------------#
 # Composite Disposable                                                         #
 #------------------------------------------------------------------------------#
 class CompositeDisposable (BaseDisposable):
+    """Composite disposable
+
+    Treat multiple disposable as one.
+    """
     __slots__ = ('disposables',)
 
     def __init__ (self, disposables = None):
@@ -121,6 +147,8 @@ class CompositeDisposable (BaseDisposable):
     # Add|Remove                                                               #
     #--------------------------------------------------------------------------#
     def Add (self, disposable):
+        """Register disposable
+        """
         disposable.__enter__ ()
         if self.disposables is None:
             disposable.__exit__ (None, None, None)
@@ -128,10 +156,14 @@ class CompositeDisposable (BaseDisposable):
             self.disposables.append (disposable)
 
     def __iadd__  (self, disposable):
+        """Register disposable
+        """
         self.Add (disposable)
         return self
 
     def Remove (self, disposable):
+        """Unregister disposable and dispose it
+        """
         if self.disposables is None:
             return
 
@@ -139,6 +171,8 @@ class CompositeDisposable (BaseDisposable):
         disposable.__exit__ (None, None, None)
 
     def __isub__ (self, disposable):
+        """Unregister disposable and dispose it
+        """
         self.Remove (disposable)
         return self
 
@@ -146,6 +180,8 @@ class CompositeDisposable (BaseDisposable):
     # Dispose                                                                  #
     #--------------------------------------------------------------------------#
     def Dispose (self):
+        """Dispose all registered disposables
+        """
         if self.disposables is None:
             return
 
@@ -157,8 +193,12 @@ class CompositeDisposable (BaseDisposable):
     # Status                                                                   #
     #--------------------------------------------------------------------------#
     def IsDisposed (self):
+        """Is disposed
+        """
         return self.disposables is None
 
     def __len__ (self):
+        """Number of registered disposables
+        """
         return len (self.disposables) if self.disposables else 0
 # vim: nu ft=python columns=120 :
