@@ -13,12 +13,15 @@ from .threading import ThreadPool
 from .console import Text, Color, COLOR_YELLOW, ATTR_BOLD
 from .log import Log
 
-__all__ = ('Application', 'ApplicationType', 'ApplicationError',)
+__all__ = ('Application', 'ApplicationType',)
 #------------------------------------------------------------------------------#
 # Application Type                                                             #
 #------------------------------------------------------------------------------#
-class ApplicationError (Exception): pass
 class ApplicationType  (object):
+    """Application
+
+    Convenient type to create pretzel base applications
+    """
     def __init__ (self, main, name = None, core = None, pool = None, execute = None):
         self.main = main
         self.name = name
@@ -40,8 +43,14 @@ class ApplicationType  (object):
     #--------------------------------------------------------------------------#
     # Execute                                                                  #
     #--------------------------------------------------------------------------#
-    def __call__ (self): self.Execute ()
+    def __call__ (self):
+        """Same as Execute
+        """
+        return self.Execute ()
+
     def Execute  (self):
+        """Execute application
+        """
         try:
             result = self.main (self)
             if isinstance (result, Future):
@@ -71,6 +80,8 @@ class ApplicationType  (object):
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
     def Dispose (self):
+        """Dispose application
+        """
         self.core.Dispose ()
 
     def __enter__ (self):
@@ -84,6 +95,10 @@ class ApplicationType  (object):
 # Application                                                                  #
 #------------------------------------------------------------------------------#
 def Application (name = None, core = None, pool = None):
+    """Application decorator
+
+    Create application with decorated functions as its main function.
+    """
     def application (main):
         if inspect.isgeneratorfunction (main):
             main = Async (main)

@@ -172,16 +172,6 @@ class ColorStack (object):
     def __bool__    (self):
         return len (self.stack) > 1
 
-    #--------------------------------------------------------------------------#
-    # Private                                                                  #
-    #--------------------------------------------------------------------------#
-    def csi_get (self, color_from, color_to):
-        csi = self.csi_cache.get ((color_from, color_to))
-        if csi is None:
-            csi = color_from >> color_to
-            self.csi_cache [(color_from, color_to)] = csi
-        return csi
-
 #------------------------------------------------------------------------------#
 # Control Sequence Initiator Decorator                                         #
 #------------------------------------------------------------------------------#
@@ -200,6 +190,7 @@ def CSI (factory):
         return csi
 
     method.__name__ = factory.__name__ + 'CSI'
+    method.__doc__  = factory.__doc__
     return method
 
 #------------------------------------------------------------------------------#
@@ -215,7 +206,7 @@ def MoveUp (count):
         return str (-count).encode () + b'B'
 
 def MoveDown (count):
-    return Up (-count)
+    return MoveUp (-count)
 
 @CSI
 def MoveColumn (index):

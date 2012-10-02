@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from ...async import Async, AsyncReturn, DummyAsync, LazyFuture
+from ...async import Async, AsyncReturn, DummyAsync, LazyFuture, FailedFuture
 
 __all__ = ('Proxy', 'ProxyQuery', 'ProxyProvider', 'LocalProxyProvider',)
 #------------------------------------------------------------------------------#

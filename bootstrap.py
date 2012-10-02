@@ -168,7 +168,7 @@ def BootstrapModules (modules = None):
         tomb.Add (module)
     modules_data = binascii.b2a_base64 (tomb.Save ()).strip ().decode ('utf-8')
 
-    return module_payload.format (**locals ())
+    return module_payload.format (bootstrap = bootstrap, modules_data = modules_data)
 
 module_payload = """{bootstrap}\
 sys.meta_path.append (_bootstrap.Tomb.Load (binascii.a2b_base64 (b"{modules_data}")))
@@ -176,7 +176,7 @@ sys.meta_path.append (_bootstrap.Tomb.Load (binascii.a2b_base64 (b"{modules_data
 
 def BootstrapSource (name, source, filename):
     data = binascii.b2a_base64 (zlib.compress (source.encode ('utf-8'))).strip ().decode ('utf-8')
-    return source_payload.format (**locals ())
+    return source_payload.format (name = name, filename = filename, data = data)
 
 source_payload = r"""
 import sys, imp, zlib, binascii

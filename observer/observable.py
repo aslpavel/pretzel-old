@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
-import operator
 
-from ..async      import FutureSource, FutureError, FutureCanceled
+from ..async      import Async, FutureSource, FutureError, FutureCanceled, SucceededFuture
 from ..disposable import Disposable, CompositeDisposable, MutableDisposable
 
 __all__ = ('Observable', 'Observer', 'Subject',)
@@ -31,11 +30,11 @@ class Observable (object):
         source = FutureSource ()
 
         if cancel:
-            def cancel (future):
+            def cancel_continuation (future):
                 disposable.Dispose ()
                 source.ErrorRaise (FutureCanceled ())
 
-            cancel.Continue (cancel)
+            cancel.Continue (cancel_continuation)
 
         # create observer
         def onNext (value):
@@ -52,7 +51,7 @@ class Observable (object):
 
         disposable = self.Subscribe (AnonymousObserver (onNext, onError, onCompleted))
 
-        return future
+        return source.Future
 
     #--------------------------------------------------------------------------#
     # Select                                                                   #
@@ -179,7 +178,7 @@ class Observable (object):
                 observer.OnCompleted ()
 
             return CompositeDisposable ((context.worker,
-                self.Subsctibe (AnonymousObserver (onNext, onError, onCompleted))))
+                self.Subscribe (AnonymousObserver (onNext, onError, onCompleted))))
 
         return AnonymousObservable (Subscribe)
 

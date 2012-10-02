@@ -18,7 +18,7 @@ class BaseEvent (object):
         """
         return self.Fire (*args)
 
-    def Fire     (self, *args):
+    def Fire (self, *args):
         """Fire event
         """
         raise NotImplementedError ()

@@ -3,7 +3,6 @@ import io
 import os
 import sys
 import signal
-import traceback
 
 from .async      import Async, AsyncReturn, AsyncFile, Future, ScopeFuture, Core, CoreDisconnectedError
 from .disposable import Disposable, CompositeDisposable

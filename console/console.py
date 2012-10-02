@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import os
 import io
 import sys
 import fcntl
@@ -83,7 +82,7 @@ class Console (object):
     #--------------------------------------------------------------------------#
     def Move (self, row = None, column = None):
         if row is not None:
-            self.stream.write (MoveUp (count))
+            self.stream.write (MoveUp (row))
         if column is not None:
             self.stream.write (MoveColumn (column))
 

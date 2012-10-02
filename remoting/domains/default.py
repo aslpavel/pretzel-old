@@ -4,7 +4,7 @@ import types
 import inspect
 from importlib import import_module
 
-from .domain import Domain
+from .domain import Domain, DomainError
 
 from ..message import Message
 from ..services.persistence import PersistenceService
