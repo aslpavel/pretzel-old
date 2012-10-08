@@ -35,9 +35,10 @@ def load_tests (loader, tests, pattern):
     from . import event
     from . import process
     from . import disposable
+    from . import pool
 
     suite = TestSuite ()
-    for test in (process, event, disposable):
+    for test in (process, event, disposable, pool):
         suite.addTests (loader.loadTestsFromModule (test))
     return suite
 

@@ -30,10 +30,10 @@ class CoreQueue (object):
         FileBlocking (self.get_pipe, False)
 
     #--------------------------------------------------------------------------#
-    # Put | Get                                                                #
+    # Enqueue | Dequeue                                                        #
     #--------------------------------------------------------------------------#
-    def Put (self, item):
-        """Put item thread safely in queue
+    def Enqueue (self, item):
+        """Enqueue item, thread safely, in queue
         """
         if self.disposed:
             raise CoreQueueError ('Queue has been disposed')
@@ -46,8 +46,8 @@ class CoreQueue (object):
         os.write (self.put_pipe, b' ')
 
     @Async
-    def Get (self):
-        """Asynchronously get item from queue
+    def Dequeue (self):
+        """Asynchronously dequeue item from queue
         """
         while not self.disposed:
             with self.queue_lock:

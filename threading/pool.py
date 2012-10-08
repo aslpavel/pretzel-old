@@ -111,7 +111,7 @@ class ThreadPool (object):
         """
         try:
             while True:
-                source, result, error = yield self.core_queue.Get ()
+                source, result, error = yield self.core_queue.Dequeue ()
 
                 try:
                     self.sources.discard (source)
@@ -155,7 +155,7 @@ class ThreadPool (object):
                 except ThreadPoolExit:
                     return
 
-                self.core_queue.Put ((source, result, error))
+                self.core_queue.Enqueue ((source, result, error))
 
         except CoreQueueError: pass
         finally:

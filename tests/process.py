@@ -9,8 +9,14 @@ from ..process import ProcessCall, PIPE
 #------------------------------------------------------------------------------#
 command_call = ['python', '-c']
 class ProcessTest (unittest.TestCase):
+    """Process unit tests
+    """
+
     @AsyncTest
     def testCall (self):
+        """Process call
+        """
+
         command = ['python', '-c', '''
 import sys
 for value in range (int (input ())):
