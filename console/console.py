@@ -138,6 +138,7 @@ class Console (object):
             pass
 
         self.stream.write (CursorVisible (True))
+        self.stream.write (b'\x1b[m')
         self.stream.flush ()
 
     def __enter__ (self):
