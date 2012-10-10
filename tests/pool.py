@@ -28,7 +28,7 @@ class ThreadPoolTest (unittest.TestCase):
 
             # register jobs completion
             for future in futures:
-                future.Continue (lambda future: futures.discard (future))
+                future.ContinueSelf (lambda future: futures.discard (future))
             self.assertEqual (len (futures), pool.Size () + 1)
 
             # wait for jobs

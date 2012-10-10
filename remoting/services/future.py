@@ -65,7 +65,7 @@ class FutureService (Service):
             info = FutureInfo (desc, future)
             self.desc_info [desc], self.future_info [future] = info, info
 
-            def resolve (future):
+            def resolve (result, error):
                 if self.desc_info.pop (desc, None) is not None:
                     self.future_info.pop (future, None)
 
@@ -99,7 +99,7 @@ class FutureService (Service):
                 info   = FutureInfo (desc, future, source)
                 self.desc_info [desc], self.future_info [future] = info, info
 
-                def resolve (this):
+                def resolve (result, error):
                     self.desc_info.pop   (desc, None)
                     self.future_info.pop (future, None)
 

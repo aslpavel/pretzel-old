@@ -48,13 +48,11 @@ class TextLogger (object):
         self.stream.write ('\n')
         self.stream.flush ()
 
-        def continuation (future):
-            error = future.Error ()
+        def continuation (result, error):
             if error is None:
                 self.write_prefix ('done', keys)
                 self.write (*args)
 
-                result = future.Result ()
                 if result is not None:
                     self.stream.write (': ')
                     self.stream.write (str (result))

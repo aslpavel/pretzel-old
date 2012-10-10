@@ -94,7 +94,7 @@ class GCore (object):
             return False # remove from event loop
 
         if cancel:
-            def cancel_continuation (future):
+            def cancel_continuation (result, error):
                 GLib.source_remove (source_id)
                 self.sources.discard (source)
                 source.ErrorRaise (FutureCanceled ())

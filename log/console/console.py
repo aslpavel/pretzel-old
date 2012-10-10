@@ -74,7 +74,6 @@ class ConsoleLogger (object):
         # Busy                                                                 #
         #----------------------------------------------------------------------#
         label = self.console.Label ()
-        begin = time.time ()
         with label.Update ():
             self.pending_draw (PENDING_BUSY)
             self.elapsed_draw ()
@@ -99,10 +98,9 @@ class ConsoleLogger (object):
         #----------------------------------------------------------------------#
         # Done                                                                 #
         #----------------------------------------------------------------------#
-        def continuation (future):
+        def continuation (result, error):
             label.Dispose ()
             with self.console.Line ():
-                error = future.Error ()
                 if error is None:
                     self.pending_draw (PENDING_DONE)
                     self.elapsed_draw ()
@@ -111,7 +109,6 @@ class ConsoleLogger (object):
                         self.source_draw (source)
                     self.console.Write (' ', *args)
 
-                    result = future.Result ()
                     if result is not None:
                         self.console.Write (': ', result)
                 else:

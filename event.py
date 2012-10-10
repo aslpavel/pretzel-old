@@ -73,7 +73,7 @@ class BaseEvent (object):
 
         # cancel
         if cancel:
-            def cancel_continuation (future):
+            def cancel_continuation (result, error):
                 self.Remove (handler_id)
                 source.ErrorRaise (FutureCanceled ())
 

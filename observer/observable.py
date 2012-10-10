@@ -30,7 +30,7 @@ class Observable (object):
         source = FutureSource ()
 
         if cancel:
-            def cancel_continuation (future):
+            def cancel_continuation (result, error):
                 disposable.Dispose ()
                 source.ErrorRaise (FutureCanceled ())
 
