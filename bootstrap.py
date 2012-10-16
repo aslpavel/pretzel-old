@@ -5,7 +5,7 @@ import re
 import io
 import imp
 import zlib
-import pickle
+import json
 import binascii
 import inspect
 
@@ -142,13 +142,13 @@ class Tomb (object):
     def ToBytes (self):
         """Save tomb as bytes
         """
-        return zlib.compress (pickle.dumps (self.containments, 2), 9)
+        return zlib.compress (json.dumps (self.containments, 2).encode ('utf-8'), 9)
 
     @classmethod
     def FromBytes (cls, data):
         """Load tomb from bytes
         """
-        return cls (pickle.loads (zlib.decompress (data)))
+        return cls (json.loads (zlib.decompress (data).decode ('utf-8')))
 
     def __getstate__ (self):
         return self.ToBytes ()
