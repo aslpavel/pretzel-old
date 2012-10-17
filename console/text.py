@@ -34,7 +34,7 @@ class Text (object):
         if color:
             self.chunks.append (self.stack.Push (color))
 
-        string, length = self.encoder (str (value))
+        string, length = self.encoder (value if hasattr (value, 'encode') else str (value))
         self.length += length
         self.chunks.append (string)
 
