@@ -7,7 +7,7 @@ __all__ = ('Config', 'FileConfig', 'StoreConfig')
 #------------------------------------------------------------------------------#
 class ConfigNode (object):
     __slots__ = ('Root', 'Target')
-    special_names = {'Root', 'Target', 'Location', 'Sack'}
+    special_names = {'Root', 'Target', 'Location', 'Store'}
 
     def __init__ (self, root, target):
         self.Target = target
