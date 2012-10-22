@@ -22,9 +22,10 @@ class ApplicationType  (object):
 
     Convenient type to create pretzel base applications
     """
-    def __init__ (self, main, name = None, core = None, pool = None, execute = None):
+    def __init__ (self, main, name = None, core = None, pool = None, execute = None, catch = None):
         self.main = main
         self.name = name
+        self.catch = catch is None or catch
 
         self.core = Core.InstanceSet (core) if core else Core.Instance ()
         self.pool = ThreadPool.Instance (pool) if pool else ThreadPool.Instance ()
@@ -62,6 +63,9 @@ class ApplicationType  (object):
                 return result
 
         except Exception as error:
+            if not self.catch:
+                raise
+
             stream = string_type ()
             traceback.print_exc (file = stream)
             traceback_saved = getattr (error, '_saved_traceback', None)
@@ -94,7 +98,7 @@ class ApplicationType  (object):
 #------------------------------------------------------------------------------#
 # Application                                                                  #
 #------------------------------------------------------------------------------#
-def Application (name = None, core = None, pool = None):
+def Application (name = None, core = None, pool = None, catch = None):
     """Application decorator
 
     Create application with decorated functions as its main function.
@@ -102,6 +106,6 @@ def Application (name = None, core = None, pool = None):
     def application (main):
         if inspect.isgeneratorfunction (main):
             main = Async (main)
-        return ApplicationType (main, name or main.__name__, core, pool, False)
+        return ApplicationType (main, name or main.__name__, core, pool, False, catch)
     return application
 # vim: nu ft=python columns=120 :
