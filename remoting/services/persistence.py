@@ -11,7 +11,7 @@ __all__ = ('PersistenceService',)
 # Persistence Service                                                          #
 #------------------------------------------------------------------------------#
 class PersistenceService (Service):
-    NAME   = b'persistence::'
+    NAME   = b'persistence::service'
     OBJECT = b'persistence::object'
 
     def __init__ (self):

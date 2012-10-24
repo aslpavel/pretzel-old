@@ -13,7 +13,7 @@ __all__ = ('LoggerService',)
 # Logger Service                                                               #
 #------------------------------------------------------------------------------#
 class LoggerService (Service):
-    NAME    = b'logger::'
+    NAME    = b'logger::service'
     MESSAGE = b'logger::message'
     OBSERVE = b'logger::observe'
 

@@ -44,12 +44,18 @@ class Channel (object):
     # Methods                                                                  #
     #--------------------------------------------------------------------------#
     def Send (self, message):
+        """Send message
+        """
         return FailedFuture (NotImplementedError ())
 
     def Recv (self, cancel = None):
+        """Receive message
+        """
         return FailedFuture (NotImplementedError ())
 
     def RecvTo (self, destination, cancel = None):
+        """Receive message with specified destination
+        """
         source = self.recv_queue.get (destination)
         if source is None:
             source = FutureSource ()
@@ -67,6 +73,10 @@ class Channel (object):
         return source.Future
 
     def RecvToHandler (self, destination, handler):
+        """Receive to handler
+
+        Receive all messages with destination to the specified handler.
+        """
         if self.recv_handlers.get (destination) is not None:
             raise ChannelError ('Handler has already been assigned')
         self.recv_handlers [destination] = handler
@@ -88,6 +98,8 @@ class Channel (object):
 
     @Async
     def recv_main (self):
+        """Receive coroutine
+        """
         cancel = self.recv_cancel.Future
         try:
             while True:
@@ -110,6 +122,8 @@ class Channel (object):
 
     @Async
     def recv_dispatch (self, message):
+        """Dispatch received message
+        """
         yield self.core.Idle ()
 
         source = self.recv_queue.pop (message.dst, None)

@@ -15,7 +15,7 @@ __all__ = ('LinkerService',)
 # Linker Service                                                               #
 #------------------------------------------------------------------------------#
 class LinkerService (Service):
-    NAME    = b'linker::'
+    NAME    = b'linker::service'
     CALL    = b'linker::call'
     METHOD  = b'linker::method'
     PROPSET = b'linker::propset'

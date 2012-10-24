@@ -14,7 +14,7 @@ __all__ = ('ImporterService',)
 # Importer Service                                                             #
 #------------------------------------------------------------------------------#
 class ImporterService (Service):
-    NAME = b'importer::'
+    NAME = b'importer::service'
     FIND = b'importer::find'
     PUSH = b'importer::push'
 

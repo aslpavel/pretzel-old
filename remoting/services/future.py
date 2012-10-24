@@ -13,10 +13,16 @@ __all__ = ('FutureService',)
 #------------------------------------------------------------------------------#
 # Future Service                                                               #
 #------------------------------------------------------------------------------#
-class FutureServiceError (ServiceError): pass
+class FutureServiceError (ServiceError):
+    """Future service specific errors
+    """
+
 class FutureService (Service):
+    """Future transfer service
+    """
+
     # service
-    NAME    = b'future::'
+    NAME    = b'future::service'
     RESOLVE = b'future::resolve'
 
     # persistence
@@ -29,7 +35,7 @@ class FutureService (Service):
     def __init__ (self):
         Service.__init__ (self,
             handlers = ((self.RESOLVE, self.resolve_handler),),
-            persistence = ((Future, self.futurePack, self.futureUnpack),))
+            persistence = ((Future, self.future_pack, self.future_unpack),))
 
         self.desc        = itertools.count ()
         self.desc_info   = {} # desc   => info
@@ -53,7 +59,9 @@ class FutureService (Service):
     #--------------------------------------------------------------------------#
     # Marshal                                                                  #
     #--------------------------------------------------------------------------#
-    def futurePack (self, future):
+    def future_pack (self, future):
+        """Pack future
+        """
         if future.IsCompleted ():
             with Result () as result:
                 result (self.domain.Pack (future.Result ()))
@@ -81,7 +89,9 @@ class FutureService (Service):
 
         return self.FUTURE_WAIT, info.Desc
 
-    def futureUnpack (self, state):
+    def future_unpack (self, state):
+        """Unpack future
+        """
         type, value = state
         if type == self.FUTURE_DONE:
             try:
@@ -114,6 +124,8 @@ class FutureService (Service):
     #--------------------------------------------------------------------------#
     @DummyAsync
     def resolve_handler (self, message):
+        """Resolve future
+        """
         value  = message.Value ()
         desc   = self.desc_struct.unpack (value [:self.desc_struct.size]) [0]
         result = Result.FromBytes (value [self.desc_struct.size:])
