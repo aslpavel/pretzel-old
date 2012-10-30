@@ -8,10 +8,9 @@ from .domain import Domain, DomainError
 
 from ..message import Message
 from ..services.persistence import PersistenceService
-from ..services.linker import LinkerService
-from ..services.importer import ImporterService
 from ..services.future import FutureService
-from ..services.channel import ChannelService
+from ..services.importer import ImporterService
+from ..services.linker import LinkerService
 from ..services.logger import LoggerService
 
 from ...async import Async, AsyncReturn
@@ -22,9 +21,9 @@ __all__ = ('LocalDomain', 'RemoteDomain',)
 # Default Domain                                                               #
 #------------------------------------------------------------------------------#
 class DefaultDomain (Domain):
-    CORE_NAME    = b'core::object'
-    DOMAIN_NAME  = b'domain::object'
-    CHANNEL_NAME = b'channel::object'
+    CORE_NAME    = b'core::'
+    DOMAIN_NAME  = b'domain::'
+    CHANNEL_NAME = b'channel::'
 
     def __init__ (self, channel, insert_importer, attach_logger):
         Domain.__init__ (self, channel, [
@@ -32,7 +31,6 @@ class DefaultDomain (Domain):
             ImporterService (insert = insert_importer),
             LinkerService (),
             FutureService (),
-            ChannelService (),
             LoggerService (attach = attach_logger)])
 
     #--------------------------------------------------------------------------#

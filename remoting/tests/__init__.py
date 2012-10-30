@@ -6,10 +6,13 @@ __all__ = tuple ()
 #------------------------------------------------------------------------------#
 def load_tests (loader, tests, pattern):
     from unittest import TestSuite
-    from . import message, linker, future, channel, nested
+    from . import message
+    from . import linker
+    from . import future
+    from . import nested
 
     suite = TestSuite ()
-    for test in (message, linker, future, channel, nested,):
+    for test in (message, linker, future, nested,):
         suite.addTests (loader.loadTestsFromModule (test))
     return suite
 
