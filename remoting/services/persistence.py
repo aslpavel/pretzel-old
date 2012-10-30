@@ -11,6 +11,8 @@ __all__ = ('PersistenceService',)
 # Persistence Service                                                          #
 #------------------------------------------------------------------------------#
 class PersistenceService (Service):
+    """Persistence service
+    """
     NAME   = b'persistence::service'
     OBJECT = b'persistence::object'
 
@@ -44,14 +46,20 @@ class PersistenceService (Service):
     # Methods                                                                  #
     #--------------------------------------------------------------------------#
     def Pack (self, target):
+        """Pack target
+        """
         stream = io.BytesIO ()
         self.pickler_type (stream, -1).dump (target)
         return stream.getvalue ()
 
     def Unpack (self, data):
+        """Unpack target
+        """
         return self.unpickler_type (io.BytesIO (data)).load ()
 
     def RegisterObject (self, object, desc):
+        """Register object with specified descriptor
+        """
         if desc in self.desc_object:
             raise ValueError ('Descriptor has already been registered: {}'.format (desc))
 
@@ -59,6 +67,8 @@ class PersistenceService (Service):
         return Disposable (lambda: (self.id_desc.pop (id (object), None), self.desc_object.pop (desc, None)))
 
     def RegisterType (self, type, pack, unpack):
+        """Register type packer and unpacker
+        """
         if type in self.type_pack:
             raise ValueError ('Type has already been registered: {}'.format (type))
 
@@ -69,17 +79,21 @@ class PersistenceService (Service):
     # Private                                                                  #
     #--------------------------------------------------------------------------#
     def pack (self, target):
-        # type package
-        for type, pack in self.type_pack.items ():
-            if isinstance (target, type):
-                return (type, pack (target))
-
+        """Pack target object
+        """
         # object packer
         desc = self.id_desc.get (id (target))
         if desc is not None:
             return (self.OBJECT, desc)
 
+        # type packer
+        for type, pack in self.type_pack.items ():
+            if isinstance (target, type):
+                return (type, pack (target))
+
     def unpack (self, state):
+        """Unpack object
+        """
         return self.tag_unpack [state [0]] (state [1])
 
 # vim: nu ft=python columns=120 :

@@ -3,11 +3,11 @@ import sys
 import struct
 import itertools
 
-from .service      import Service, ServiceError
-from ..message     import Message
-from ..result      import Result
+from .service import Service, ServiceError
+from ..message import Message
+from ..result import Result
 from ...disposable import Disposable
-from ...async      import Async, DummyAsync, Future, FutureSource, SucceededFuture, FailedFuture
+from ...async import Async, DummyAsync, Future, FutureSource, SucceededFuture, FailedFuture
 
 __all__ = ('FutureService',)
 #------------------------------------------------------------------------------#
@@ -29,8 +29,8 @@ class FutureService (Service):
     FUTURE_DONE = 0
     FUTURE_WAIT = 1
 
-    # resolve helper struct
-    desc_struct = struct.Struct ('!Q')
+    # resolve helper structure
+    desc_struct = struct.Struct ('>Q')
 
     def __init__ (self):
         Service.__init__ (self,

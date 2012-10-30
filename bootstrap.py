@@ -6,10 +6,12 @@ import io
 import imp
 import zlib
 import json
+import types
 import binascii
 import inspect
+import pkgutil
 
-__all__ = ('Tomb', 'BootstrapModules', 'BootstrapSource', 'BootstrapBootstrap',)
+__all__ = ('Tomb', 'BootstrapSource', 'BootstrapBootstrap',)
 #------------------------------------------------------------------------------#
 # Tomb                                                                         #
 #------------------------------------------------------------------------------#
@@ -18,31 +20,55 @@ class Tomb (object):
 
     Serializable importer. Capable to import all previously added modules.
     """
-    UID = '1f43bbd9-36e0-4084-84e5-b7fb14fdb1bd'
+    TOMB_UUID = '1f43bbd9-36e0-4084-84e5-b7fb14fdb1bd'
 
     def __init__ (self, containments = None):
         self.containments = {} if containments is None else containments
 
     #--------------------------------------------------------------------------#
-    # Methods                                                                  #
+    # Factory                                                                  #
     #--------------------------------------------------------------------------#
+    @classmethod
+    def FromModules (cls, modules = None):
+        """Create tomb from modules
+
+        If modules install add topmost package containing this module.
+        """
+
+        tomb = cls ()
+        if modules:
+            for module in modules:
+                tomb.Add (module)
+        else:
+            tomb.Add (__package__ if __package__ else __name__.partition ('.') [0])
+        return tomb
+
+    #--------------------------------------------------------------------------#
+    # Add                                                                      #
+    #--------------------------------------------------------------------------#
+    def __iadd__ (self, module):
+        """Add module or package
+        """
+        self.Add (module)
+        return self
+
     def Add (self, module):
         """Add module or package
 
-        Only capable to add top level packages or modules witch reside on disk
-        as plain python files or in tomb.
+        Only capable to add modules witch reside on disk as plain python files
+        or in tomb.
         """
-        modname = module.__name__
-        if modname.find ('.') > 0:
-            raise ValueError ('Module isn\'t a top level: \'{}\''.format (modname))
 
-        loader = getattr (module, '__loader__', None)
-        if getattr (loader, 'UID', None) == self.UID:
+        # top level package name
+        modname = (module.getattr ('__package__', module.__name__)
+            if isinstance (module, types.ModuleType) else module).partition ('.') [0]
+        loader  = pkgutil.get_loader (modname)
+        if getattr (loader, 'TOMB_UUID', None) == self.TOMB_UUID:
             self.containments.update ((key, value) for key, value in loader.containments.items ()
                 if key.startswith (modname))
             return
 
-        filename = inspect.getsourcefile (module)
+        filename = inspect.getsourcefile (loader.load_module (modname))
         if not filename:
             raise ValueError ('Module doesn\'t have sources: \'{}\''.format (modname))
 
@@ -64,16 +90,50 @@ class Tomb (object):
         else:
             self.containments [modname] = self.read_source (filename), filename, False
 
-    def __iadd__ (self, module):
-        """Add module or package
+    #--------------------------------------------------------------------------#
+    # Install                                                                  #
+    #--------------------------------------------------------------------------#
+    def Install (self):
+        """Install tomb to meta_path
         """
-        self.Add (module)
-        return self
+        if self in sys.meta_path:
+            return
+        sys.meta_path.insert (0, self)
 
+    #--------------------------------------------------------------------------#
+    # Bootstrap                                                                #
+    #--------------------------------------------------------------------------#
+    def Bootstrap (self):
+        """Create bootstrap source for this tomb
+        """
+        return self.tomb_payload.format (
+            bootstrap = BootstrapBootstrap ('_bootstrap'),
+            dump = binascii.b2a_base64 (self.ToBytes ()).strip ().decode ('utf-8'))
+
+    tomb_payload = """{bootstrap}
+# install tomb
+_bootstrap.Tomb.FromBytes (binascii.a2b_base64 (b"{dump}")).Install ()
+"""
+    #--------------------------------------------------------------------------#
+    # Lookup                                                                   #
+    #--------------------------------------------------------------------------#
     def __iter__ (self):
         """Iterate over available module names
         """
         return iter (self.containments.keys ())
+
+    def __continas__ (self, name):
+        """Check if tomb is containing module with specified name
+        """
+        return name in self.containments
+
+    def __getitem__ (self, name):
+        """Get module by its name
+        """
+        try:
+            return self.load_module (name)
+        except ImportError: pass
+        raise KeyError (name)
 
     #--------------------------------------------------------------------------#
     # Importer Protocol                                                        #
@@ -184,16 +244,6 @@ class Tomb (object):
             return source.getvalue ().decode (encoding)
 
     #--------------------------------------------------------------------------#
-    # Install                                                                  #
-    #--------------------------------------------------------------------------#
-    def Install (self):
-        """Install tomb to meta_path
-        """
-        if self in sys.meta_path:
-            return
-        sys.meta_path.append (self)
-
-    #--------------------------------------------------------------------------#
     # Dispose                                                                  #
     #--------------------------------------------------------------------------#
     def Dispose (self):
@@ -212,28 +262,6 @@ class Tomb (object):
 #------------------------------------------------------------------------------#
 # Bootstrap                                                                    #
 #------------------------------------------------------------------------------#
-def BootstrapModules (modules = None):
-    """Bootstrap modules
-
-    Returns python source, witch when executed allows to import
-    specified modules.
-    """
-    # bootstrap payload
-    bootstrap = BootstrapBootstrap ('_bootstrap')
-
-    # modules payload
-    tomb    = Tomb ()
-    modules = modules if modules else (sys.modules [(__package__ if __package__ else __name__).split ('.') [0]],)
-    for module in modules:
-        tomb.Add (module)
-    modules_data = binascii.b2a_base64 (tomb.ToBytes ()).strip ().decode ('utf-8')
-
-    return module_payload.format (bootstrap = bootstrap, modules_data = modules_data)
-
-module_payload = """{bootstrap}\
-_bootstrap.Tomb.FromBytes (binascii.a2b_base64 (b"{modules_data}")).Install ()
-"""
-
 def BootstrapSource (name, source, filename):
     """Bootstrap python source
 
@@ -243,10 +271,11 @@ def BootstrapSource (name, source, filename):
     data = binascii.b2a_base64 (zlib.compress (source.encode ('utf-8'))).strip ().decode ('utf-8')
     return source_payload.format (name = name, filename = filename, data = data)
 
-source_payload = r"""
-import sys, imp, zlib, binascii
+source_payload = """import sys, imp, zlib, binascii
 
 def load ():
+    \"\"\"Load bootstrap module
+    \"\"\"
     module = imp.new_module ("{name}")
     module.__file__    = "{filename}"
     module.__package__ = "{name}"
@@ -267,13 +296,14 @@ def load ():
 try: {name} = load ()
 finally:
     del load
+
 """
 
 def BootstrapBootstrap (name):
-    """Bootstrap module by name
+    """Bootstrap this module
 
-    Returns python source, witch when executed allows to import
-    specified "module".
+    Returns python source, witch when executed allows to import this module
+    by specified "name".
     """
     module  = sys.modules [__name__]
     return BootstrapSource (name, inspect.getsource (module), inspect.getsourcefile (module))
@@ -332,7 +362,6 @@ def Main ():
     """Main for this module
     """
     import getopt
-    import importlib
 
     #--------------------------------------------------------------------------#
     # Parse Options                                                            #
@@ -352,16 +381,13 @@ def Main ():
         elif o == '-m':
             main_path = a
         else:
-            assert False, 'Uhnadled option: {}'.format (o)
+            assert False, 'Unhandled option: {}'.format (o)
 
     #--------------------------------------------------------------------------#
     # Output                                                                   #
     #--------------------------------------------------------------------------#
     sys.stdout.write ('# -*- coding: utf-8 -*-\n' if main_path is None else '#! /usr/bin/env python\n')
-    if args:
-        sys.stdout.write (BootstrapModules (importlib.import_module (name) for name in args))
-    else:
-        sys.stdout.write (BootstrapModules ())
+    sys.stdout.write (Tomb.FromModules (args or None).Bootstrap ())
     sys.stdout.write ('\n')
 
     if main_path:

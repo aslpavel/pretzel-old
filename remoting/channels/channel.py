@@ -22,6 +22,7 @@ class Channel (object):
         self.recv_cancel   = FutureSource ()
 
         self.OnDisconnect  = Event ()
+        self.OnMessage = Event ()
 
     #--------------------------------------------------------------------------#
     # Connect                                                                  #
@@ -125,6 +126,8 @@ class Channel (object):
         """Dispatch received message
         """
         yield self.core.Idle ()
+
+        self.OnMessage (message)
 
         source = self.recv_queue.pop (message.dst, None)
         if source is not None:

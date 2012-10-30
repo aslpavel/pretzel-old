@@ -74,10 +74,7 @@ class SSHChannel (FileChannel):
         self.FilesSet (out_pipe.DetachReadAsync (), in_stream)
 
         # send payload
-        tomb    = Tomb ()
-        tomb   += sys.modules [(__package__ if __package__ else __name__).split ('.') [0]]
-        payload = tomb.ToBytes ()
-
+        payload = Tomb.FromModules ().ToBytes ()
         in_stream.Write (struct.pack ('!L', len (payload)))
         in_stream.Write (payload)
         yield in_stream.Flush ()

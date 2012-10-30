@@ -6,7 +6,7 @@ import traceback
 from .file        import FileChannel
 from .pipe        import Pipe
 from ...async     import Async
-from ...bootstrap import BootstrapModules
+from ...bootstrap import Tomb
 from ..           import __name__ as remoting_name
 
 __all__ = ('ForkChannel',)
@@ -50,7 +50,7 @@ class ForkChannel (FileChannel):
         # send payload
         with load_pipe.DetachWriteAsync () as load_stream:
             load_stream.Write (payload.format (
-                bootstrap     = BootstrapModules (),
+                bootstrap     = Tomb.FromModules ().Bootstrap (),
                 remoting_name = remoting_name,
                 in_fd         = in_fd,
                 out_fd        = out_fd,
