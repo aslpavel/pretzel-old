@@ -305,6 +305,7 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
     stdin  = PIPE if input else stdin
     stdout = PIPE if stdout is None else stdout
     stderr = PIPE if stderr is None else stderr
+    buffer_size = buffer_size or default_buffer_size
 
     # read helper
     @Async

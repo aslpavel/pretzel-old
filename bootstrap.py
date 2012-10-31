@@ -60,18 +60,26 @@ class Tomb (object):
         """
 
         # top level package name
-        modname = (module.getattr ('__package__', module.__name__)
+        modname = ((getattr (module, '__package__', '') or module.__name__)
             if isinstance (module, types.ModuleType) else module).partition ('.') [0]
+
+        # skip already imported packages
+        if modname in self.containments:
+            return
+
+        # check if loader is tomb
         loader  = pkgutil.get_loader (modname)
         if getattr (loader, 'TOMB_UUID', None) == self.TOMB_UUID:
             self.containments.update ((key, value) for key, value in loader.containments.items ()
                 if key.startswith (modname))
             return
 
+        # find package file
         filename = inspect.getsourcefile (loader.load_module (modname))
         if not filename:
             raise ValueError ('Module doesn\'t have sources: \'{}\''.format (modname))
 
+        # add sources
         if os.path.basename (filename).lower () == '__init__.py':
             root = os.path.dirname (filename)
             for path, dirs, files in os.walk (root):

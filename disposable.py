@@ -154,6 +154,7 @@ class CompositeDisposable (BaseDisposable):
             disposable.__exit__ (None, None, None)
         else:
             self.disposables.append (disposable)
+        return disposable
 
     def __iadd__  (self, disposable):
         """Register disposable

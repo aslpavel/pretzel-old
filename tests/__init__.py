@@ -32,10 +32,7 @@ def load_tests (loader, tests, pattern):
     """Load test protocol
     """
     from unittest import TestSuite
-    from . import event
-    from . import process
-    from . import disposable
-    from . import pool
+    from . import event, process, disposable, pool
 
     suite = TestSuite ()
     for test in (process, event, disposable, pool):
