@@ -2,7 +2,7 @@
 import unittest
 
 from ..domains.fork import ForkDomain
-from ...tests import AsyncTest
+from ...async.tests import AsyncTest
 
 __all__ = ('LinkerTest',)
 #------------------------------------------------------------------------------#

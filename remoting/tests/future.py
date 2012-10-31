@@ -2,8 +2,8 @@
 import unittest
 
 from ..domains.fork import ForkDomain
-from ...tests import AsyncTest
 from ...async import FutureSource, SucceededFuture, FailedFuture, RaisedFuture
+from ...async.tests import AsyncTest
 
 __all__ = ('FutureTest',)
 #------------------------------------------------------------------------------#

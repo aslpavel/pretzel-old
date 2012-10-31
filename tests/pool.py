@@ -2,9 +2,9 @@
 import time
 import unittest
 
-from . import AsyncTest
-from ..async import Future
 from ..threading import ThreadPool
+from ..async import Future
+from ..async.tests import AsyncTest
 
 __all__ = ('ThreadPoolTest',)
 #------------------------------------------------------------------------------#

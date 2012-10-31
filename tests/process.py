@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-from . import AsyncTest
 from ..process import ProcessCall, PIPE
+from ..async.tests import AsyncTest
 
 #------------------------------------------------------------------------------#
 # Process Call Tests                                                           #

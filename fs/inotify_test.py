@@ -2,8 +2,8 @@
 import unittest
 
 from .inotify import FileMonitor, FM_CLOSE_NOWRITE
-from ..tests import AsyncTest
 from ..async import Future, ScopeFuture, Core
+from ..async.tests import AsyncTest
 from ..disposable import CompositeDisposable
 
 __all__ = ('FileMonitorInotifyTest',)

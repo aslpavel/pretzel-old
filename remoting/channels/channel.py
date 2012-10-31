@@ -119,7 +119,7 @@ class Channel (object):
                 else:
                     future.ErrorSet (error)
 
-            yield self.disconnect ()
+            self.disconnect ()
 
     @Async
     def recv_dispatch (self, message):
