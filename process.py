@@ -4,7 +4,8 @@ import os
 import sys
 import signal
 
-from .async      import Async, AsyncReturn, AsyncFile, Future, ScopeFuture, Core, CoreDisconnectedError
+from .async import (Async, AsyncReturn, AsyncFile, Future, ScopeFuture, Core,
+                    BrokenPipeError)
 from .disposable import Disposable, CompositeDisposable
 
 __all__ = ('Process', 'ProcessCall', 'ProcessError', 'PIPE', 'DEVNULL', 'STDIN', 'STDOUT', 'STDERR',)
@@ -138,7 +139,7 @@ class Process (object):
 
                 yield alive_stream.Read (1, cancel)
 
-        except CoreDisconnectedError: pass
+        except BrokenPipeError: pass
         except Exception:
             os.kill (self.pid, signal.SIGTERM)
             os.waitpid (self.pid, 0)
@@ -317,7 +318,7 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
             data = io.BytesIO ()
             while True:
                 data.write ((yield stream.Read (buffer_size, cancel)))
-        except CoreDisconnectedError: pass
+        except BrokenPipeError: pass
         AsyncReturn (data.getvalue ())
 
     # process helper

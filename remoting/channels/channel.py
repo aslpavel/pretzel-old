@@ -3,7 +3,7 @@ import sys
 
 from ...event import Event
 from ...async import (Async, DummyAsync,
-                     Core, CoreStopped, CoreDisconnectedError,
+                     Core, CoreStopped, BrokenPipeError,
                      FailedFuture, FutureSource, FutureCanceled)
 from ...disposable import Disposable
 
@@ -108,7 +108,7 @@ class Channel (object):
 
         except FutureCanceled: pass
         except CoreStopped: pass
-        except CoreDisconnectedError: pass
+        except BrokenPipeError: pass
         finally:
             # resolve queued futures
             error = sys.exc_info ()

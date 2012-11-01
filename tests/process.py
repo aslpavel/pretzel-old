@@ -7,7 +7,6 @@ from ..async.tests import AsyncTest
 #------------------------------------------------------------------------------#
 # Process Call Tests                                                           #
 #------------------------------------------------------------------------------#
-command_call = ['python', '-c']
 class ProcessTest (unittest.TestCase):
     """Process unit tests
     """
@@ -25,8 +24,7 @@ for value in range (int (input ())):
     else:
         sys.stdout.write (str (value))''']
 
-        out, err, code = yield ProcessCall (command, input = b'10', check = False,
-            stdout = PIPE, stderr = PIPE)
+        out, err, code = yield ProcessCall (command, input = b'10', check = False, stdout = PIPE, stderr = PIPE)
 
         self.assertEqual (code, 0)
         self.assertEqual (out, b'02468')

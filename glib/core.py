@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import time
+import errno
 from gi.repository import GLib
 
 from ..async import (FutureSource, FutureCanceled, SucceededFuture,
-                     CoreError, CoreStopped, CoreDisconnectedError, CoreIOError)
+                     CoreError, CoreStopped, BrokenPipeError, ConnectionError)
 
 __all__ = ('GCore',)
 #------------------------------------------------------------------------------#
@@ -47,10 +48,11 @@ class GCore (object):
             return # no clean up for closed file descriptors
 
         def resolve (source, fd, cond):
-            if cond & self.ERROR:
-                source.ErrorRaise (CoreDisconnectedError () if cond & self.DISCONNECT else CoreIOError ())
-            else:
+            if cond & ~self.ERROR:
                 source.ResultSet (cond)
+            else:
+                source.ErrorRaise (BrokenPipeError (errno.EPIPE, 'Broken pipe') if cond & self.DISCONNECT else \
+                                   ConnectionError ())
 
         return self.source_create (resolve, cancel, GLib.io_add_watch, (fd, mask | self.ERROR))
 
