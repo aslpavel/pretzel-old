@@ -2,8 +2,7 @@
 import os
 import threading
 from collections import deque
-from ..async import Async, AsyncReturn, Core, BrokenPipeError, CoreStopped
-from ..async.core.fd import FileBlocking
+from ..async import Async, AsyncReturn, Core, CoreStopped, BlockingFD
 
 __all__ = ('CoreQueue', 'CoreQueueError',)
 #------------------------------------------------------------------------------#
@@ -27,7 +26,7 @@ class CoreQueue (object):
         # pipe
         self.get_pipe, self.put_pipe = os.pipe ()
         self.disposed = False
-        FileBlocking (self.get_pipe, False)
+        BlockingFD (self.get_pipe, False)
 
     #--------------------------------------------------------------------------#
     # Enqueue | Dequeue                                                        #
@@ -59,9 +58,8 @@ class CoreQueue (object):
                 yield self.core.Poll (self.get_pipe, self.core.READ)
                 while len (os.read (self.get_pipe, 65536)) == 65536: pass
 
-            except CoreStopped:           break
-            except BrokenPipeError: break
-            except OSError:               break
+            except OSError: break
+            except CoreStopped: break
 
         raise CoreQueueError ('Queue has been disposed')
 
