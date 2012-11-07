@@ -36,7 +36,8 @@ class BaseEvent (object):
     def __iadd__ (self, handler):
         """Add new event handler
 
-        Returns event handler identifier.
+        Returns event handler identifier. If handler returns False it will be
+        automatically unsubscribe
         """
         self.Add (handler)
         return self
@@ -66,9 +67,8 @@ class BaseEvent (object):
 
         # handler
         def handler (*args):
-            self.Remove (handler_id)
             source.ResultSet (args)
-
+            return False
         handler_id = self.Add (handler)
 
         # cancel
@@ -98,7 +98,9 @@ class Event (BaseEvent):
 
     def Fire (self, *args):
         for handler in tuple (self.handlers):
-            handler (*args)
+            if handler (*args):
+                continue
+            self.Remove (handler)
 
     #--------------------------------------------------------------------------#
     # Add | Remove                                                             #
@@ -126,13 +128,20 @@ class AsyncEvent (Event):
     #--------------------------------------------------------------------------#
     # Fire                                                                     #
     #--------------------------------------------------------------------------#
-
     @Async
     def Fire (self, *args):
+        """Fire asynchronous event
+
+        New handler won't be executed unless previous is completed.
+        """
         for handler in tuple (self.handlers):
-            future = handler (*args)
-            if isinstance (future, Future):
-                yield future
+            result = handler (*args)
+            if isinstance (result, Future):
+                if (yield result):
+                    continue
+            elif result:
+                continue
+            self.Remove (handler)
 
 #------------------------------------------------------------------------------#
 # Delegated Event                                                              #
@@ -151,7 +160,17 @@ class DelegatedEvent (BaseEvent):
     #--------------------------------------------------------------------------#
 
     def Add (self, handler):
-        return self.add (handler)
+        def handler_wrapper (*args):
+            result = handler (*args)
+            if not result:
+                self.Remove (handler_id)
+            return result
+
+        handler_wrapper.__name__ = handler.__name__
+        handler_wrapper.__doc__ = handler.__doc__
+
+        handler_id = self.add (handler_wrapper)
+        return handler_id
 
     def Remove (self, handler_id):
         return self.remove (handler_id)
@@ -184,7 +203,9 @@ class AccumulativeEvent (Event):
 
     def Add (self, handler):
         for args in self.values:
-            handler (*args)
+            if handler (*args):
+                continue
+            self.Remove (handler)
         return Event.Add (self, handler)
 
 # vim: nu ft=python columns=120 :

@@ -18,7 +18,7 @@ class Observable (object):
     @classmethod
     def FromEvent (cls, event):
         def Subscribe (observer):
-            handler_id = event.Add (lambda *args: observer.OnNext (args))
+            handler_id = event.Add (lambda *args: (observer.OnNext (args),))
             return Disposable (lambda: event.Remove (handler_id))
 
         return AnonymousObservable (Subscribe)

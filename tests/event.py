@@ -15,6 +15,7 @@ class EventTests (unittest.TestCase):
         values = []
         def handler (value):
             values.append (value)
+            return True
 
         # create
         event = Event ()
