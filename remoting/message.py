@@ -65,8 +65,8 @@ class Message (Result):
 
     @Async
     def LoadAsync (self, stream, cancel = None):
-        size, src_end = self.message_struct.unpack ((yield stream.ReadExactly (self.message_struct.size, cancel)))
-        data = yield stream.ReadExactly (size, cancel)
+        size, src_end = self.message_struct.unpack ((yield stream.ReadUntilSize (self.message_struct.size, cancel)))
+        data = yield stream.ReadUntilSize (size, cancel)
         self.src, self.dst = data [:src_end], data [src_end:]
 
         yield Result.LoadAsync (self, stream, cancel)

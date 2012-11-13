@@ -146,8 +146,8 @@ class Result (object):
 
     @Async
     def LoadAsync (self, stream, cancel = None):
-        is_value, size = self.result_struct.unpack ((yield stream.ReadExactly (self.result_struct.size, cancel)))
-        data = (yield stream.ReadExactly (size, cancel)) if size else None
+        is_value, size = self.result_struct.unpack ((yield stream.ReadUntilSize (self.result_struct.size, cancel)))
+        data = (yield stream.ReadUntilSize (size, cancel)) if size else None
 
         if is_value:
             self.value = data

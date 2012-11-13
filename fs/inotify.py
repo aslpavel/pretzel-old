@@ -162,10 +162,10 @@ class FileMonitor (object):
             event_size = self.event_struct.size
             while True:
                 # receive
-                event_data = yield self.file.ReadExactly (event_size, cancel)
+                event_data = yield self.file.ReadUntilSize (event_size, cancel)
                 watch_desc, mask, cookie, name_length = self.event_struct.unpack (event_data)
                 if name_length > 0:
-                    name = (yield self.file.ReadExactly (name_length, cancel)).rstrip (b'\x00').decode ()
+                    name = (yield self.file.ReadUntilSize (name_length, cancel)).rstrip (b'\x00').decode ()
                 else:
                     name = ''
 
