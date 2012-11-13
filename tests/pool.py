@@ -2,7 +2,7 @@
 import time
 import unittest
 
-from ..threading import ThreadPool
+from ..thread import ThreadPool
 from ..async import Future
 from ..async.tests import AsyncTest
 
