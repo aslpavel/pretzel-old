@@ -9,7 +9,7 @@ else:
     string_type = io.BytesIO
 
 from .async import Async, Future, Core
-from .threading import ThreadPool
+from .thread import ThreadPool
 from .console import Text, Color, COLOR_YELLOW, ATTR_BOLD
 from .log import Log
 

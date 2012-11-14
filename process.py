@@ -2,11 +2,12 @@
 import io
 import os
 import sys
+import pickle
 import signal
 
-from .async import (Async, AsyncReturn, AsyncFile, Future, ScopeFuture, Core,
-                    BrokenPipeError)
 from .disposable import Disposable, CompositeDisposable
+from .async import (Async, AsyncReturn, AsyncFile, Future, SucceededFuture,
+                    Core, BrokenPipeError)
 
 __all__ = ('Process', 'ProcessCall', 'ProcessError', 'PIPE', 'DEVNULL', 'STDIN', 'STDOUT', 'STDERR',)
 #------------------------------------------------------------------------------#
@@ -32,7 +33,7 @@ class Process (object):
         self.command     = ['/bin/sh', '-c', command] if shell else command
         self.environ     = environ
         self.check       = check is None or check
-        self.buffer_size = buffer_size or default_buffer_size
+        self.buffer_size = buffer_size or AsyncFile.default_buffer_size
         self.core        = core or Core.Instance ()
 
         # dispose
@@ -40,7 +41,7 @@ class Process (object):
 
         # state
         self.pid    = None
-        self.result = None
+        self.status = None
 
         self.stdin  = None
         self.stdout = None
@@ -50,15 +51,15 @@ class Process (object):
         # Pipes                                                                #
         #----------------------------------------------------------------------#
         stdin       = self.to_fd (stdin, STDIN)
-        stdin_pipe  = Pipe (None if stdin is None else (stdin, None), self)
+        stdin_pipe  = processPipe (None if stdin is None else (stdin, None), self)
 
         stdout      = self.to_fd (stdout, STDOUT)
-        stdout_pipe = Pipe (None if stdout is None else (None, stdout), self)
+        stdout_pipe = processPipe (None if stdout is None else (None, stdout), self)
 
         stderr      = self.to_fd (stderr, STDERR)
-        stderr_pipe = Pipe (None if stderr is None else (None, stderr), self)
+        stderr_pipe = processPipe (None if stderr is None else (None, stderr), self)
 
-        alive_pipe  = Pipe (None, self)
+        status_pipe  = processPipe (None, self)
 
         #----------------------------------------------------------------------#
         # Fork                                                                 #
@@ -70,8 +71,8 @@ class Process (object):
             self.stdout = stdout_pipe.DetachReadAsync ()
             self.stderr = stderr_pipe.DetachReadAsync ()
 
-            # result
-            self.result = self.result_main (alive_pipe.DetachReadAsync ())
+            # status
+            self.status = self.status_main (status_pipe.DetachReadAsync ())
 
         else:
             try:
@@ -79,19 +80,17 @@ class Process (object):
                 stdin_pipe.DetachRead (0)
                 stdout_pipe.DetachWrite (1)
                 stderr_pipe.DetachWrite (2)
-                alive_pipe.DetachWrite ()
+                status_fd = status_pipe.DetachWrite ()
 
                 # exec
-                if self.environ is None:
-                    os.execvp (self.command [0], self.command)
-                else:
-                    os.execvpe (self.command [0], self.command, self.environ)
+                os.execvpe (self.command [0], self.command, self.environ or os.environ)
+
+            except Exception as error:
+                with io.open (status_fd, 'wb') as error_stream:
+                    pickle.dump (error, error_stream)
 
             finally:
-                exit = getattr (os, '_exit', None)
-                if exit: exit (255)
-                else:
-                    os.kill (os.getpid (), signal.SIGKILL)
+                getattr (os, '_exit', lambda _: os.kill (os.getpid (), signal.SIGKILL)) (255)
 
     #--------------------------------------------------------------------------#
     # Properties                                                               #
@@ -115,10 +114,10 @@ class Process (object):
         return self.stderr
 
     @property
-    def Result (self):
+    def Status (self):
         """Future object for return code of the process
         """
-        return self.result
+        return self.status
 
     @property
     def Pid (self):
@@ -130,27 +129,29 @@ class Process (object):
     # Private                                                                  #
     #--------------------------------------------------------------------------#
     @Async
-    def result_main (self, alive_stream):
-        """Result coroutine main
+    def status_main (self, error_stream):
+        """Status coroutine main
         """
+        error_dump = b''
         try:
-            with ScopeFuture () as cancel:
-                self.dispose += cancel
-
-                yield alive_stream.Read (1, cancel)
+            error_dump = yield error_stream.ReadUntilEof ()
 
         except BrokenPipeError: pass
-        except Exception:
-            os.kill (self.pid, signal.SIGTERM)
-            os.waitpid (self.pid, 0)
-            raise
+        finally:
+            error_stream.Dispose ()
 
-        # result
-        result = os.waitpid (self.pid, 0) [1]
-        if self.check and result:
-            raise ProcessError ('Command \'{}\' returned non-zero exit status {}'.format (self.command, result))
+            pid, status = os.waitpid (self.pid, os.WNOHANG)
+            if pid != self.pid:
+                os.kill (self.pid, signal.SIGTERM)
+                pid, status = os.waitpid (self.pid, 0)
 
-        AsyncReturn (result)
+            if error_dump:
+                raise pickle.loads (error_dump)
+            elif self.check and status:
+                raise ProcessError ('Command \'{}\' returned non-zero status exit {}'
+                    .format (self.command, status))
+
+        AsyncReturn (status)
 
     def to_fd (self, file, default):
         """Convert file object to file descriptor
@@ -187,7 +188,7 @@ class Process (object):
 #------------------------------------------------------------------------------#
 # Pipe                                                                         #
 #------------------------------------------------------------------------------#
-class Pipe (object):
+class processPipe (object):
     """Pipe helper type
     """
     def __init__ (self, fds, process):
@@ -208,7 +209,7 @@ class Pipe (object):
     def DetachRead (self, fd = None):
         """Detach read side
         """
-        self.detach (True, fd)
+        return self.detach (True, fd)
 
     def DetachReadAsync (self):
         """Detach read side and create asynchronous stream out of it
@@ -218,7 +219,7 @@ class Pipe (object):
     def DetachWrite (self, fd = None):
         """Detach write side
         """
-        self.detach (False, fd)
+        return self.detach (False, fd)
 
     def DetachWriteAsync (self):
         """Detach write side and create asynchronous stream out of it
@@ -306,20 +307,6 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
     stdin  = PIPE if input else stdin
     stdout = PIPE if stdout is None else stdout
     stderr = PIPE if stderr is None else stderr
-    buffer_size = buffer_size or default_buffer_size
-
-    # read helper
-    @Async
-    def read (stream):
-        if stream is None:
-            AsyncReturn (None)
-
-        try:
-            data = io.BytesIO ()
-            while True:
-                data.write ((yield stream.Read (buffer_size, cancel)))
-        except BrokenPipeError: pass
-        AsyncReturn (data.getvalue ())
 
     # process helper
     @Async
@@ -331,17 +318,12 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
                 proc.Stdin.Flush ().Continue (lambda *_: proc.Stdin.Dispose ())
 
             # output
-            out = read (proc.Stdout)
-            err = read (proc.Stderr)
+            out = proc.Stdout.ReadUntilEof () if proc.Stdout else SucceededFuture (None)
+            err = proc.Stderr.ReadUntilEof () if proc.Stderr else SucceededFuture (None)
             yield Future.WhenAll ((out, err))
 
-            AsyncReturn ((out.Result (), err.Result (), (yield proc.Result)))
+            AsyncReturn ((out.Result (), err.Result (), (yield proc.Status)))
 
     return process ()
-
-#------------------------------------------------------------------------------#
-# Defaults                                                                     #
-#------------------------------------------------------------------------------#
-default_buffer_size = 1 << 16
 
 # vim: nu ft=python columns=120 :
