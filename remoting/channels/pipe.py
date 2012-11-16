@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 
-from ...async import AsyncFile
+from ...async import BufferedFile
 
 __all__ = ('Pipe',)
 #------------------------------------------------------------------------------#
@@ -63,7 +63,7 @@ class Pipe (object):
             return fd
 
     def detach_async (self, read):
-        async = AsyncFile (self.detach (read), buffer_size = self.buffer_size, core = self.core)
+        async = BufferedFile (self.detach (read), buffer_size = self.buffer_size, core = self.core)
         async.CloseOnExec (True)
         return async
 

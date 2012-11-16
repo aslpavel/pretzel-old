@@ -6,8 +6,7 @@ import pickle
 import signal
 
 from .disposable import Disposable, CompositeDisposable
-from .async import (Async, AsyncReturn, AsyncFile, Future, SucceededFuture,
-                    Core, BrokenPipeError)
+from .async import Async, AsyncReturn, Future, SucceededFuture, Pipe, BrokenPipeError
 
 __all__ = ('Process', 'ProcessCall', 'ProcessError', 'PIPE', 'DEVNULL', 'STDIN', 'STDOUT', 'STDERR',)
 #------------------------------------------------------------------------------#
@@ -26,15 +25,13 @@ class ProcessError (Exception): pass
 class Process (object):
     """Create child process
     """
-    def __init__ (self, command, stdin = None, stdout = None, stderr = None,
+    def __init__ (self, command, stdin = None, stdout = None, stderr = None, preexec = None,
             shell = None, environ = None, check = None, buffer_size = None, core = None):
 
         # vars
         self.command     = ['/bin/sh', '-c', command] if shell else command
         self.environ     = environ
         self.check       = check is None or check
-        self.buffer_size = buffer_size or AsyncFile.default_buffer_size
-        self.core        = core or Core.Instance ()
 
         # dispose
         self.dispose = CompositeDisposable ()
@@ -43,44 +40,71 @@ class Process (object):
         self.pid    = None
         self.status = None
 
-        self.stdin  = None
-        self.stdout = None
-        self.stderr = None
-
         #----------------------------------------------------------------------#
         # Pipes                                                                #
         #----------------------------------------------------------------------#
-        stdin       = self.to_fd (stdin, STDIN)
-        stdin_pipe  = processPipe (None if stdin is None else (stdin, None), self)
+        stdin_fd = self.to_fd (stdin, STDIN)
+        self.stdin_pipe = self.dispose.Add (
+            Pipe (None if stdin_fd is None else (stdin_fd, None), buffer_size, core))
 
-        stdout      = self.to_fd (stdout, STDOUT)
-        stdout_pipe = processPipe (None if stdout is None else (None, stdout), self)
+        stdout_fd = self.to_fd (stdout, STDOUT)
+        self.stdout_pipe = self.dispose.Add (
+            Pipe (None if stdout_fd is None else (None, stdout_fd), buffer_size, core))
 
-        stderr      = self.to_fd (stderr, STDERR)
-        stderr_pipe = processPipe (None if stderr is None else (None, stderr), self)
+        stderr_fd = self.to_fd (stderr, STDERR)
+        self.stderr_pipe = self.dispose.Add (
+            Pipe (None if stderr_fd is None else (None, stderr_fd), buffer_size ,core))
 
-        status_pipe  = processPipe (None, self)
+        status_pipe  = self.dispose.Add (Pipe (core = core))
 
         #----------------------------------------------------------------------#
         # Fork                                                                 #
         #----------------------------------------------------------------------#
         self.pid = os.fork ()
         if self.pid:
-            # pipes
-            self.stdin  = stdin_pipe.DetachWriteAsync ()
-            self.stdout = stdout_pipe.DetachReadAsync ()
-            self.stderr = stderr_pipe.DetachReadAsync ()
+            # dispose remote streams
+            self.stdin_pipe.Read.Dispose ()
+            self.stdout_pipe.Write.Dispose ()
+            self.stderr_pipe.Write.Dispose ()
+            status_pipe.Write.Dispose ()
+
+            # close on exec
+            for stream in (self.stdin_pipe.Write, self.stdout_pipe.Read,
+                self.stderr_pipe.Read, status_pipe.Read):
+                    if stream is not None:
+                        stream.CloseOnExec (True)
 
             # status
-            self.status = self.status_main (status_pipe.DetachReadAsync ())
+            self.status = self.status_main (status_pipe.Read)
 
         else:
             try:
-                # pipes
-                stdin_pipe.DetachRead (0)
-                stdout_pipe.DetachWrite (1)
-                stderr_pipe.DetachWrite (2)
-                status_fd = status_pipe.DetachWrite ()
+                # status
+                status_pipe.Write.Blocking (True)
+                status_fd = status_pipe.Write.Detach ().Result ()
+                status_pipe.Dispose ()
+
+                # standard input
+                self.stdin_pipe.Read.Blocking (True)
+                if self.stdin_pipe.Read.Fd != 0:
+                    os.dup2 (self.stdin_pipe.Read.Fd, 0)
+                    self.stdin_pipe.Dispose ()
+
+                # standard output
+                self.stdout_pipe.Write.Blocking (True)
+                if self.stdout_pipe.Write.Fd != 1:
+                    os.dup2 (self.stdout_pipe.Write.Fd, 1)
+                    self.stdin_pipe.Dispose ()
+
+                # standard error
+                self.stderr_pipe.Write.Blocking (True)
+                if self.stderr_pipe.Write.Fd != 2:
+                    os.dup2 (self.stderr_pipe.Write.Fd, 2)
+                    self.stderr_pipe.Dispose ()
+
+                # pre-exec hook
+                if preexec is not None:
+                    preexec ()
 
                 # exec
                 os.execvpe (self.command [0], self.command, self.environ or os.environ)
@@ -99,19 +123,19 @@ class Process (object):
     def Stdin (self):
         """Standard input asynchronous stream
         """
-        return self.stdin
+        return self.stdin_pipe.Write
 
     @property
     def Stdout (self):
         """Standard output asynchronous stream
         """
-        return self.stdout
+        return self.stdout_pipe.Read
 
     @property
     def Stderr (self):
         """Standard error asynchronous stream
         """
-        return self.stderr
+        return self.stderr_pipe.Read
 
     @property
     def Status (self):
@@ -148,7 +172,7 @@ class Process (object):
             if error_dump:
                 raise pickle.loads (error_dump)
             elif self.check and status:
-                raise ProcessError ('Command \'{}\' returned non-zero status exit {}'
+                raise ProcessError ('Command \'{}\' returned non-zero exit status {}'
                     .format (self.command, status))
 
         AsyncReturn (status)
@@ -177,111 +201,6 @@ class Process (object):
         """Terminate process and dispose associated resources
         """
         self.dispose.Dispose ()
-
-    def __enter__ (self):
-        return self
-
-    def __exit__ (self, et, eo, tb):
-        self.Dispose ()
-        return False
-
-#------------------------------------------------------------------------------#
-# Pipe                                                                         #
-#------------------------------------------------------------------------------#
-class processPipe (object):
-    """Pipe helper type
-    """
-    def __init__ (self, fds, process):
-        self.process = process
-        if fds:
-            self.piped = False
-            self.fds   = fds
-        else:
-            self.piped = True
-            self.fds   = os.pipe ()
-
-        # dispose
-        process.dispose += self
-
-    #--------------------------------------------------------------------------#
-    # Detach                                                                   #
-    #--------------------------------------------------------------------------#
-    def DetachRead (self, fd = None):
-        """Detach read side
-        """
-        return self.detach (True, fd)
-
-    def DetachReadAsync (self):
-        """Detach read side and create asynchronous stream out of it
-        """
-        return self.detach_async (True)
-
-    def DetachWrite (self, fd = None):
-        """Detach write side
-        """
-        return self.detach (False, fd)
-
-    def DetachWriteAsync (self):
-        """Detach write side and create asynchronous stream out of it
-        """
-        return self.detach_async (False)
-
-    #--------------------------------------------------------------------------#
-    # Private                                                                  #
-    #--------------------------------------------------------------------------#
-    def detach (self, read, fd = None):
-        """Detach from the pipe
-
-        Detaches requested side of the pipe, and close the other one. Returns
-        detached file descriptor.
-        """
-        if self.fds is None:
-            raise ProcessError ('Pipe has already been detached')
-
-        fds, self.fds = self.fds, None
-        to_return, to_close = fds if read else reversed (fds)
-
-        if self.piped and to_close is not None:
-            os.close (to_close)
-
-        if fd is None or fd == to_return:
-            return to_return
-        else:
-            os.dup2  (to_return, fd)
-            os.close (to_return)
-            return fd
-
-    def detach_async (self, read):
-        """Detach from the pipe
-
-        Detaches requested side of the pipe, and close the other one. Returns
-        asynchronous file stream for detached side.
-        """
-        fd = self.detach (read)
-        if fd is None:
-            return
-
-        file  = AsyncFile (fd, buffer_size = self.process.buffer_size,
-                           closefd = self.piped, core = self.process.core)
-        self.process.dispose += file
-        if self.piped:
-            file.CloseOnExec (True)
-
-        return file
-
-    #--------------------------------------------------------------------------#
-    # Disposable                                                               #
-    #--------------------------------------------------------------------------#
-    def Dispose (self):
-        """Dispose pipe
-        """
-        if self.fds is None:
-            return
-
-        fds, self.fds = self.fds, None
-        for fd in fds:
-            if self.piped and fd is not None:
-                os.close (fd)
 
     def __enter__ (self):
         return self

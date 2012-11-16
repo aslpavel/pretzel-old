@@ -3,7 +3,7 @@ from .default import LocalDomain, RemoteDomain
 
 from ..channels.ssh  import SSHChannel
 from ..channels.file import FileChannel
-from ...async.core   import AsyncFile
+from ...async import BufferedFile
 
 __all__ = ('SSHDomain', )
 #-----------------------------------------------------------------------------#
@@ -23,8 +23,8 @@ class SSHRemoteDomain (RemoteDomain):
     def __init__ (self, buffer_size, core):
         channel = FileChannel (core)
         channel.FilesSet (
-            AsyncFile (0, buffer_size = buffer_size, core = channel.core),
-            AsyncFile (1, buffer_size = buffer_size, core = channel.core))
+            BufferedFile (0, buffer_size = buffer_size, core = channel.core),
+            BufferedFile (1, buffer_size = buffer_size, core = channel.core))
 
         RemoteDomain.__init__ (self, channel)
 

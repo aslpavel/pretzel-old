@@ -5,7 +5,7 @@ import sys
 import unittest
 
 from ..message import Message
-from ...async import Async, AsyncFile, ScopeFuture, Core
+from ...async import Async, BufferedFile, ScopeFuture, Core
 
 __all__ = ('MessageTest',)
 #------------------------------------------------------------------------------#
@@ -35,7 +35,7 @@ class MessageTest (unittest.TestCase):
         msg = Message.FromValue (b'value', b'dst')
 
         with Core.Instance () as core:
-            ra, wa = (AsyncFile (fd) for fd in os.pipe ())
+            ra, wa = (BufferedFile (fd) for fd in os.pipe ())
 
             @Async
             def test ():

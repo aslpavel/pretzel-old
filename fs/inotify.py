@@ -6,7 +6,7 @@ import struct
 import ctypes
 import ctypes.util
 
-from ..async import Future, FutureSource, FutureCanceled, Async, AsyncReturn, AsyncFile, Core
+from ..async import Future, FutureSource, FutureCanceled, Async, AsyncReturn, BufferedFile, Core
 from ..event import Event
 
 __all__ = ['FileMonitor']
@@ -107,7 +107,7 @@ class FileMonitor (object):
 
         self.event_struct = struct.Struct ('iIII')
         self.fd = self.inotify_impl.init ()
-        self.file = AsyncFile (self.fd, core = self.core)
+        self.file = BufferedFile (self.fd, core = self.core)
 
         self.worker_cancel = FutureSource ()
         self.worker = self.worker_main ()

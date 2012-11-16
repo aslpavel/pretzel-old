@@ -10,6 +10,7 @@ import types
 import binascii
 import inspect
 import pkgutil
+import pickle
 
 __all__ = ('Tomb', 'BootstrapSource', 'BootstrapBootstrap',)
 #------------------------------------------------------------------------------#
@@ -111,17 +112,33 @@ class Tomb (object):
     #--------------------------------------------------------------------------#
     # Bootstrap                                                                #
     #--------------------------------------------------------------------------#
-    def Bootstrap (self):
+    def Bootstrap (self, init = None, *args, **keys):
         """Create bootstrap source for this tomb
+
+        Initialization function (init) and its arguments (args, keys) must be
+        pickle-able objects and required modules must added to tomb.
         """
-        return self.tomb_payload.format (
-            bootstrap = BootstrapBootstrap ('_bootstrap'),
-            dump = binascii.b2a_base64 (self.ToBytes ()).strip ().decode ('utf-8'))
+
+        return ''.join ((
+            # tomb
+            self.tomb_payload.format (
+                bootstrap = BootstrapBootstrap ('_bootstrap'),
+                dump = binascii.b2a_base64 (self.ToBytes ()).strip ().decode ('utf-8')),
+            # init
+            '' if init is None else self.init_payload.format (
+                binascii.b2a_base64 (pickle.dumps ((init, args, keys))).strip ().decode ('utf-8'))))
 
     tomb_payload = """{bootstrap}
-# install tomb
+# install
 _bootstrap.Tomb.FromBytes (binascii.a2b_base64 (b"{dump}")).Install ()
 """
+    init_payload = """
+import pickle
+init, args, keys = pickle.loads (binascii.a2b_base64 (b"{0}"))
+if init is not None:
+    init (*args, **keys)
+    """
+
     #--------------------------------------------------------------------------#
     # Lookup                                                                   #
     #--------------------------------------------------------------------------#
@@ -304,7 +321,6 @@ def load ():
 try: {name} = load ()
 finally:
     del load
-
 """
 
 def BootstrapBootstrap (name):
