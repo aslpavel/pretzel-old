@@ -15,9 +15,12 @@ class GCore (object):
         self.sources = set ()
 
     #--------------------------------------------------------------------------#
-    # Sleep                                                                    #
+    # Time                                                                     #
     #--------------------------------------------------------------------------#
-    def Sleep (self, delay, cancel = None):
+    def WhenTime (self, resume, cancel = None):
+        return self.WhenTimeDelay (resume - time.time (), cancel)
+
+    def WhenTimeDelay (self, delay, cancel = None):
         resume = time.time () + delay
         if delay < 0:
             return SucceededFuture (resume)
@@ -25,13 +28,10 @@ class GCore (object):
         return self.source_create (lambda source: source.ResultSet (resume),
             cancel, GLib.timeout_add, (int (delay * 1000),))
 
-    def SleepUntil (self, resume, cancel = None):
-        return self.Sleep (resume - time.time (), cancel)
-
     #--------------------------------------------------------------------------#
     # Idle                                                                     #
     #--------------------------------------------------------------------------#
-    def Idle (self, cancel = None):
+    def WhenIdle (self, cancel = None):
         return self.source_create (lambda source: source.ResultSet (None), cancel, GLib.idle_add)
 
     #--------------------------------------------------------------------------#
@@ -43,7 +43,7 @@ class GCore (object):
     DISCONNECT = GLib.IO_HUP
     ERROR      = GLib.IO_ERR | GLib.IO_NVAL | GLib.IO_HUP
 
-    def Poll (self, fd, mask, cancel = None):
+    def WhenFile (self, fd, mask, cancel = None):
         if mask is None:
             return # no clean up for closed file descriptors
 

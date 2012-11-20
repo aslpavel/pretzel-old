@@ -118,6 +118,8 @@ class Tomb (object):
         Initialization function (init) and its arguments (args, keys) must be
         pickle-able objects and required modules must added to tomb.
         """
+        if init and inspect.getmodule (init).__name__ not in self.containments:
+            raise ValueError ('Initialization function must reside in added modules')
 
         return ''.join ((
             # tomb
@@ -379,7 +381,7 @@ def Usage ():
     usage_pattern = '''Usage: {name} [options] [<modules>]
     -h|?      : print this help message
     -m <file> : use file as main
-'''
+    '''
     sys.stderr.write (usage_pattern.format (name = os.path.basename (sys.argv [0])))
 
 def Main ():

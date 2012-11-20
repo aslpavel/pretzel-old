@@ -166,7 +166,7 @@ class RemoteProxyProvider (ProxyProvider):
     #--------------------------------------------------------------------------#
     @Async
     def Dispose (self):
-        yield self.linker.domain.channel.core.Idle ()
+        yield self.linker.domain.channel.core.WhenIdle ()
 
         self.linker.desc_prov.pop (self.desc ^ 0x1, None)
         self.linker.prov_desc.pop (self, None)

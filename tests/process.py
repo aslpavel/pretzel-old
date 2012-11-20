@@ -35,7 +35,7 @@ for value in range (int (input ())):
     def testCleanup (self):
         """Process cleanup
         """
-        yield Core.Instance ().Idle ()
+        yield Core.Instance ().WhenIdle ()
 
         with Process (['cat'], stdin = PIPE, stdout = PIPE, stderr = PIPE) as proc:
             self.assertTrue (proc.Stdin.CloseOnExec ())

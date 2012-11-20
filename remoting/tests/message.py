@@ -39,9 +39,9 @@ class MessageTest (unittest.TestCase):
 
             @Async
             def test ():
-                yield core.Idle ()
+                yield core.WhenIdle ()
                 with ScopeFuture () as cancel:
-                    msg_load_future = Message.FromAsyncStream (ra, core.Sleep (1, cancel))
+                    msg_load_future = Message.FromAsyncStream (ra, core.WhenTimeDelay (1, cancel))
                     self.assertFalse (msg_load_future.IsCompleted ())
 
                     msg.SaveAsync (wa)
