@@ -2,7 +2,7 @@
 import os
 import threading
 from collections import deque
-from ..async import Async, AsyncReturn, Core, CoreStopped, BlockingFD
+from ..async import Async, AsyncReturn, Core, BlockingFD, FutureCanceled
 
 __all__ = ('CoreQueue', 'CoreQueueError',)
 #------------------------------------------------------------------------------#
@@ -59,7 +59,7 @@ class CoreQueue (object):
                 while len (os.read (self.get_pipe, 65536)) == 65536: pass
 
             except OSError: break
-            except CoreStopped: break
+            except FutureCanceled: break
 
         raise CoreQueueError ('Queue has been disposed')
 

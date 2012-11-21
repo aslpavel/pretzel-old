@@ -3,8 +3,7 @@ import time
 import errno
 from gi.repository import GLib
 
-from ..async import (FutureSource, FutureCanceled, SucceededFuture,
-                     CoreError, CoreStopped, BrokenPipeError, ConnectionError)
+from ..async import (FutureSource, FutureCanceled, SucceededFuture, BrokenPipeError, ConnectionError)
 
 __all__ = ('GCore',)
 #------------------------------------------------------------------------------#
@@ -70,7 +69,7 @@ class GCore (object):
                 if not self.sources:
                     return
         finally:
-            self.Dispose (CoreError ('Core has terminated without resolving this future'))
+            self.Dispose ()
 
     def __iter__ (self): return self.Iterator ()
     def Iterator (self, block = True):
@@ -112,7 +111,7 @@ class GCore (object):
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
     def Dispose (self, error = None):
-        error = error or CoreStopped ()
+        error = error or FutureCanceled ('Core has been stopped')
 
         # resolve futures
         sources, self.sources = self.sources, set ()

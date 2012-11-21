@@ -2,10 +2,9 @@
 import sys
 
 from ...event import Event
-from ...async import (Async, DummyAsync,
-                     Core, CoreStopped, BrokenPipeError,
-                     FailedFuture, FutureSource, FutureCanceled)
 from ...disposable import Disposable
+from ...async import (Async, DummyAsync, Core, BrokenPipeError, FailedFuture,
+                      FutureSource, FutureCanceled)
 
 __all__ = ('Channel', 'ChannelError',)
 #------------------------------------------------------------------------------#
@@ -107,7 +106,6 @@ class Channel (object):
                 self.recv_dispatch ((yield self.Recv (cancel)))
 
         except FutureCanceled: pass
-        except CoreStopped: pass
         except BrokenPipeError: pass
         finally:
             # resolve queued futures
