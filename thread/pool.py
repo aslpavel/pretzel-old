@@ -38,23 +38,19 @@ class ThreadPool (object):
     # Instance                                                                 #
     #--------------------------------------------------------------------------#
     @classmethod
-    def Instance (cls):
-        """Get global thread pool instance, creates it if it's None
+    def Instance (cls, instance = None):
+        """Global thread pool instance, creates it if it's None
         """
         with cls.instance_lock:
-            if cls.instance is None:
-                cls.instance = ThreadPool (4)
+            if instance is None:
+                if cls.instance is None:
+                    cls.instance = ThreadPool (4)
+            else:
+                if instance is cls.instance:
+                    return instance
+                instance, cls.instance = cls.instance, instance
+                instance.Dispose ()
             return cls.instance
-
-    @classmethod
-    def InstanceSet (cls, instance):
-        """Set global thread pool instance
-        """
-        with cls.instance_lock:
-            instance_prev, cls.instance = cls.instance, instance
-        if instance_prev is not None and instance_prev != instance:
-            instance_prev.Dispose ()
-        return instance
 
     #--------------------------------------------------------------------------#
     # Execute                                                                  #

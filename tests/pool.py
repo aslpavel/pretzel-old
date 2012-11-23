@@ -42,6 +42,6 @@ class ThreadPoolTest (unittest.TestCase):
             self.assertEqual (round ((time.time () - time_start) / time_span), 2)
 
         finally:
-            pool.InstanceSet (None)
+            pool.Instance (None)
 
 # vim: nu ft=python columns=120 :

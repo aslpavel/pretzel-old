@@ -27,8 +27,8 @@ class ApplicationType  (object):
         self.name = name
         self.catch = catch is None or catch
 
-        self.core = Core.InstanceSet (core) if core else Core.Instance ()
-        self.pool = ThreadPool.Instance (pool) if pool else ThreadPool.Instance ()
+        self.core = Core.Instance (core)
+        self.pool = ThreadPool.Instance (pool)
 
         # execute
         if execute is None or execute:

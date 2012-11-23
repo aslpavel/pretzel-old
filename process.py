@@ -4,6 +4,7 @@ import os
 import sys
 import pickle
 import signal
+import threading
 
 from .disposable import Disposable, CompositeDisposable
 from .async import Async, AsyncReturn, Future, FutureSource, SucceededFuture, Pipe, BrokenPipeError
@@ -43,17 +44,36 @@ class Process (object):
         #----------------------------------------------------------------------#
         # Pipes                                                                #
         #----------------------------------------------------------------------#
+        def to_fd (file, default):
+            """Convert file object to file descriptor
+            """
+            if file is None:
+                return default
+            elif file == PIPE:
+                return
+            elif file == DEVNULL:
+                if not hasattr (self, 'null_fd'):
+                    self.null_fd  = os.open (os.devnull, os.O_RDWR)
+                    self.dispose += Disposable (lambda: os.close (self.null_fd))
+                return self.null_fd
+            return file if isinstance (file, int) else file.fileno ()
+
+        # status
         status_pipe  = self.dispose.Add (Pipe (core = core))
 
-        stdout_fd = self.to_fd (stdout, STDOUT)
+        # standard output
+        stdout_fd = to_fd (stdout, STDOUT)
         self.stdout_pipe = self.dispose.Add (
             Pipe (None if stdout_fd is None else (None, stdout_fd), buffer_size, core))
 
-        stderr_fd = self.to_fd (stderr, STDERR)
+        # standard error
+        stderr_fd = to_fd (stderr, STDERR)
         self.stderr_pipe = self.dispose.Add (
             Pipe (None if stderr_fd is None else (None, stderr_fd), buffer_size ,core))
 
-        stdin_fd = self.to_fd (stdin, STDIN)
+
+        # standard input
+        stdin_fd = to_fd (stdin, STDIN)
         self.stdin_pipe = self.dispose.Add (
             Pipe (None if stdin_fd is None else (stdin_fd, None), buffer_size, core))
 
@@ -157,7 +177,6 @@ class Process (object):
         finally:
             error_stream.Dispose ()
 
-
             '''
             while True:
                 pid, status = os.waitpid (self.pid, os.WNOHANG)
@@ -178,23 +197,6 @@ class Process (object):
                     .format (self.command, status))
 
         AsyncReturn (status)
-
-    def to_fd (self, file, default):
-        """Convert file object to file descriptor
-        """
-        if file is None:
-            return default
-
-        elif file == PIPE:
-            return
-
-        elif file == DEVNULL:
-            if not hasattr (self, 'null_fd'):
-                self.null_fd  = os.open (os.devnull, os.O_RDWR)
-                self.dispose += Disposable (lambda: os.close (self.null_fd))
-            return self.null_fd
-
-        return file if isinstance (file, int) else file.fileno ()
 
     #--------------------------------------------------------------------------#
     # Dispose                                                                  #
@@ -250,5 +252,29 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
             AsyncReturn ((out.Result (), err.Result (), (yield proc.Status)))
 
     return process ()
+
+
+class ProcessWaiter (object):
+    """Process waiter
+
+    Waits for child process to terminate and returns its exit code.
+    """
+    instance_lock = threading.Lock ()
+    instance      = None
+
+    def __init__ (self, core = None):
+        self.core = core.Instance ()
+
+    #--------------------------------------------------------------------------#
+    # Instance                                                                 #
+    #--------------------------------------------------------------------------#
+    @classmethod
+    def Instance (cls):
+        """Get global process waiter instance, creates it if it's None
+        """
+        with cls.instance_lock:
+            if cls.instance is None:
+                cls.instance = cls ()
+            return cls.instance
 
 # vim: nu ft=python columns=120 :
