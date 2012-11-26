@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 import io
-import os
 import sys
 import unittest
 
 from ..message import Message
-from ...async import Async, BufferedFile, ScopeFuture, Core
+from ...async import Pipe, Core
+from ...async.tests import AsyncTest
 
 __all__ = ('MessageTest',)
 #------------------------------------------------------------------------------#
@@ -29,37 +29,25 @@ class MessageTest (unittest.TestCase):
         self.assertEqual (msg.dst, msg_load.dst)
         self.assertEqual (msg.Value (), msg_load.Value ())
 
+    @AsyncTest
     def testSerializeAsync (self):
         """Test asynchronous serialization
         """
         msg = Message.FromValue (b'value', b'dst')
 
-        with Core.Instance () as core:
-            ra, wa = (BufferedFile (fd) for fd in os.pipe ())
+        with Pipe () as pipe:
+            msg_load_future = Message.FromAsyncStream (pipe.Read, Core.Instance ().WhenTimeDelay (1))
+            if msg_load_future.IsCompleted ():
+                msg_load_future.Result ()
 
-            @Async
-            def test ():
-                yield core.WhenIdle ()
-                with ScopeFuture () as cancel:
-                    msg_load_future = Message.FromAsyncStream (ra, core.WhenTimeDelay (1, cancel))
-                    self.assertFalse (msg_load_future.IsCompleted ())
+            msg.SaveAsync (pipe.Write)
+            yield pipe.Write.Flush ()
 
-                    msg.SaveAsync (wa)
-                    yield wa.Flush ()
+            msg_load = yield msg_load_future
 
-                    msg_load = yield msg_load_future
-
-                self.assertEqual (msg.src, msg_load.src)
-                self.assertEqual (msg.dst, msg_load.dst)
-                self.assertEqual (msg.Value (), msg_load.Value ())
-            test_future = test ()
-
-            core.Execute ()
-
-        ra.Dispose ()
-        wa.Dispose ()
-
-        test_future.Result ()
+            self.assertEqual (msg.src, msg_load.src)
+            self.assertEqual (msg.dst, msg_load.dst)
+            self.assertEqual (msg.Value (), msg_load.Value ())
 
     def testError (self):
         """Test error value

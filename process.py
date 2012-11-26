@@ -2,14 +2,17 @@
 import io
 import os
 import sys
+import errno
 import pickle
 import signal
 import threading
 
 from .disposable import Disposable, CompositeDisposable
-from .async import Async, AsyncReturn, Future, FutureSource, SucceededFuture, Pipe, BrokenPipeError
+from .async import (Async, AsyncReturn, Future, FutureSource, FutureCanceled,
+                    SucceededFuture, Pipe, BrokenPipeError, Core)
 
-__all__ = ('Process', 'ProcessCall', 'ProcessError', 'PIPE', 'DEVNULL', 'STDIN', 'STDOUT', 'STDERR',)
+__all__ = ('Process', 'ProcessCall', 'ProcessWaiter', 'ProcessError',
+           'PIPE', 'DEVNULL', 'STDIN', 'STDOUT', 'STDERR',)
 #------------------------------------------------------------------------------#
 # Constants                                                                    #
 #------------------------------------------------------------------------------#
@@ -28,6 +31,9 @@ class Process (object):
     """
     def __init__ (self, command, stdin = None, stdout = None, stderr = None, preexec = None,
             shell = None, environ = None, check = None, buffer_size = None, kill = None, core = None):
+        self.core    = core or Core.Instance ()
+        self.process_waiter = ProcessWaiter.Instance ()
+
         # vars
         self.command = ['/bin/sh', '-c', command] if shell else command
         self.environ = environ
@@ -37,9 +43,9 @@ class Process (object):
         # dispose
         self.dispose = CompositeDisposable ()
 
-        # state
-        self.pid    = None
-        self.status = FutureSource ()
+        # status
+        self.pid = None
+        self.status_source = FutureSource ()
 
         #----------------------------------------------------------------------#
         # Pipes                                                                #
@@ -71,7 +77,6 @@ class Process (object):
         self.stderr_pipe = self.dispose.Add (
             Pipe (None if stderr_fd is None else (None, stderr_fd), buffer_size ,core))
 
-
         # standard input
         stdin_fd = to_fd (stdin, STDIN)
         self.stdin_pipe = self.dispose.Add (
@@ -94,24 +99,15 @@ class Process (object):
                     if stream is not None:
                         stream.CloseOnExec (True)
 
-            # status
-            @Async
-            def status_main ():
-                try:
-                    error_dump = yield error_stream.ReadUntilEof ()
-                    if error_dump:
-                        self.status.ErrorRaise (pickle.loads (error_dump))
-                except BrokenPipeError: pass
-                finally:
-                    self.Dispose ()
-            status_main ()
+            # start status coroutine
+            self.status_main (status_pipe.Read).Traceback ('process status main')
 
         else:
             try:
                 # status descriptor (must not block)
                 status_fd = status_pipe.DetachWrite ().Result ()
 
-                self.stdin_pipe.DetachRead (0)
+                self.stdin_pipe.DetachRead   (0)
                 self.stdout_pipe.DetachWrite (1)
                 self.stderr_pipe.DetachWrite (2)
 
@@ -154,7 +150,7 @@ class Process (object):
     def Status (self):
         """Future object for return code of the process
         """
-        return self.status.Future
+        return self.status_source.Future
 
     @property
     def Pid (self):
@@ -169,34 +165,18 @@ class Process (object):
     def status_main (self, error_stream):
         """Status coroutine main
         """
-        error_dump = b''
+        status_future = self.process_waiter (self.pid, self.core)
+
+        # restore error from error stream if any
         try:
             error_dump = yield error_stream.ReadUntilEof ()
-
-        except BrokenPipeError: pass
-        finally:
-            error_stream.Dispose ()
-
-            '''
-            while True:
-                pid, status = os.waitpid (self.pid, os.WNOHANG)
-                if pid != self.pid:
-                    yield error_stream.Core.WhenTimeDelay (1)
-            '''
-
-            pid, status = os.waitpid (self.pid, os.WNOHANG)
-            if pid != self.pid:
-                if self.kill:
-                    os.kill (self.pid, signal.SIGTERM)
-                pid, status = os.waitpid (self.pid, 0)
-
             if error_dump:
-                raise pickle.loads (error_dump)
-            elif self.check and status:
-                raise ProcessError ('Command \'{}\' returned non-zero exit status {}'
-                    .format (self.command, status))
+                self.status_source.ErrorRaise (pickle.loads (error_dump))
+                return
+        except BrokenPipeError: pass
 
-        AsyncReturn (status)
+        # wait for process to terminate
+        self.status_source.ResultSet ((yield status_future))
 
     #--------------------------------------------------------------------------#
     # Dispose                                                                  #
@@ -205,6 +185,8 @@ class Process (object):
         """Terminate process and dispose associated resources
         """
         self.dispose.Dispose ()
+        if not self.Status.IsCompleted ():
+            os.kill (self.pid, signal.SIGTERM)
 
     def __enter__ (self):
         return self
@@ -212,6 +194,23 @@ class Process (object):
     def __exit__ (self, et, eo, tb):
         self.Dispose ()
         return False
+
+    #--------------------------------------------------------------------------#
+    # Representation                                                           #
+    #--------------------------------------------------------------------------#
+    def __str__ (self):
+        """String representation of the process
+        """
+        if self.Status.IsCompleted ():
+            error = self.Status.Error ()
+            if error:
+                status = repr (error)
+            else:
+                status = self.Status.Result ()
+        else:
+            status = 'running'
+        return '<Process [pid:{} status:{}] at {}'.format (self.pid, status, id (self))
+    __repr__ = __str__
 
 #------------------------------------------------------------------------------#
 # Call Process                                                                 #
@@ -253,28 +252,110 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
 
     return process ()
 
-
+#------------------------------------------------------------------------------#
+# Process Waiter                                                               #
+#------------------------------------------------------------------------------#
 class ProcessWaiter (object):
     """Process waiter
 
-    Waits for child process to terminate and returns its exit code.
+    Waits for child process to terminate and returns its exit code. This object
+    must be created inside main thread as signal.signal would fail otherwise.
     """
-    instance_lock = threading.Lock ()
+    instance_lock = threading.RLock ()
     instance      = None
 
-    def __init__ (self, core = None):
-        self.core = core.Instance ()
+    def __init__ (self):
+        self.queue = []
+        self.handle_signal_prev = signal.signal (signal.SIGCHLD, self.handle_signal)
 
     #--------------------------------------------------------------------------#
     # Instance                                                                 #
     #--------------------------------------------------------------------------#
     @classmethod
-    def Instance (cls):
-        """Get global process waiter instance, creates it if it's None
+    def Instance (cls, instance = None):
+        """Global process waiter instance
+
+        If ``instance`` is provided sets current global instance to ``instance``,
+        otherwise returns current global instance, creates it if needed.
         """
-        with cls.instance_lock:
-            if cls.instance is None:
-                cls.instance = cls ()
-            return cls.instance
+        try:
+            with cls.instance_lock:
+                if instance is None:
+                    if cls.instance is None:
+                        cls.instance = ProcessWaiter ()
+                else:
+                    if instance is cls.instance:
+                        return instance
+                    instance, cls.instance = cls.instance, instance
+                return cls.instance
+        finally:
+            if instance:
+                instance.Dispose ()
+
+    #--------------------------------------------------------------------------#
+    # Wait                                                                     #
+    #--------------------------------------------------------------------------#
+    def __call__ (self, pid, core = None):
+        """Wait for process exit status
+
+        Returned future will be resolved inside core's context.
+        """
+        # check if process has already been terminated
+        pid, status = os.waitpid (pid, os.WNOHANG)
+        if pid != 0:
+            return SucceededFuture (os.WEXITSTATUS (status))
+
+        # enqueue source
+        with self.instance_lock:
+            source = FutureSource ()
+            self.queue.append ((pid, source, core or Core.Instance (),))
+        return source.Future
+
+    #--------------------------------------------------------------------------#
+    # Private                                                                  #
+    #--------------------------------------------------------------------------#
+    def handle_signal (self, sig, frame):
+        """Handle SIGCHLD
+        """
+        with self.instance_lock:
+            resolved_queue, unresolved_queue = [], []
+            for pid, source, core in self.queue:
+                try:
+                    pid, status = os.waitpid (pid, os.WNOHANG)
+                    if pid == 0:
+                        unresolved_queue.append ((pid, source, core,))
+                        continue
+                except OSError as error:
+                    if error.errno != errno.ECHILD:
+                        raise
+                    status = -1
+                resolved_queue.append ((pid, source, core, status))
+            self.queue = unresolved_queue
+
+        for pid, source, core, status in resolved_queue:
+            try:
+                # Resolve source inside calling core's thread
+                core.WhenContext (os.WEXITSTATUS (status)).Continue (
+                    lambda result, error: source.ResultSet (result))
+            except FutureCanceled: pass
+
+    #--------------------------------------------------------------------------#
+    # Dispose                                                                  #
+    #--------------------------------------------------------------------------#
+    def Dispose (self):
+        """Dispose process waiter
+        """
+        signal.signal (signal.SIGCHLD, self.handle_signal_prev)
+
+        pid_source, self.pid_source = self.pid_source, {}
+        for pid, source in pid_source.items ():
+            source.ErrorRaise (FutureCanceled ('Process waiter has been disposed'))
+
+    def __enter__ (self):
+        return self
+
+    def __exit__ (self, et, eo, tb):
+        self.Dispose ()
+        return False
 
 # vim: nu ft=python columns=120 :

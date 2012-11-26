@@ -23,11 +23,15 @@ for value in range (int (input ())):
     if value % 2 == 1:
         sys.stderr.write (str (value))
     else:
-        sys.stdout.write (str (value))"""]
+        sys.stdout.write (str (value))
+sys.stderr.flush ()
+sys.stdout.flush ()
+sys.exit (117)
+"""]
 
         out, err, code = yield ProcessCall (command, input = b'10', check = False)
 
-        self.assertEqual (code, 0)
+        self.assertEqual (code, 117)
         self.assertEqual (out, b'02468')
         self.assertEqual (err, b'13579')
 

@@ -58,10 +58,6 @@ class GCore (object):
     #--------------------------------------------------------------------------#
     # Execute                                                                  #
     #--------------------------------------------------------------------------#
-    @property
-    def IsExecuting (self):
-        return bool (self.sources)
-
     def __call__ (self): return self.Execute ()
     def Execute  (self):
         try:
@@ -71,6 +67,9 @@ class GCore (object):
         finally:
             self.Dispose ()
 
+    #--------------------------------------------------------------------------#
+    # Iterator                                                                 #
+    #--------------------------------------------------------------------------#
     def __iter__ (self): return self.Iterator ()
     def Iterator (self, block = True):
         context = GLib.main_context_default ()
@@ -117,9 +116,6 @@ class GCore (object):
         sources, self.sources = self.sources, set ()
         for source in list (sources):
             source.ErrorRaise (error)
-
-        # clear queue
-        self.sources.clear ()
 
     def __enter__ (self):
         return self
