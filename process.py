@@ -29,16 +29,20 @@ class ProcessError (Exception): pass
 class Process (object):
     """Create child process
     """
-    def __init__ (self, command, stdin = None, stdout = None, stderr = None, preexec = None,
-            shell = None, environ = None, check = None, buffer_size = None, kill = None, core = None):
-        self.core    = core or Core.Instance ()
+    default_kill_delay = 10
+
+    def __init__ (self, command, stdin = None, stdout = None, stderr = None,
+        preexec = None, shell = None, environ = None, check = None,
+        buffer_size = None, kill_delay = None, core = None):
+
+        self.core = core or Core.Instance ()
         self.process_waiter = ProcessWaiter.Instance ()
 
         # vars
         self.command = ['/bin/sh', '-c', command] if shell else command
         self.environ = environ
-        self.kill    = kill
-        self.check   = check is None or check
+        self.kill_delay = kill_delay or self.default_kill_delay
+        self.check = check is None or check
 
         # dispose
         self.dispose = CompositeDisposable ()
@@ -185,8 +189,22 @@ class Process (object):
         """Terminate process and dispose associated resources
         """
         self.dispose.Dispose ()
-        if not self.Status.IsCompleted ():
-            os.kill (self.pid, signal.SIGTERM)
+
+        @Async
+        def kill ():
+            """Force process termination (with SIGTERM) if it has not terminated yet
+            """
+            if self.Status.IsCompleted ():
+                return
+
+            try:
+                if self.kill_delay > 0:
+                    yield self.core.WhenTimeDelay (self.kill_delay, cancel = self.Status)
+            except FutureCanceled: pass
+            finally:
+                if not self.Status.IsCompleted ():
+                    os.kill (self.pid, signal.SIGTERM)
+        kill ()
 
     def __enter__ (self):
         return self
@@ -217,7 +235,7 @@ class Process (object):
 #------------------------------------------------------------------------------#
 def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = None,
     preexec = None, shell = None, environ = None, check = None, buffer_size = None,
-    kill = None, core = None, cancel = None):
+    kill_delay = None, core = None, cancel = None):
     """Asynchronously run command
 
     Asynchronously returns standard output, standard error and return code tuple.
@@ -236,7 +254,7 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
     def process ():
         with Process (command = command, stdin = stdin, stdout = stdout, stderr = stderr,
             preexec = preexec, shell = shell, environ = environ, check = check,
-            buffer_size = buffer_size, kill = kill, core = core) as proc:
+            buffer_size = buffer_size, kill_delay = kill_delay, core = core) as proc:
 
             # input
             if input:
@@ -259,7 +277,7 @@ class ProcessWaiter (object):
     """Process waiter
 
     Waits for child process to terminate and returns its exit code. This object
-    must be created inside main thread as signal.signal would fail otherwise.
+    MUST BE CREATED INSIDE MAIN THREAD as signal.signal would fail otherwise.
     """
     instance_lock = threading.RLock ()
     instance      = None
