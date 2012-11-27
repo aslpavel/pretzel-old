@@ -36,12 +36,12 @@ class MessageTest (unittest.TestCase):
         msg = Message.FromValue (b'value', b'dst')
 
         with Pipe () as pipe:
-            msg_load_future = Message.FromAsyncStream (pipe.Read, Core.Instance ().WhenTimeDelay (1))
+            msg_load_future = Message.FromAsyncStream (pipe.Reader, Core.Instance ().WhenTimeDelay (1))
             if msg_load_future.IsCompleted ():
                 msg_load_future.Result ()
 
-            msg.SaveAsync (pipe.Write)
-            yield pipe.Write.Flush ()
+            msg.SaveAsync (pipe.Writer)
+            yield pipe.Writer.Flush ()
 
             msg_load = yield msg_load_future
 

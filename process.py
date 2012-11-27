@@ -92,28 +92,28 @@ class Process (object):
         self.pid = os.fork ()
         if self.pid:
             # dispose remote streams
-            self.stdin_pipe.Read.Dispose ()
-            self.stdout_pipe.Write.Dispose ()
-            self.stderr_pipe.Write.Dispose ()
-            status_pipe.Write.Dispose ()
+            self.stdin_pipe.Reader.Dispose ()
+            self.stdout_pipe.Writer.Dispose ()
+            self.stderr_pipe.Writer.Dispose ()
+            status_pipe.Writer.Dispose ()
 
             # close on exec
-            for stream in (self.stdin_pipe.Write, self.stdout_pipe.Read,
-                self.stderr_pipe.Read, status_pipe.Read):
+            for stream in (self.stdin_pipe.Writer, self.stdout_pipe.Reader,
+                self.stderr_pipe.Reader, status_pipe.Reader):
                     if stream is not None:
                         stream.CloseOnExec (True)
 
             # start status coroutine
-            self.status_main (status_pipe.Read).Traceback ('process status main')
+            self.status_main (status_pipe.Reader).Traceback ('process status main')
 
         else:
             try:
                 # status descriptor (must not block)
-                status_fd = status_pipe.DetachWrite ().Result ()
+                status_fd = status_pipe.DetachWriter ().Result ()
 
-                self.stdin_pipe.DetachRead   (0)
-                self.stdout_pipe.DetachWrite (1)
-                self.stderr_pipe.DetachWrite (2)
+                self.stdin_pipe.DetachReader   (0)
+                self.stdout_pipe.DetachWriter (1)
+                self.stderr_pipe.DetachWriter (2)
 
                 # pre-exec hook
                 if preexec is not None:
@@ -136,19 +136,19 @@ class Process (object):
     def Stdin (self):
         """Standard input asynchronous stream
         """
-        return self.stdin_pipe.Write
+        return self.stdin_pipe.Writer
 
     @property
     def Stdout (self):
         """Standard output asynchronous stream
         """
-        return self.stdout_pipe.Read
+        return self.stdout_pipe.Reader
 
     @property
     def Stderr (self):
         """Standard error asynchronous stream
         """
-        return self.stderr_pipe.Read
+        return self.stderr_pipe.Reader
 
     @property
     def Status (self):
@@ -192,7 +192,9 @@ class Process (object):
 
         @Async
         def kill ():
-            """Force process termination (with SIGTERM) if it has not terminated yet
+            """Kill process (with SIGTREM)
+
+            Kill process unless its terminated in ``kill_delay`` seconds.
             """
             if self.Status.IsCompleted ():
                 return
