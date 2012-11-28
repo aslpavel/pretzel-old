@@ -266,7 +266,7 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
             # output
             out = proc.Stdout.ReadUntilEof (cancel) if proc.Stdout else SucceededFuture (None)
             err = proc.Stderr.ReadUntilEof (cancel) if proc.Stderr else SucceededFuture (None)
-            yield Future.WhenAll ((out, err))
+            yield Future.All ((out, err))
 
             AsyncReturn ((out.Result (), err.Result (), (yield proc.Status)))
 

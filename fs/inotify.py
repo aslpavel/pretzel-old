@@ -204,7 +204,7 @@ class FileMonitorWatch (object):
     @Async
     def Changed (self):
         changed, deleted = self.OnChanged.Await (), self.OnDeleted.Await ()
-        future = yield Future.WhenAny ((changed, deleted))
+        future = yield Future.Any ((changed, deleted))
         if future is deleted:
             raise FileMonitorError ('Watch has been deleted')
 

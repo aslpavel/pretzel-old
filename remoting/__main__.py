@@ -97,7 +97,7 @@ class Main (object):
             with Log ('Method'):
                 with Timer () as method_timer:
                     futures = [proxy.Method () for i in range (CallCount)]
-                    yield Future.WhenAll (futures)
+                    yield Future.All (futures)
 
             if sorted (list (future.Result () for future in futures)) != list (range (CallCount)):
                 raise ValueError ('Method benchmark failed')
@@ -108,7 +108,7 @@ class Main (object):
             with Log ('Function'):
                 with Timer () as func_timer:
                     futures = [domain.Call (RemoteFunction) for i in range (CallCount)]
-                    yield Future.WhenAll (futures)
+                    yield Future.All (futures)
 
             for future in futures:
                 if future.Result () != 1:

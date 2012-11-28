@@ -34,11 +34,11 @@ class ThreadPoolTest (unittest.TestCase):
             # wait for jobs
             time_start = time.time ()
             for _ in range (pool.Size ()):
-                yield Future.WhenAny (futures)
+                yield Future.Any (futures)
                 self.assertEqual (round ((time.time () - time_start) / time_span), 1)
 
             self.assertEqual (len (futures), 1)
-            yield Future.WhenAny (futures)
+            yield Future.Any (futures)
             self.assertEqual (round ((time.time () - time_start) / time_span), 2)
 
         finally:
