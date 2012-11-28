@@ -123,7 +123,7 @@ class Channel (object):
     def recv_dispatch (self, message):
         """Dispatch received message
         """
-        yield self.core.WhenIdle ()
+        yield self.core.IdleAwait ()
 
         self.OnMessage (message)
 

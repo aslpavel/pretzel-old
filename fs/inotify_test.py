@@ -18,7 +18,7 @@ class FileMonitorInotifyTest (unittest.TestCase):
             # stream
             stream = open (__file__)
             dispose += stream
-            core.WhenIdle ().Continue (lambda *_: stream.close ())
+            core.IdleAwait ().Continue (lambda *_: stream.close ())
 
             # monitor
             file_monitor = FileMonitor ()
@@ -31,7 +31,7 @@ class FileMonitorInotifyTest (unittest.TestCase):
             # init
             with ScopeFuture () as cancel:
                 changed = file_watch.Changed ()
-                result  = yield Future.WhenAny ((changed, core.WhenTimeDelay (1, cancel)))
+                result  = yield Future.WhenAny ((changed, core.TimeDelayAwait (1, cancel)))
 
                 # check
                 self.assertTrue  (stream.closed, 'File was not closed')

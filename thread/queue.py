@@ -55,7 +55,7 @@ class CoreQueue (object):
                 self.queue_wait = True
 
             try:
-                yield self.core.WhenFile (self.get_pipe, self.core.READ)
+                yield self.core.FileAwait (self.get_pipe, self.core.READ)
                 while len (os.read (self.get_pipe, 65536)) == 65536: pass
 
             except OSError: break
@@ -74,7 +74,7 @@ class CoreQueue (object):
                 return
             self.disposed = True
 
-        self.core.WhenFile (self.get_pipe, None)
+        self.core.FileAwait (self.get_pipe, None)
         os.close (self.get_pipe)
         os.close (self.put_pipe)
 
