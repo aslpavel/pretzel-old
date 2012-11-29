@@ -73,11 +73,10 @@ class BaseEvent (object):
 
         # cancel
         if cancel:
-            def cancel_continuation (result, error):
+            def cancel_cont (result, error):
                 self.Remove (handler_id)
                 source.ErrorRaise (FutureCanceled ())
-
-            cancel.Continue (cancel_continuation)
+            cancel.Continue (cancel_cont)
 
         return source.Future
 
@@ -95,27 +94,31 @@ class Event (BaseEvent):
     #--------------------------------------------------------------------------#
     # Fire                                                                     #
     #--------------------------------------------------------------------------#
-
     def Fire (self, *args):
-        for handler in tuple (self.handlers):
+        """Fire event
+        """
+        handlers, self.handlers = self.handlers, []
+        for handler in handlers:
             if handler (*args):
-                continue
-            self.Remove (handler)
+                self.handlers.append (handler)
 
     #--------------------------------------------------------------------------#
     # Add | Remove                                                             #
     #--------------------------------------------------------------------------#
-
     def Add (self, handler):
+        """Add handler
+        """
         self.handlers.append (handler)
         return handler
 
     def Remove (self, handler_id):
+        """Remove handler
+        """
         try:
             self.handlers.remove (handler_id)
             return True
-        except ValueError: pass
-        return False
+        except ValueError:
+            return False
 
 #------------------------------------------------------------------------------#
 # Asynchronous Event                                                           #
