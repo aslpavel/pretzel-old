@@ -56,12 +56,11 @@ class Message (Result):
     #--------------------------------------------------------------------------#
     # Save | Load                                                              #
     #--------------------------------------------------------------------------#
-    def SaveAsync (self, stream):
+    def SaveBuffer (self, stream):
         src_end = len (self.src)
         size    = src_end + len (self.dst)
-        stream.Write (self.message_struct.pack (size, src_end) + self.src + self.dst)
-
-        Result.SaveAsync (self, stream)
+        stream.WriteBuffer (self.message_struct.pack (size, src_end) + self.src + self.dst)
+        Result.SaveBuffer (self, stream)
 
     @Async
     def LoadAsync (self, stream, cancel = None):

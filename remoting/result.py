@@ -141,8 +141,21 @@ class Result (object):
     #--------------------------------------------------------------------------#
     # Save | Load                                                              #
     #--------------------------------------------------------------------------#
-    def SaveAsync (self, stream):
-        self.save_result (stream.Write)
+    def SaveBuffer (self, stream):
+        if self.error is None:
+            if self.value is None:
+                stream.WriteBuffer (self.result_struct.pack (1, 0))
+            else:
+                stream.WriteBuffer (self.result_struct.pack (1, len (self.value)))
+                stream.WriteBuffer (self.value)
+        else:
+            try:
+                error_value = pickle.dumps ((self.error, self.traceback))
+            except Exception:
+                error_value = pickle.dumps ((type (self.error) ('Failed to pack arguments'), self.traceback))
+
+            stream.WriteBuffer (self.result_struct.pack (0, len (error_value)))
+            stream.WriteBuffer (error_value)
 
     @Async
     def LoadAsync (self, stream, cancel = None):
@@ -161,7 +174,20 @@ class Result (object):
         AsyncReturn (self)
 
     def Save (self, stream):
-        self.save_result (stream.write)
+        if self.error is None:
+            if self.value is None:
+                stream.write (self.result_struct.pack (1, 0))
+            else:
+                stream.write (self.result_struct.pack (1, len (self.value)))
+                stream.write (self.value)
+        else:
+            try:
+                error_value = pickle.dumps ((self.error, self.traceback))
+            except Exception:
+                error_value = pickle.dumps ((type (self.error) ('Failed to pack arguments'), self.traceback))
+
+            stream.write (self.result_struct.pack (0, len (error_value)))
+            stream.write (error_value)
 
     def Load (self, stream):
         is_value, size = self.result_struct.unpack (stream.read (self.result_struct.size))
@@ -182,25 +208,6 @@ class Result (object):
         stream = io.BytesIO ()
         self.Save (stream)
         return stream.getvalue ()
-
-    #--------------------------------------------------------------------------#
-    # Private                                                                  #
-    #--------------------------------------------------------------------------#
-    def save_result (self, write):
-        if self.error is None:
-            if self.value is None:
-                write (self.result_struct.pack (1, 0))
-            else:
-                write (self.result_struct.pack (1, len (self.value)))
-                write (self.value)
-        else:
-            try:
-                error_value = pickle.dumps ((self.error, self.traceback))
-            except Exception:
-                error_value = pickle.dumps ((type (self.error) ('Failed to pack arguments'), self.traceback))
-
-            write (self.result_struct.pack (0, len (error_value)))
-            write (error_value)
 
 #------------------------------------------------------------------------------#
 # Saved Traceback Template                                                     #

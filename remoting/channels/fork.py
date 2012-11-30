@@ -49,7 +49,7 @@ class ForkChannel (FileChannel):
 
         # send payload
         with load_pipe.DetachWriteAsync () as load_stream:
-            load_stream.Write (payload.format (
+            load_stream.WriteBuffer (payload.format (
                 bootstrap     = Tomb.FromModules ().Bootstrap (),
                 remoting_name = remoting_name,
                 in_fd         = in_fd,

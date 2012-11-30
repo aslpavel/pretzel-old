@@ -75,8 +75,8 @@ class SSHChannel (FileChannel):
 
         # send payload
         payload = Tomb.FromModules ().ToBytes ()
-        in_stream.Write (struct.pack ('!L', len (payload)))
-        in_stream.Write (payload)
+        in_stream.WriteBuffer (struct.pack ('!L', len (payload)))
+        in_stream.WriteBuffer (payload)
         yield in_stream.Flush ()
 
         # parent connect

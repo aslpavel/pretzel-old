@@ -18,7 +18,7 @@ class FileChannel (Channel):
     # Methods                                                                  #
     #--------------------------------------------------------------------------#
     def Send (self, message):
-        message.SaveAsync (self.out_file)
+        message.SaveBuffer (self.out_file)
         return self.out_file.Flush ()
 
     def Recv (self, cancel = None):

@@ -40,7 +40,7 @@ class MessageTest (unittest.TestCase):
             if msg_load_future.IsCompleted ():
                 msg_load_future.Result ()
 
-            msg.SaveAsync (pipe.Writer)
+            msg.SaveBuffer (pipe.Writer)
             yield pipe.Writer.Flush ()
 
             msg_load = yield msg_load_future

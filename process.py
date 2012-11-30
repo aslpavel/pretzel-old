@@ -260,7 +260,7 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
 
             # input
             if input:
-                proc.Stdin.Write (input)
+                proc.Stdin.WriteBuffer (input)
                 proc.Stdin.Flush ().Continue (lambda *_: proc.Stdin.Dispose ())
 
             # output
