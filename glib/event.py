@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-from ..event import BaseEvent
+from ..async import Event
 
 __all__ = ('GEvent',)
 #------------------------------------------------------------------------------#
 # GObject Event                                                                #
 #------------------------------------------------------------------------------#
-class GEvent (BaseEvent):
+class GEvent (Event):
     __slots__ = ('source', 'name', 'args',)
 
     def __init__ (self, source, name, *args):
@@ -14,12 +14,12 @@ class GEvent (BaseEvent):
         self.args   = args
 
     #--------------------------------------------------------------------------#
-    # Add | Remove                                                             #
+    # Subscribe | Unsubscribe                                                  #
     #--------------------------------------------------------------------------#
-    def Add (self, handler):
+    def Subscribe (self, handler):
         return self.source.connect (self.name, handler, *self.args)
 
-    def Remove (self, handler_id):
+    def Unsubscribe (self, handler_id):
         return self.source.disconnect (handler_id, *self.args)
 
 # vim: nu ft=python columns=120 :

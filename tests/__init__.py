@@ -8,10 +8,10 @@ def load_tests (loader, tests, pattern):
     """Load test protocol
     """
     from unittest import TestSuite
-    from . import event, process, disposable, pool
+    from . import process, disposable, pool
 
     suite = TestSuite ()
-    for test in (process, event, disposable, pool):
+    for test in (process, disposable, pool):
         suite.addTests (loader.loadTestsFromModule (test))
     return suite
 

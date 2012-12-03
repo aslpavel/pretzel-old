@@ -6,8 +6,8 @@ import struct
 import ctypes
 import ctypes.util
 
-from ..async import Future, FutureSource, FutureCanceled, Async, AsyncReturn, BufferedFile, Core
-from ..event import Event
+from ..async import (Future, FutureSource, FutureCanceled, Async, AsyncReturn,
+                     BufferedFile, Core, Event)
 
 __all__ = ['FileMonitor']
 #------------------------------------------------------------------------------#
@@ -37,22 +37,19 @@ class InotifyImpl (object):
     def init (self):
         fd = self.inotify_init ()
         if fd == -1:
-            errno = ctypes.get_errno ()
-            raise OSError (errno, os.strerror (errno))
+            raise OSError (errno, os.strerror (ctypes.get_errno ()))
         return fd
 
     def add_watch (self, fd, path, mask):
         watch_desc = self.inotify_add_watch (fd, path.encode (sys.getfilesystemencoding ()), mask)
         if watch_desc == -1:
-            errno = ctypes.get_errno ()
-            raise OSError (errno, os.strerror (errno))
+            raise OSError (errno, os.strerror (ctypes.get_errno ()))
 
         return watch_desc
 
     def rm_watch (self, fd, wd):
         if self.inotify_rm_watch (fd, wd) != 0:
-            errno = ctypes.get_errno ()
-            raise OSError (errno, os.strerror (errno))
+            raise OSError (errno, os.strerror (ctypes.get_errno ()))
 
 #------------------------------------------------------------------------------#
 # Flags                                                                        #

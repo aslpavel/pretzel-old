@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 import sys
 
-from ...event import Event
 from ...disposable import Disposable
 from ...async import (Async, DummyAsync, Core, BrokenPipeError, FailedFuture,
-                      FutureSource, FutureCanceled)
+                      FutureSource, FutureCanceled, Event)
 
 __all__ = ('Channel', 'ChannelError',)
 #------------------------------------------------------------------------------#
