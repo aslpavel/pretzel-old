@@ -51,7 +51,7 @@ class LogType (object):
     def LoggerCreate (self, name, *args, **keys):
         logger_type = self.logger_types.get (name)
         if logger_type is None:
-            raise ValueError ('Uknown logger name: {}'.format (name))
+            raise ValueError ('Unknown logger name: {}'.format (name))
 
         return self.LoggerAttach (logger_type (*args, **keys))
 

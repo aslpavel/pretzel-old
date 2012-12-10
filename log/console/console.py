@@ -93,6 +93,7 @@ class ConsoleLogger (object):
                 report_value [0] = value
                 with label.Update (False):
                     self.progress_draw (value)
+                return True
             report += report_callback
 
         #----------------------------------------------------------------------#
