@@ -174,7 +174,7 @@ class ThreadPool (object):
         # terminate threads
         self.thread_exit ()
 
-        # dispose core queueu
+        # dispose core queue
         self.core_queue.Dispose ()
 
         # resolve futures
