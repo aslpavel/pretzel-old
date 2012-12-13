@@ -61,10 +61,10 @@ class Channel (object):
 
             # cancel
             if cancel:
-                def cancel_continuation (result, error):
+                def cancel_cont (result, error):
                     self.recv_queue.pop (destination, None)
                     source.ErrorRaise (FutureCanceled ())
-                cancel.Continue (cancel_continuation)
+                cancel.Await ().OnCompleted (cancel_cont)
 
             # enqueue
             self.recv_queue [destination] = source

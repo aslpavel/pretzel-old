@@ -3,7 +3,8 @@ import time
 import errno
 from gi.repository import GLib
 
-from ..async import (FutureSource, FutureCanceled, SucceededFuture, BrokenPipeError, ConnectionError)
+from ..async import (FutureSourcePair, FutureCanceled, SucceededFuture,
+                     BrokenPipeError, ConnectionError)
 
 __all__ = ('GCore',)
 #------------------------------------------------------------------------------#
@@ -24,14 +25,14 @@ class GCore (object):
         if delay < 0:
             return SucceededFuture (resume)
 
-        return self.source_create (lambda source: source.ResultSet (resume),
+        return self.source_create (lambda source: source.TrySetResult (resume),
             cancel, GLib.timeout_add, (int (delay * 1000),))
 
     #--------------------------------------------------------------------------#
     # Idle                                                                     #
     #--------------------------------------------------------------------------#
     def IdleAwait (self, cancel = None):
-        return self.source_create (lambda source: source.ResultSet (None), cancel, GLib.idle_add)
+        return self.source_create (lambda source: source.TrySetResult (None), cancel, GLib.idle_add)
 
     #--------------------------------------------------------------------------#
     # Poll                                                                     #
@@ -48,10 +49,10 @@ class GCore (object):
 
         def resolve (source, fd, cond):
             if cond & ~self.ERROR:
-                source.ResultSet (cond)
+                source.TrySetResult (cond)
             else:
-                source.ErrorRaise (BrokenPipeError (errno.EPIPE, 'Broken pipe') if cond & self.DISCONNECT else \
-                                   ConnectionError ())
+                source.TrySetException (BrokenPipeError (errno.EPIPE, 'Broken pipe')
+                    if cond & self.DISCONNECT else ConnectionError ())
 
         return self.source_create (resolve, cancel, GLib.io_add_watch, (fd, mask | self.ERROR))
 
@@ -86,7 +87,7 @@ class GCore (object):
         enqueue (*args, resolve)        -> source_id
         resolve (source, *resolve_args) -> None
         """
-        source = FutureSource ()
+        future, source = FutureSourcePair ()
 
         def resolve_internal (*resolve_args):
             self.sources.discard (source)
@@ -94,17 +95,16 @@ class GCore (object):
             return False # remove from event loop
 
         if cancel:
-            def cancel_continuation (result, error):
+            def cancel_cont (result, error):
                 GLib.source_remove (source_id)
                 self.sources.discard (source)
-                source.ErrorRaise (FutureCanceled ())
-
-            cancel.Continue (cancel_continuation)
+                source.TrySetCanceled ()
+            cancel.Await ().OnCompleted (cancel_cont)
 
         source_id = enqueue (*(args + (resolve_internal,))) if args else enqueue (resolve_internal)
         self.sources.add (source)
 
-        return source.Future
+        return future
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
@@ -115,7 +115,7 @@ class GCore (object):
         # resolve futures
         sources, self.sources = self.sources, set ()
         for source in list (sources):
-            source.ErrorRaise (error)
+            source.TrySetException (error)
 
     def __enter__ (self):
         return self

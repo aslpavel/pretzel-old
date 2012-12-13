@@ -99,7 +99,7 @@ class ConsoleLogger (object):
         #----------------------------------------------------------------------#
         # Done                                                                 #
         #----------------------------------------------------------------------#
-        def continuation (result, error):
+        def observe_cont (result, error):
             label.Dispose ()
             with self.console.Line ():
                 if error is None:
@@ -123,7 +123,7 @@ class ConsoleLogger (object):
 
                 self.progress_draw (report_value [0])
 
-        future.Continue (continuation)
+        future.Then (observe_cont)
         return future
 
     #--------------------------------------------------------------------------#

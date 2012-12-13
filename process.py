@@ -269,7 +269,7 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
             # input
             if input:
                 proc.Stdin.WriteBuffer (input)
-                proc.Stdin.Flush ().Continue (lambda *_: proc.Stdin.Dispose ())
+                proc.Stdin.Flush ().Then (lambda *_: proc.Stdin.Dispose ())
 
             # output
             out = proc.Stdout.ReadUntilEof (cancel) if proc.Stdout else SucceededFuture (None)
@@ -363,8 +363,8 @@ class ProcessWaiter (object):
         for pid, source, core, status in resolved_queue:
             try:
                 # Resolve source inside calling core's thread
-                core.ContextAwait (os.WEXITSTATUS (status)).Continue (
-                    lambda result, error: source.ResultSet (result))
+                core.ContextAwait (os.WEXITSTATUS (status)) \
+                    .Then (lambda result, _: source.ResultSet (result))
             except FutureCanceled: pass
 
     #--------------------------------------------------------------------------#

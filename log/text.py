@@ -48,7 +48,7 @@ class TextLogger (object):
         self.stream.write ('\n')
         self.stream.flush ()
 
-        def continuation (result, error):
+        def observe_cont (result, error):
             if error is None:
                 self.write_prefix ('done', keys)
                 self.write (*args)
@@ -66,7 +66,7 @@ class TextLogger (object):
             self.stream.write ('\n')
             self.stream.flush ()
 
-        future.Continue (continuation)
+        future.Then (observe_cont)
         return future
 
     #--------------------------------------------------------------------------#

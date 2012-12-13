@@ -27,8 +27,10 @@ class ThreadPoolTest (unittest.TestCase):
             futures = set (pool (lambda: time.sleep (time_span)) for _ in range (pool.Size () + 1))
 
             # register jobs completion
+            def future_register (future):
+                future.Then (lambda *_: futures.discard (future))
             for future in futures:
-                future.ContinueSelf (lambda future: futures.discard (future))
+                future_register (future)
             self.assertEqual (len (futures), pool.Size () + 1)
 
             # wait for jobs

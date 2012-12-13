@@ -85,7 +85,7 @@ class FutureService (Service):
                     value = self.desc_struct.pack (desc ^ 0x1) + result.ToBytes ()
                     self.domain.channel.Send (Message.FromValue (value, self.RESOLVE))
 
-            future.Continue (resolve)
+            future.Then (resolve)
 
         return self.FUTURE_WAIT, info.Desc
 
@@ -113,7 +113,7 @@ class FutureService (Service):
                     self.desc_info.pop   (desc, None)
                     self.future_info.pop (future, None)
 
-                future.Continue (resolve)
+                future.Then (resolve)
 
             return info.Future
 
