@@ -205,7 +205,7 @@ class FileMonitorWatch (object):
         if future is deleted:
             raise FileMonitorError ('Watch has been deleted')
 
-        AsyncReturn (changed.Result ())
+        AsyncReturn (changed.GetResult () [0])
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #

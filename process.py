@@ -9,7 +9,7 @@ import threading
 
 from .disposable import Disposable, CompositeDisposable
 from .async import (Async, AsyncReturn, Future, FutureSource, FutureCanceled,
-                    SucceededFuture, Pipe, BrokenPipeError, Core)
+                    CompletedFuture, Pipe, BrokenPipeError, Core)
 
 __all__ = ('Process', 'ProcessCall', 'ProcessWaiter', 'ProcessError',
            'PIPE', 'DEVNULL', 'STDIN', 'STDOUT', 'STDERR',)
@@ -272,8 +272,8 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
                 proc.Stdin.Flush ().Then (lambda *_: proc.Stdin.Dispose ())
 
             # output
-            out = proc.Stdout.ReadUntilEof (cancel) if proc.Stdout else SucceededFuture (None)
-            err = proc.Stderr.ReadUntilEof (cancel) if proc.Stderr else SucceededFuture (None)
+            out = proc.Stdout.ReadUntilEof (cancel) if proc.Stdout else CompletedFuture (None)
+            err = proc.Stderr.ReadUntilEof (cancel) if proc.Stderr else CompletedFuture (None)
             yield Future.All ((out, err))
 
             AsyncReturn ((out.Result (), err.Result (), (yield proc.Status)))
@@ -331,7 +331,7 @@ class ProcessWaiter (object):
         # check if process has already been terminated
         pid, status = os.waitpid (pid, os.WNOHANG)
         if pid != 0:
-            return SucceededFuture (os.WEXITSTATUS (status))
+            return CompletedFuture (os.WEXITSTATUS (status))
 
         # enqueue source
         with self.instance_lock:

@@ -2,7 +2,7 @@
 import unittest
 
 from ..domains.fork import ForkDomain
-from ...async import FutureSource, SucceededFuture, FailedFuture, RaisedFuture
+from ...async import FutureSource, CompletedFuture, RaisedFuture
 from ...async.tests import AsyncTest
 
 __all__ = ('FutureTest',)
@@ -30,14 +30,14 @@ class FutureTest (unittest.TestCase):
             yield proxy.Done ('result')
             yield future
             self.assertEqual (future.Result (), 'result')
-            self.assertEqual (type ((yield proxy.Future)), SucceededFuture)
+            self.assertEqual (type ((yield proxy.Future)), CompletedFuture)
 
             # error future
             yield proxy.Create ()
             future = yield proxy.Future
 
             yield proxy.Error (ValueError ('test'))
-            self.assertEqual (type ((yield proxy.Future)), FailedFuture)
+            self.assertEqual (type ((yield proxy.Future)), CompletedFuture)
             try:
                 yield future
             except Exception as error:
@@ -47,13 +47,13 @@ class FutureTest (unittest.TestCase):
             # succeeded future
             future = yield proxy.Succeeded ()
             self.assertEqual (future.Result (), 'success')
-            self.assertEqual (type (future), SucceededFuture)
+            self.assertEqual (type (future), CompletedFuture)
 
             # failed future
             future = yield proxy.Failed ()
             self.assertEqual (future.Error () [0], ValueError)
             self.assertEqual (future.Error () [1].args, ('failed',))
-            self.assertEqual (type (future), FailedFuture)
+            self.assertEqual (type (future), CompletedFuture)
 
 #------------------------------------------------------------------------------#
 # Helpers                                                                      #
@@ -81,7 +81,7 @@ class RemoteFuture (object):
 
     # completed
     def Succeeded (self):
-        return SucceededFuture ('success')
+        return CompletedFuture ('success')
 
     def Failed (self):
         return RaisedFuture (ValueError ('failed'))
