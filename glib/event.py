@@ -14,12 +14,12 @@ class GEvent (Event):
         self.args   = args
 
     #--------------------------------------------------------------------------#
-    # Subscribe | Unsubscribe                                                  #
+    # On | Off                                                                 #
     #--------------------------------------------------------------------------#
-    def Subscribe (self, handler):
+    def On (self, handler):
         return self.source.connect (self.name, handler, *self.args)
 
-    def Unsubscribe (self, handler_id):
+    def Off (self, handler_id):
         return self.source.disconnect (handler_id, *self.args)
 
 # vim: nu ft=python columns=120 :
