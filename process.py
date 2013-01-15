@@ -8,7 +8,7 @@ import signal
 import threading
 
 from .disposable import Disposable, CompositeDisposable
-from .async import (Async, AsyncReturn, Future, FutureSource, FutureCanceled,
+from .async import (Async, AsyncReturn, Future, FutureSourcePair, FutureCanceled,
                     CompletedFuture, Pipe, BrokenPipeError, Core)
 
 __all__ = ('Process', 'ProcessCall', 'ProcessWaiter', 'ProcessError',
@@ -49,7 +49,7 @@ class Process (object):
 
         # status
         self.pid = None
-        self.status_source = FutureSource ()
+        self.status_future = None
 
         #----------------------------------------------------------------------#
         # Pipes                                                                #
@@ -104,7 +104,7 @@ class Process (object):
                         stream.CloseOnExec (True)
 
             # start status coroutine
-            self.status_main (status_pipe.Reader).Traceback ('process status main')
+            self.status_future = self.status_main (status_pipe.Reader)
 
         else:
             try:
@@ -154,7 +154,7 @@ class Process (object):
     def Status (self):
         """Future object for return code of the process
         """
-        return self.status_source.Future
+        return self.status_future
 
     @property
     def Pid (self):
@@ -177,18 +177,16 @@ class Process (object):
     def status_main (self, error_stream):
         """Status coroutine main
         """
-        status_future = self.process_waiter (self.pid, self.core)
+        process_future = self.process_waiter (self.pid, self.core)
 
-        # restore error from error stream if any
         try:
+            # restore error from error stream if any
             error_dump = yield error_stream.ReadUntilEof ()
             if error_dump:
-                self.status_source.ErrorRaise (pickle.loads (error_dump))
-                return
+                raise error_dump
         except BrokenPipeError: pass
 
-        # wait for process to terminate
-        self.status_source.ResultSet ((yield status_future))
+        AsyncReturn ((yield process_future))
 
     #--------------------------------------------------------------------------#
     # Dispose                                                                  #
@@ -224,7 +222,7 @@ class Process (object):
         return False
 
     #--------------------------------------------------------------------------#
-    # Representation                                                           #
+    # To String                                                                #
     #--------------------------------------------------------------------------#
     def __str__ (self):
         """String representation of the process
@@ -335,9 +333,9 @@ class ProcessWaiter (object):
 
         # enqueue source
         with self.instance_lock:
-            source = FutureSource ()
+            future, source = FutureSourcePair ()
             self.queue.append ((pid, source, core or Core.Instance (),))
-        return source.Future
+        return future
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #
@@ -364,7 +362,7 @@ class ProcessWaiter (object):
             try:
                 # Resolve source inside calling core's thread
                 core.ContextAwait (os.WEXITSTATUS (status)) \
-                    .Then (lambda result, _: source.ResultSet (result))
+                    .Then (lambda result, _: source.TrySetResult (result))
             except FutureCanceled: pass
 
     #--------------------------------------------------------------------------#
@@ -377,7 +375,7 @@ class ProcessWaiter (object):
 
         pid_source, self.pid_source = self.pid_source, {}
         for pid, source in pid_source.items ():
-            source.ErrorRaise (FutureCanceled ('Process waiter has been disposed'))
+            source.TrySetException (FutureCanceled ('Process waiter has been disposed'))
 
     def __enter__ (self):
         return self
