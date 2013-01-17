@@ -135,6 +135,12 @@ class Connection (object):
     def dispatch (self, msg):
         """Dispatch incoming (packed) message
         """
+
+        # Detachment from  current coroutine is vital here because if handler
+        # tries to create nested core loop to resolve future synchronously
+        # (i.g. importer proxy) it can stop dispatching coroutine
+        yield self.core.Idle ()
+
         msg, src, dst = self.unpickler_type (io.BytesIO (msg)).load ()
         dst = dst - 1 # strip remote connection address
 
