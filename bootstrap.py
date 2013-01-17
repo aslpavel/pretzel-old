@@ -277,7 +277,7 @@ if init is not None:
         """Dispose tomb
         """
         if self in sys.meta_path:
-            self.meta_path.remove ()
+            self.meta_path.remove (self)
 
     def __enter__ (self):
         return self
