@@ -93,7 +93,7 @@ class Connection (object):
         if isinstance (target, Sender):
             if target.dst == self.sender.dst:
                 # This sender was previously received from this connection
-                # so it must not be routed here again.
+                # so it must not be routed again.
                 return self.PACK_UNROUTE, target.dst - 1
             else:
                 # Sender must be routed
@@ -104,8 +104,8 @@ class Connection (object):
             if proxify is not None:
                 proxy = proxify ()
                 if proxy is not target:
-                    # Target object implements proxy interface, send proxy instead
-                    # of target object
+                    # Target object implements proxify interface, send proxy
+                    # instead of target object.
                     return self.PACK_PROXY, proxy
 
     def unpack (self, state):
@@ -128,7 +128,7 @@ class Connection (object):
         """Handle message
         """
         stream = io.BytesIO ()
-        self.pickler_type (stream, -1).dump ((msg, src, dst - 1)) # strip connection address
+        self.pickler_type (stream, -1).dump ((msg, src, dst))
         return stream.getvalue ()
 
     @Async
@@ -136,12 +136,15 @@ class Connection (object):
         """Dispatch incoming (packed) message
         """
         msg, src, dst = self.unpickler_type (io.BytesIO (msg)).load ()
+        dst = dst - 1 # strip remote connection address
+
         if dst:
-            # routed message
+            # After striping remote connection address, destination is not empty
+            # so it needs to be routed.
             self.hub.Send (dst, msg, src)
 
         else:
-            # incoming message
+            # Message target is connection itself, execute action
             with ResultSender (src) as send:
                 # dispose
                 if msg is None:
