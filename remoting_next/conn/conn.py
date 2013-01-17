@@ -242,9 +242,6 @@ class ConnectionProxy (object):
             raise ValueError ('Connection is disposed')
         return self.sender.Request ((func, args, keys, self.mutators))
 
-    #--------------------------------------------------------------------------#
-    # Mutators                                                                 #
-    #--------------------------------------------------------------------------#
     def __getattr__ (self, mutator):
         """Return mutated proxy
         """

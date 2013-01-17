@@ -33,7 +33,7 @@ class Proxy (object):
         """Call proxy
         """
         if self.sender is None:
-            raise RuntimeError ('Proxy is disposed')
+            raise ValueError ('Proxy is disposed')
         return self.sender.Request ((PROXY_CALL, None, (args, keys), None))
 
     #--------------------------------------------------------------------------#
@@ -43,7 +43,7 @@ class Proxy (object):
         """Get attribute
         """
         if self.sender is None:
-            raise RuntimeError ('Proxy is disposed')
+            raise ValueError ('Proxy is disposed')
 
         if name in PROXY_MUTATORS:
             return ProxyAttribute (self.sender, None, (name,))
@@ -54,7 +54,7 @@ class Proxy (object):
         """Set attribute
         """
         if self.sender is None:
-            raise RuntimeError ('Proxy is disposed')
+            raise ValueError ('Proxy is disposed')
         return self.sender.Request ((PROXY_SETATTR, name, value, None))
 
     #--------------------------------------------------------------------------#
@@ -64,7 +64,7 @@ class Proxy (object):
         """Get awaiter
         """
         if self.sender is None:
-            raise RuntimeError ('Proxy is disposed')
+            raise ValueError ('Proxy is disposed')
         return self.sender.Request ((PROXY_AWAIT, None, None, None))
 
     #--------------------------------------------------------------------------#
