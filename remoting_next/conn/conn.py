@@ -46,25 +46,6 @@ class Connection (object):
         self.unpickler_type = unpickler_type
 
     #--------------------------------------------------------------------------#
-    # Proxify                                                                  #
-    #--------------------------------------------------------------------------#
-    def Proxify (self):
-        """Get proxy
-        """
-        return ConnectionProxy (self.sender)
-
-    #--------------------------------------------------------------------------#
-    # Awaitable                                                                #
-    #--------------------------------------------------------------------------#
-    @Async
-    def Await (self, target = None):
-        """Get awaiter
-        """
-        if not self.Connected:
-            yield self.Connect (target)
-        AsyncReturn (self.Proxify ())
-
-    #--------------------------------------------------------------------------#
     # Connect                                                                  #
     #--------------------------------------------------------------------------#
     @Async
@@ -89,6 +70,15 @@ class Connection (object):
         """Is connected
         """
         return self.state.State == self.STATE_CONNED
+
+    @DummyAsync
+    def connect (self, target):
+        """Connect implementation
+        """
+
+    def disconnect (self):
+        """Disconnect implementation
+        """
 
     #--------------------------------------------------------------------------#
     # Marshal                                                                  #
@@ -177,16 +167,24 @@ class Connection (object):
                 send (result)
 
     #--------------------------------------------------------------------------#
-    # Implementation                                                           #
+    # Awaitable                                                                #
     #--------------------------------------------------------------------------#
-    @DummyAsync
-    def connect (self, target):
-        """Connect implementation
+    @Async
+    def Await (self, target = None):
+        """Get awaiter
         """
+        if not self.Connected:
+            yield self.Connect (target)
+        AsyncReturn (self.Proxify ())
 
-    def disconnect (self):
-        """Disconnect implementation
+    #--------------------------------------------------------------------------#
+    # Proxify                                                                  #
+    #--------------------------------------------------------------------------#
+    def Proxify (self):
+        """Get proxy
         """
+        return ConnectionProxy (self.sender)
+
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
     #--------------------------------------------------------------------------#
@@ -232,14 +230,6 @@ class ConnectionProxy (object):
         self.mutators = mutators
 
     #--------------------------------------------------------------------------#
-    # Proxify                                                                  #
-    #--------------------------------------------------------------------------#
-    def Proxify (self):
-        """Get proxy
-        """
-        return self
-
-    #--------------------------------------------------------------------------#
     # Call                                                                     #
     #--------------------------------------------------------------------------#
     def __call__ (self, func, *args, **keys):
@@ -257,6 +247,14 @@ class ConnectionProxy (object):
         """
         return ConnectionProxy (self.sender, self.mutators + (mutator,)
             if self.mutators else (mutator,))
+
+    #--------------------------------------------------------------------------#
+    # Proxify                                                                  #
+    #--------------------------------------------------------------------------#
+    def Proxify (self):
+        """Get proxy
+        """
+        return self
 
     #--------------------------------------------------------------------------#
     # Reduce                                                                   #
