@@ -88,7 +88,7 @@ class Observable (object):
             context = Context (value = None, hasValue = False, worker = SucceededFuture (None))
             @Async
             def worker ():
-                yield core.TimeDelayAwait (delay)
+                yield core.TimeDelay (delay)
                 observer.OnNext (context.value)
                 context.value, context.hasValue = None, False
 
@@ -157,7 +157,7 @@ class Observable (object):
             context = Context (value = None, hasValue = False, worker = SucceededFuture (None))
             @Async
             def worker ():
-                yield core.TimeDelayAwait (delay)
+                yield core.TimeDelay (delay)
                 observer.OnNext (context.value)
                 context.value, context.hasValue = None, False
 

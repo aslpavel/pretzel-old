@@ -36,7 +36,7 @@ class MessageTest (unittest.TestCase):
         msg = Message.FromValue (b'value', b'dst')
 
         with Pipe () as pipe:
-            msg_load_future = Message.FromAsyncStream (pipe.Reader, Core.Instance ().TimeDelayAwait (1))
+            msg_load_future = Message.FromAsyncStream (pipe.Reader, Core.Instance ().TimeDelay (1))
             if msg_load_future.IsCompleted ():
                 msg_load_future.Result ()
 

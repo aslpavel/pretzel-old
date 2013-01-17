@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-from . import hub
+from . import hub, proxy, conn
 
 from .hub import *
+from .proxy import *
 from .conn import *
 
-__all__ = hub.__all__ + conn.__all__
+__all__ = hub.__all__ + proxy.__all__ + conn.__all__
 #------------------------------------------------------------------------------#
 # Load Test Protocol                                                           #
 #------------------------------------------------------------------------------#

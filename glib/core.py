@@ -17,10 +17,10 @@ class GCore (object):
     #--------------------------------------------------------------------------#
     # Time                                                                     #
     #--------------------------------------------------------------------------#
-    def TimeAwait (self, resume, cancel = None):
-        return self.TimeDelayAwait (resume - time.time (), cancel)
+    def Time (self, resume, cancel = None):
+        return self.TimeDelay (resume - time.time (), cancel)
 
-    def TimeDelayAwait (self, delay, cancel = None):
+    def TimeDelay (self, delay, cancel = None):
         resume = time.time () + delay
         if delay < 0:
             return SucceededFuture (resume)
@@ -31,7 +31,7 @@ class GCore (object):
     #--------------------------------------------------------------------------#
     # Idle                                                                     #
     #--------------------------------------------------------------------------#
-    def IdleAwait (self, cancel = None):
+    def Idle (self, cancel = None):
         return self.source_create (lambda source: source.TrySetResult (None), cancel, GLib.idle_add)
 
     #--------------------------------------------------------------------------#
@@ -43,7 +43,7 @@ class GCore (object):
     DISCONNECT = GLib.IO_HUP
     ERROR      = GLib.IO_ERR | GLib.IO_NVAL | GLib.IO_HUP
 
-    def FileAwait (self, fd, mask, cancel = None):
+    def Poll (self, fd, mask, cancel = None):
         if mask is None:
             return # no clean up for closed file descriptors
 

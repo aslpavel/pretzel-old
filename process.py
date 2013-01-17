@@ -207,7 +207,7 @@ class Process (object):
 
             try:
                 if self.kill_delay > 0:
-                    yield self.core.TimeDelayAwait (self.kill_delay, cancel = self.Status)
+                    yield self.core.TimeDelay (self.kill_delay, cancel = self.Status)
             except FutureCanceled: pass
             finally:
                 if not self.Status.IsCompleted ():
@@ -361,7 +361,7 @@ class ProcessWaiter (object):
         for pid, source, core, status in resolved_queue:
             try:
                 # Resolve source inside calling core's thread
-                core.ContextAwait (os.WEXITSTATUS (status)) \
+                core.Context (os.WEXITSTATUS (status)) \
                     .Then (lambda result, _: source.TrySetResult (result))
             except FutureCanceled: pass
 

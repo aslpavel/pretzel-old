@@ -39,7 +39,7 @@ sys.exit (117)
     def testCleanup (self):
         """Process cleanup
         """
-        yield Core.Instance ().IdleAwait ()
+        yield Core.Instance ().Idle ()
 
         with Process (['cat'], stdin = PIPE, stdout = PIPE, stderr = PIPE) as proc:
             self.assertTrue (proc.Stdin.CloseOnExec ())
