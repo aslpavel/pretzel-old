@@ -188,7 +188,8 @@ class ResultSender (object):
                     else:
                         return False
             except Exception:
-                # result cannot be pickled or sender is disconnected
+                # Failed to send result (It is probably failed to pickle), try
+                # to send error.
                 self.sender.Send (Result ().SetCurrentError ())
         return True
 

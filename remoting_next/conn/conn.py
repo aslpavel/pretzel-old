@@ -127,6 +127,7 @@ class Connection (object):
     def handle (self, msg, src, dst):
         """Handle message
         """
+        # just send it to remote peer
         stream = io.BytesIO ()
         self.pickler_type (stream, -1).dump ((msg, src, dst))
         return stream.getvalue ()

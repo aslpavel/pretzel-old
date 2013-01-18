@@ -68,19 +68,25 @@ class Hub (object):
         if not handlers_prev:
             raise HubError ('No receiver for destination: {}'.format (dst))
 
-        handlers_next = []
-        for handler in handlers_prev:
-            if handler (msg, src, dst):
-                handlers_next.append (handler)
+        try:
+            handlers_next = []
+            for handler in handlers_prev:
+                if handler (msg, src, dst):
+                    handlers_next.append (handler)
 
-        if handlers_next:
-            handlers_prev = self.handlers.setdefault (dst, handlers_next)
-            if handlers_prev is not handlers_next:
-                handlers_prev.extend (handlers_next)
+        except Exception:
+            handlers_next = handlers_prev
+            raise
 
-        if dst and self.handlers.get (None, None):
-            # Special destination  where all messages are send
-            self.Send (None, msg, src)
+        finally:
+            if handlers_next:
+                handlers_prev = self.handlers.setdefault (dst, handlers_next)
+                if handlers_prev is not handlers_next:
+                    handlers_prev.extend (handlers_next)
+
+            # call broadcast handlers
+            if dst and self.handlers.get (None, None):
+                self.Send (None, msg, src)
 
     #--------------------------------------------------------------------------#
     # Receiver                                                                 #
