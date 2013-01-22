@@ -38,7 +38,11 @@ class StreamConnection (Connection):
                 msg_next = self.in_stream.BytesRead ()
                 while True:
                     msg, msg_next = (yield msg_next), self.in_stream.BytesRead ()
-                    self.dispatch (msg).Traceback ('Connection::dispatch')
+
+                    # Detachment from  current coroutine is vital here because if handler
+                    # tries to create nested core loop to resolve future synchronously
+                    # (i.g. importer proxy) it can stop dispatching coroutine
+                    self.core.Idle ().Then (lambda r, e: self.dispatch (msg))
 
             except (FutureCanceled, BrokenPipeError): pass
             finally:
