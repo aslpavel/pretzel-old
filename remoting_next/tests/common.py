@@ -11,8 +11,18 @@ class RemoteError (Exception):
 
 class Remote (object):
     def __init__ (self, value):
+        self.items = {}
         self.value = value
         self.event = Event ()
+
+    #--------------------------------------------------------------------------#
+    # Items                                                                    #
+    #--------------------------------------------------------------------------#
+    def __getitem__ (self, name):
+        return self.items [name]
+
+    def __setitem__ (self, name, value):
+        self.items [name] = value
 
     #--------------------------------------------------------------------------#
     # Value                                                                    #

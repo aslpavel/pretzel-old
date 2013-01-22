@@ -3,8 +3,9 @@ import io
 import pickle
 
 from ..hub import Hub, Sender, ReceiverSenderPair
-from ..result import ResultSender
-from ..proxy import Proxify
+from ..result import Result, ResultPrintException
+from ..proxy import Proxy
+from ..expr import LoadConstExpr, LoadArgExpr
 from ...async import Async, AsyncReturn, DummyAsync, Core, StateMachine, StateMachineGraph
 from ...disposable import CompositeDisposable
 
@@ -46,6 +47,16 @@ class Connection (object):
         self.unpickler_type = unpickler_type
 
     #--------------------------------------------------------------------------#
+    # Call                                                                     #
+    #--------------------------------------------------------------------------#
+    def __call__ (self, target):
+        """Create proxy object from provided pickle-able constant.
+        """
+        if not self.Connected:
+            raise ValueError ('Not connected')
+        return Proxy (self.sender, LoadConstExpr (target))
+
+    #--------------------------------------------------------------------------#
     # Connect                                                                  #
     #--------------------------------------------------------------------------#
     @Async
@@ -62,8 +73,7 @@ class Connection (object):
        except Exception:
            self.Dispose ()
            raise
-
-       AsyncReturn (self.Proxify ())
+       AsyncReturn (self)
 
     @property
     def Connected (self):
@@ -100,7 +110,7 @@ class Connection (object):
                 return self.PACK_ROUTE, target.dst
 
         elif not isinstance (target, type):
-            proxify = getattr (target, 'Proxify', None)
+            proxify = getattr (target, 'Proxy', None)
             if proxify is not None:
                 proxy = proxify ()
                 if proxy is not target:
@@ -151,49 +161,37 @@ class Connection (object):
             self.hub.Send (dst, msg, src)
 
         else:
-            # Message target is connection itself, execute action
-            with ResultSender (src) as send:
-                # dispose
-                if msg is None:
-                    self.Dispose ()
-                    return
+            # Message target is connection itself, execute code object
+            if msg is None:
+                self.Dispose ()
+                return
 
-                # call
-                func, args, keys, mutators = msg
-                result = func (*args, **keys)
+            def conn_cont (result, error):
+                if src is not None:
+                    if error is None:
+                        src.Send (Result ().SetResult (result))
+                    else:
+                        src.Send (Result ().SetError (error))
+                elif error is not None:
+                    ResultPrintException (*error)
 
-                # mutate
-                if mutators:
-                    for mutator in mutators:
-                        if mutator == 'Proxy':
-                            result = Proxify (result)
-                        elif mutator == 'Yield':
-                            result = yield result.Await ()
-                        elif mutator == 'Null':
-                            result = None
-                        else:
-                            raise ValueError ('Invalid mutator: {}'.format (mutator))
-
-                send (result)
+            msg (self).Then (conn_cont)
 
     #--------------------------------------------------------------------------#
     # Awaitable                                                                #
     #--------------------------------------------------------------------------#
-    @Async
     def Await (self, target = None):
         """Get awaiter
         """
-        if not self.Connected:
-            yield self.Connect (target)
-        AsyncReturn (self.Proxify ())
+        return self.Connect (target)
 
     #--------------------------------------------------------------------------#
-    # Proxify                                                                  #
+    # Proxy                                                                    #
     #--------------------------------------------------------------------------#
-    def Proxify (self):
+    def Proxy (self):
         """Get proxy
         """
-        return ConnectionProxy (self.sender)
+        return Proxy (self.sender, LoadArgExpr (0))
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
@@ -223,81 +221,6 @@ class Connection (object):
             self.state.State, self.sender.dst, id (self))
 
     def __repr__  (self):
-        """String representation
-        """
-        return str (self)
-
-#------------------------------------------------------------------------------#
-# Connection Proxy                                                             #
-#------------------------------------------------------------------------------#
-class ConnectionProxy (object):
-    """Connection proxy object
-    """
-    __slots__ = ('sender', 'mutators',)
-
-    def __init__ (self, sender, mutators = None):
-        self.sender = sender
-        self.mutators = mutators
-
-    #--------------------------------------------------------------------------#
-    # Call                                                                     #
-    #--------------------------------------------------------------------------#
-    def __call__ (self, func, *args, **keys):
-        """Call connection and unwrap returned result
-        """
-        if self.sender is None:
-            raise ValueError ('Connection is disposed')
-        return self.sender.Request ((func, args, keys, self.mutators))
-
-    def __getattr__ (self, mutator):
-        """Return mutated proxy
-        """
-        return ConnectionProxy (self.sender, self.mutators + (mutator,)
-            if self.mutators else (mutator,))
-
-    #--------------------------------------------------------------------------#
-    # Proxify                                                                  #
-    #--------------------------------------------------------------------------#
-    def Proxify (self):
-        """Get proxy
-        """
-        return self
-
-    #--------------------------------------------------------------------------#
-    # Reduce                                                                   #
-    #--------------------------------------------------------------------------#
-    def __reduce__ (self):
-        """Reduce protocol
-        """
-        return ConnectionProxy, (self.sender, self.mutators,)
-
-    #--------------------------------------------------------------------------#
-    # Dispose                                                                  #
-    #--------------------------------------------------------------------------#
-    def Dispose (self):
-        """Dispose connection
-        """
-        sender, self.sender = self.sender, None
-        if sender is not None:
-            sender.Send (None)
-
-    def __enter__ (self):
-        return self
-
-    def __exit__ (self, et, eo, tb):
-        self.Dispose ()
-        return False
-
-    #--------------------------------------------------------------------------#
-    # To String                                                                #
-    #--------------------------------------------------------------------------#
-    def __str__ (self):
-        """String representation
-        """
-        return '<{0} [addr:{2}] at {1}>'.format (type (self).__name__, id (self),
-            self.sender.dst if self.sender else None)
-
-    def __repr__ (self):
         """String representation
         """
         return str (self)

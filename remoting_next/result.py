@@ -139,6 +139,22 @@ class Result (object):
         """
         return Result, (self.state, self.value,)
 
+    #--------------------------------------------------------------------------#
+    # To String                                                                #
+    #--------------------------------------------------------------------------#
+    def __str__ (self):
+        """String representation
+        """
+        return '<{} [{}]>'.format (type (self).__name__,
+            '?' if not self.state & self.STATE_DONE else
+            '~{}'.format (self.value) if self.state & self.STATE_FAIL else
+            '={}'.format (self.value))
+
+    def __repr__ (self):
+        """String representation
+        """
+        return str (self)
+
 traceback_template = """
 `-------------------------------------------------------------------------------
 Location : {host}/{pid}

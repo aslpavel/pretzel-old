@@ -1,229 +1,158 @@
 # -*- coding: utf-8 -*-
 
 from .hub import ReceiverSenderPair
-from .result import ResultSender
-from ..async import Async, LazyFuture
+from .result import Result, ResultPrintException
+from .expr import (LoadArgExpr, LoadConstExpr, CallExpr, GetAttrExpr, SetAttrExpr,
+                   GetItemExpr, SetItemExpr, AwaitExpr, Code)
 
-__all__ = ('Proxify',)
-#------------------------------------------------------------------------------#
-# Proxy Constants                                                              #
-#------------------------------------------------------------------------------#
-PROXY_CALL    = 0x01
-PROXY_GETATTR = 0x02
-PROXY_SETATTR = 0x04
-PROXY_AWAIT   = 0x08
-PROXY_DISPOSE = 0x10
-PROXY_MUTATORS = {'Proxy', 'Yield', 'Null'}
-
+__all__ = ('Proxy', 'Proxify',)
 #------------------------------------------------------------------------------#
 # Proxy                                                                        #
 #------------------------------------------------------------------------------#
 class Proxy (object):
     """Proxy object
     """
-    __slots__  = ('sender',)
+    __slots__ = ('sender', 'expr', 'code',)
 
-    def __init__ (self, sender):
+    def __init__ (self, sender, expr):
         object.__setattr__ (self, 'sender', sender)
-
-    #--------------------------------------------------------------------------#
-    # Call                                                                     #
-    #--------------------------------------------------------------------------#
-    def __call__ (self, *args, **keys):
-        """Call proxy
-        """
-        if self.sender is None:
-            raise ValueError ('Proxy is disposed')
-        return self.sender.Request ((PROXY_CALL, None, (args, keys), None))
-
-    #--------------------------------------------------------------------------#
-    # Attributes                                                               #
-    #--------------------------------------------------------------------------#
-    def __getattr__ (self, name):
-        """Get attribute
-        """
-        if self.sender is None:
-            raise ValueError ('Proxy is disposed')
-
-        if name in PROXY_MUTATORS:
-            return ProxyAttribute (self.sender, None, (name,))
-        else:
-            return ProxyAttribute (self.sender, name, None)
-
-    def __setattr__ (self, name, value):
-        """Set attribute
-        """
-        if self.sender is None:
-            raise ValueError ('Proxy is disposed')
-        return self.sender.Request ((PROXY_SETATTR, name, value, None))
+        object.__setattr__ (self, 'expr', expr)
+        object.__setattr__ (self, 'code', None)
 
     #--------------------------------------------------------------------------#
     # Awaitable                                                                #
     #--------------------------------------------------------------------------#
     def Await (self):
-        """Get awaiter
+        """Get awaitable
+
+        Resolves to result of expression execution.
         """
-        if self.sender is None:
-            raise ValueError ('Proxy is disposed')
-        return self.sender.Request ((PROXY_AWAIT, None, None, None))
+        if self.code is None:
+            code = Code ()
+            self.expr.Compile (code)
+            object.__setattr__ (self, 'code', code)
+        return self.sender.Request (self.code)
 
     #--------------------------------------------------------------------------#
-    # Proxify                                                                  #
+    # Proxy                                                                    #
     #--------------------------------------------------------------------------#
-    def Proxify (self):
-        """Get proxy to the object
+    def Proxy (self):
+        """Get proxy
         """
         return self
 
     #--------------------------------------------------------------------------#
-    # Reduce                                                                   #
+    # Pickle                                                                   #
     #--------------------------------------------------------------------------#
     def __reduce__ (self):
-        """Reduce protocol
+        """Reduce proxy
         """
-        return Proxy, (self.sender,)
+        return Proxy, (self.sender, self.expr)
 
     #--------------------------------------------------------------------------#
-    # Disposable                                                               #
+    # Operations                                                               #
     #--------------------------------------------------------------------------#
-    def Dispose (self, deep = None):
-        """Dispose proxy
+    def __call__ (self, *args, **keys):
+        """Call
         """
-        if self.sender is not None:
-            self.sender.Send ((PROXY_DISPOSE, None, deep, None))
-            object.__setattr__ (self, 'sender', None)
+        return Proxy (self.sender, CallExpr (self.expr, *args, **keys))
 
+    def __getattr__ (self, name):
+        """Get attribute
+        """
+        return Proxy (self.sender, GetAttrExpr (self.expr, name))
+
+    def __setattr__ (self, name, value):
+        """Set attribute
+        """
+        code = Code ()
+        SetAttrExpr (self.expr, name, value).Compile (code)
+        self.sender.Send (code)
+
+    def __getitem__ (self, item):
+        """Get item
+        """
+        return Proxy (self.sender, GetItemExpr (self.expr, item))
+
+    def __setitem__ (self, item, value):
+        """Set item
+        """
+        code = Code ()
+        SetItemExpr (self.expr, item, value).Compile (code)
+        self.sender.Send (code)
+
+    def __invert__ (self):
+        """Await
+        """
+        return Proxy (self.sender, AwaitExpr (self.expr))
+
+    def __pos__ (self):
+        """Proxify
+        """
+        return Proxy (self.sender, CallExpr (LoadConstExpr (Proxify), self.expr))
+
+    #--------------------------------------------------------------------------#
+    # To String                                                                #
+    #--------------------------------------------------------------------------#
+    def __str__ (self):
+        """String representation
+        """
+        return '<Proxy [addr:{} expr:{}]>'.format (
+            self.sender.dst if self.sender else None, self.expr)
+
+    def __repr__ (self):
+        """String representation
+        """
+        return str (self)
+
+    #--------------------------------------------------------------------------#
+    # Dispose                                                                  #
+    #--------------------------------------------------------------------------#
     def __enter__ (self):
+        """Enter proxy scope
+        """
         return self
 
     def __exit__ (self, et, eo, tb):
-        self.Dispose ()
+        """Leave proxy scope
+
+        Proxy will be disposed and want won't reply to any further request.
+        """
+        if self.sender is not None:
+            self.sender.Send (None)
+            object.__setattr__ (self, 'sender', None)
         return False
-
-    #--------------------------------------------------------------------------#
-    # To String                                                                #
-    #--------------------------------------------------------------------------#
-    def __str__ (self):
-        """String representation
-        """
-        return '<{} at {}>'.format (type (self).__name__,
-            None if self.sender is None else self.sender.dst)
-
-    def __repr__ (self):
-        """String representation
-        """
-        return str (self)
-
-
-#------------------------------------------------------------------------------#
-# Proxy Attribute                                                              #
-#------------------------------------------------------------------------------#
-class ProxyAttribute (LazyFuture):
-    """Proxy attribute object
-    """
-    __slots__ = LazyFuture.__slots__ + ('sender', 'name', 'mutators')
-
-    def __init__ (self, sender, name, mutators):
-        LazyFuture.__init__ (self, lambda: sender.Request ((PROXY_GETATTR, name, None, mutators)))
-
-        self.sender = sender
-        self.name = name
-        self.mutators = mutators
-
-    #--------------------------------------------------------------------------#
-    # Call                                                                     #
-    #--------------------------------------------------------------------------#
-    def __call__ (self, *args, **keys):
-        """Call method
-        """
-        return self.sender.Request ((PROXY_CALL, self.name, (args, keys), self.mutators))
-
-    #--------------------------------------------------------------------------#
-    # Mutators                                                                 #
-    #--------------------------------------------------------------------------#
-    def __getattr__ (self, mutator):
-        """Return mutated attribute
-        """
-        if mutator not in PROXY_MUTATORS:
-            raise AttributeError ('Unknown mutator \'{}\''.format (mutator))
-
-        return ProxyAttribute (self.sender, self.name,
-            self.mutators + (mutator,) if self.mutators else (mutator,))
-
-    #--------------------------------------------------------------------------#
-    # Reduce                                                                   #
-    #--------------------------------------------------------------------------#
-    def __reduce__ (self):
-        """Reduce protocol
-        """
-        return ProxyAttribute, (self.sender, self.name, self.mutators,)
-
-    #--------------------------------------------------------------------------#
-    # To String                                                                #
-    #--------------------------------------------------------------------------#
-    def __str__ (self):
-        """String representation
-        """
-        return '<{0} [name:{2} addr:{3} mutators:{4}] at {1}>'.format (
-            type (self).__name__, id (self), self.name, self.sender.dst,
-            ','.join (self.mutators) if self.mutators else None)
-
-    def __repr__ (self):
-        """String representation
-        """
-        return str (self)
 
 #------------------------------------------------------------------------------#
 # Proxify                                                                      #
 #------------------------------------------------------------------------------#
 def Proxify (target, hub = None):
-    """Create proxy object for specified target object
-    """
-    proxy = getattr (target, 'Proxify', None)
+    proxy = getattr (target, 'Proxy', None)
     if proxy is not None:
         return proxy ()
 
     receiver, sender = ReceiverSenderPair (hub = hub)
 
-    @Async
-    def proxy_handler_coro (msg, src):
-        """Proxy handler coroutine
-        """
-        with ResultSender (src) as send:
-            action, name, value, mutators = msg
-            if   action == PROXY_SETATTR: result = setattr (target, name, value)
-            elif action == PROXY_GETATTR: result = getattr (target, name)
-            elif action == PROXY_CALL:    result = (target (*value [0], **value [1]) if name is None else
-                                                    getattr (target, name) (*value [0], **value [1]))
-            elif action == PROXY_AWAIT:   result = yield target.Await ()
-            elif action == PROXY_DISPOSE:
-                # Postpone handler removal as otherwise it will be re-subscribed
-                # when proxy_handler returns True
-                yield receiver.hub
-                receiver.Off (proxy_handler)
-                if value:
-                    target.Dispose ()
-                return
-            else:
-                raise ValueError ('Unknown action: {}'.format (action))
-
-            if mutators:
-                for mutator in mutators:
-                    if   mutator == 'Proxy': result = Proxify (result)
-                    elif mutator == 'Yield': result = yield result.Await ()
-                    elif mutator == 'Null' : result = None
-                    else:
-                        raise ValueError ('Invalid mutator: {}'.format (mutator))
-
-            send (result)
-
     def proxy_handler (msg, src, dst):
-        """Proxy handler
-        """
-        proxy_handler_coro (msg, src)
+        if msg is None:
+            # Unsubscribe proxy handler
+            return False
+
+        def proxy_cont (result, error):
+            if src is not None:
+                if error is None:
+                    src.Send (Result ().SetResult (result))
+                else:
+                    src.Send (Result ().SetError (error))
+            elif error is not None:
+                # Print exception there is no reply port is provided and
+                # exception has happened.
+                ResultPrintException (*error)
+
+        msg (target).Then (proxy_cont)
         return True
 
     receiver.On (proxy_handler)
-    return Proxy (sender)
+    return Proxy (sender, LoadArgExpr (0))
 
 # vim: nu ft=python columns=120 :
