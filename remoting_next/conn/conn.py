@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import io
+import sys
 import pickle
 
 from ..hub import Hub, Sender, ReceiverSenderPair
@@ -52,8 +53,6 @@ class Connection (object):
     def __call__ (self, target):
         """Create proxy object from provided pickle-able constant.
         """
-        if not self.Connected:
-            raise ValueError ('Not connected')
         return Proxy (self.sender, LoadConstExpr (target))
 
     #--------------------------------------------------------------------------#
@@ -145,30 +144,36 @@ class Connection (object):
     def dispatch (self, msg):
         """Dispatch incoming (packed) message
         """
-        msg, src, dst = self.unpickler_type (io.BytesIO (msg)).load ()
-        dst = dst - 1 # strip remote connection address
+        try:
+            msg, src, dst = self.unpickler_type (io.BytesIO (msg)).load ()
+            dst = dst - 1 # strip remote connection address
 
-        if dst:
-            # After striping remote connection address, destination is not empty
-            # so it needs to be routed.
-            self.hub.Send (dst, msg, src)
+            if dst:
+                # After striping remote connection address, destination is not empty
+                # so it needs to be routed.
+                self.hub.Send (dst, msg, src)
 
-        else:
-            # Message target is connection itself, execute code object
-            if msg is None:
-                self.Dispose ()
-                return
+            else:
+                # Message target is connection itself, execute code object
+                if msg is None:
+                    self.Dispose ()
+                    return
 
-            def conn_cont (result, error):
-                if src is not None:
-                    if error is None:
-                        src.Send (Result ().SetResult (result))
-                    else:
-                        src.Send (Result ().SetError (error))
-                elif error is not None:
-                    ResultPrintException (*error)
+                def conn_cont (result, error):
+                    if src is not None:
+                        if error is None:
+                            src.Send (Result ().SetResult (result))
+                        else:
+                            src.Send (Result ().SetError (error))
+                    elif error is not None:
+                        ResultPrintException (*error)
 
-            msg (self).Then (conn_cont)
+                msg (self).Then (conn_cont)
+
+        except Exception:
+            # Try to report possible cause of lock
+            if src is not None:
+                ResultPrintException (*sys.exc_info ())
 
     #--------------------------------------------------------------------------#
     # Awaitable                                                                #

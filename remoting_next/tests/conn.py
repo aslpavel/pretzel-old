@@ -5,7 +5,6 @@ import unittest
 from .common import Remote, RemoteError
 from ..conn import ForkConnection
 from ..proxy import Proxy
-from ...async import Async
 from ...async.tests import AsyncTest
 
 __all__ = ('ConnectionTest',)
@@ -54,9 +53,6 @@ class ConnectionTest (unittest.TestCase):
                 with (yield +proxy.Value) as value_proxy:
                     self.assertTrue (isinstance (value_proxy, Proxy))
 
-        with self.assertRaises (ValueError):
-            conn ('test')
-
         # process exit status
         self.assertEqual ((yield conn.Process), 0)
         self.assertFalse (conn.hub.handlers)
@@ -73,5 +69,7 @@ class ConnectionTest (unittest.TestCase):
         self.assertNotEqual (c0_pid, c1_pid)
         self.assertNotEqual (os.getpid (), c0_pid)
         self.assertNotEqual (os.getpid (), c1_pid)
+
+        self.assertFalse (c0.hub.handlers)
 
 # vim: nu ft=python columns=120 :

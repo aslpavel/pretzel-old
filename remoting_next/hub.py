@@ -66,7 +66,7 @@ class Hub (object):
         """
         handlers_prev = self.handlers.pop (dst, None)
         if not handlers_prev:
-            raise HubError ('No receiver for destination: {}'.format (dst))
+            raise HubError ('No receiver: dst:{} msg:{} src:{}'.format (dst, msg, src))
 
         try:
             handlers_next = []
