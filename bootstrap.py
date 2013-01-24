@@ -6,10 +6,10 @@ import io
 import imp
 import zlib
 import json
-import types
 import binascii
 import inspect
 import pkgutil
+import importlib
 import pickle
 
 __all__ = ('Tomb', 'BootstrapSource', 'BootstrapBootstrap',)
@@ -41,7 +41,7 @@ class Tomb (object):
             for module in modules:
                 tomb.Add (module)
         else:
-            tomb.Add (__package__ if __package__ else __name__.partition ('.') [0])
+            tomb.Add (__package__ or __name__.partition ('.') [0])
         return tomb
 
     #--------------------------------------------------------------------------#
@@ -53,16 +53,21 @@ class Tomb (object):
         self.Add (module)
         return self
 
+
     def Add (self, module):
         """Add module or package
 
         Only capable to add modules witch reside on disk as plain python files
         or in tomb.
         """
+        if isinstance (module, str):
+            # convert module name to module
+            module = sys.modules.get (module, None) or importlib.import_module (module)
 
-        # top level package name
-        modname = ((getattr (module, '__package__', '') or module.__name__)
-            if isinstance (module, types.ModuleType) else module).partition ('.') [0]
+        # name of the top level package
+        modname = (getattr (module, '__package__', '') or module.__name__).partition ('.') [0]
+        if modname != module.__name__:
+            module = importlib.import_module (modname)
 
         # skip already imported packages
         if modname in self.containments:
@@ -76,11 +81,12 @@ class Tomb (object):
             return
 
         # find package file
-        filename = inspect.getsourcefile (loader.load_module (modname))
+        filename = inspect.getsourcefile (module)
         if not filename:
             raise ValueError ('Module doesn\'t have sources: \'{}\''.format (modname))
 
-        # add sources
+        # Use file name to determine if it is a package instead of loader.is_package
+        # because is_package incorrectly handles __main__ module.
         if os.path.basename (filename).lower () == '__init__.py':
             root = os.path.dirname (filename)
             for path, dirs, files in os.walk (root):
@@ -98,6 +104,11 @@ class Tomb (object):
                         self.containments ['.'.join ((name, file [:-3]))] = source, filename, False
         else:
             self.containments [modname] = self.read_source (filename), filename, False
+
+    def AddSource (self, name, source, filename):
+        """Add single file module by its source
+        """
+        self.containments [name] = source, filename, False
 
     #--------------------------------------------------------------------------#
     # Install                                                                  #
