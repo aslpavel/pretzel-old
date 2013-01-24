@@ -176,7 +176,7 @@ class ReturnExpr (Expr):
         return 'return {}'.format (self.result)
 
 class RaiseExpr (Expr):
-    """Raise epxression
+    """Raise expression
     """
     __slots__ = ('error',)
 
@@ -283,23 +283,25 @@ class Code (list):
             elif op == OP_CALL:
                 a_count, kw_count = arg
                 if kw_count:
-                   kw = {}
-                   for _ in range (kw_count):
+                    kw = {}
+                    for _ in range (kw_count):
                        v, k = stack.pop (), stack.pop ()
                        kw [k] = v
                 if a_count:
                     a = reversed ([stack.pop () for _ in range (a_count)])
                 fn = stack.pop ()
-                stack.append (
-                    fn (*a, **kw) if a_count and kw_count else
-                    fn (*a)       if a_count else
-                    fn ())
+                if a_count:
+                    if kw_count: stack.append (fn (*a, **kw))
+                    else:        stack.append (fn (*a))
+                else:
+                    if kw_count: stack.append (fn (**kw))
+                    else:        stack.append (fn ())
 
             elif op == OP_RETURN:
                 break
 
             elif op == OP_RAISE:
-                raise arg
+                raise stack.pop ()
 
             elif op == OP_AWAIT:
                 stack.append ((yield stack.pop ()))
