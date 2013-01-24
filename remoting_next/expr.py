@@ -313,14 +313,12 @@ class Code (list):
             elif op == OP_GETITEM:
                 item   = stack.pop ()
                 target = stack.pop ()
-
                 stack.append (target [item])
 
             elif op == OP_SETITEM:
                 item   = stack.pop ()
                 target = stack.pop ()
                 value  = stack.pop ()
-
                 target [item] = value
 
             else:
