@@ -11,7 +11,8 @@ from ..async import Async, AsyncReturn
 
 __all__ = ('Expr', 'LoadArgExpr', 'LoadConstExpr', 'CallExpr',
            'GetAttrExpr', 'SetAttrExpr', 'GetItemExpr', 'SetItemExpr',
-           'ReturnExpr', 'RaiseExpr', 'AwaitExpr', 'Code',)
+           'ReturnExpr', 'RaiseExpr', 'AwaitExpr', 'CmpExpr', 'IfExpr', 'WhileExpr',
+           'Code',)
 
 #------------------------------------------------------------------------------#
 # Expression                                                                   #
@@ -45,7 +46,7 @@ class LoadArgExpr (Expr):
         code.Emit (OP_LDARG, self.index)
 
     def String (self):
-        return 'arg [{}]'.format (self.index)
+        return 'arg_{}'.format (self.index)
 
 class LoadConstExpr (Expr):
     """Load constant on stack
@@ -205,6 +206,82 @@ class AwaitExpr (Expr):
     def String (self):
         return 'await {}'.format (self.target)
 
+class CmpExpr (Expr):
+    """Compare expression
+    """
+    __slots__ = ('op', 'first', 'second',)
+
+    def __init__ (self, op, first, second):
+        self.op = op
+        self.first = first
+        self.second = second
+
+    def Compile (self, code):
+        compile (self.first, code)
+        compile (self.second, code)
+        code.Emit (OP_COMPARE, self.op)
+
+    def String (self):
+        return '{} {} {}'.format (self.first, self.op, self.second)
+
+class IfExpr (Expr):
+    """If expression
+    """
+    __slots__ = ('cond', 'true', 'false',)
+
+    def __init__ (self, cond, true, false = None):
+        self.cond = cond
+        self.true = true
+        self.false = false
+
+    def Compile (self, code):
+        # condition
+        compile (self.cond, code)
+        if_pos = len (code)
+        code.Emit (OP_JMP_IF)
+
+        # true
+        compile (self.false, code)
+        else_pos = len (code)
+        code.Emit (OP_JMP)
+
+        # false
+        compile (self.true, code)
+
+        # update jumps
+        code.Emit (OP_JMP_IF, else_pos + 1, if_pos)
+        code.Emit (OP_JMP, len (code), else_pos)
+
+    def String (self):
+        return '{} if {} else {}'.format (self.true, self.cond, self.false)
+
+class WhileExpr (Expr):
+    """While expression
+    """
+    __slots__ = ('cond', 'body',)
+
+    def __init__ (self, cond, body):
+        self.cond = cond
+        self.body = body
+
+    def Compile (self, code):
+        # condition
+        cond_pos = len (code)
+        compile (self.cond, code)
+        if_pos = len (code)
+        code.Emit (OP_JMP_IF_NOT)
+
+        # body
+        compile (self.body, code)
+        code.Emit (OP_POP)
+        code.Emit (OP_JMP, cond_pos)
+
+        # update jumps
+        code.Emit (OP_JMP_IF_NOT, len (code), if_pos)
+
+    def String (self):
+        return 'while {}: {}'.format (self.cond, self.body)
+
 def compile (target, code):
     """Compile target
 
@@ -220,29 +297,39 @@ def compile (target, code):
 # Operation Codes                                                              #
 #------------------------------------------------------------------------------#
 OP = itertools.count (1)
-OP_LDARG     = next (OP)
-OP_LDCONST   = next (OP)
-OP_CALL      = next (OP)
-OP_GETATTR   = next (OP)
-OP_SETATTR   = next (OP)
-OP_GETITEM   = next (OP)
-OP_SETITEM   = next (OP)
-OP_RETURN    = next (OP)
-OP_RAISE     = next (OP)
-OP_AWAIT     = next (OP)
+OP_LDARG      = next (OP)
+OP_LDCONST    = next (OP)
+OP_CALL       = next (OP)
+OP_GETATTR    = next (OP)
+OP_SETATTR    = next (OP)
+OP_GETITEM    = next (OP)
+OP_SETITEM    = next (OP)
+OP_RETURN     = next (OP)
+OP_RAISE      = next (OP)
+OP_AWAIT      = next (OP)
+OP_JMP        = next (OP)
+OP_JMP_IF     = next (OP)
+OP_JMP_IF_NOT = next (OP)
+OP_COMPARE    = next (OP)
+OP_POP        = next (OP)
 del OP
 
 opToName = {
-    OP_LDARG   : 'LOAD_ARG',
-    OP_LDCONST : 'LOAD_CONST',
-    OP_CALL    : 'CALL',
-    OP_GETATTR : 'ATTR_GET',
-    OP_SETATTR : 'ATTR_SET',
-    OP_GETITEM : 'ITEM_GET',
-    OP_SETITEM : 'ITEM_SET',
-    OP_RETURN  : 'RETURN',
-    OP_RAISE   : 'RAISE',
-    OP_AWAIT   : 'AWAIT',
+    OP_LDARG      : 'LOAD_ARG',
+    OP_LDCONST    : 'LOAD_CONST',
+    OP_CALL       : 'CALL',
+    OP_GETATTR    : 'ATTR_GET',
+    OP_SETATTR    : 'ATTR_SET',
+    OP_GETITEM    : 'ITEM_GET',
+    OP_SETITEM    : 'ITEM_SET',
+    OP_RETURN     : 'RETURN',
+    OP_RAISE      : 'RAISE',
+    OP_AWAIT      : 'AWAIT',
+    OP_JMP        : 'JMP',
+    OP_JMP_IF     : 'JMP_IF',
+    OP_JMP_IF_NOT : 'JMP_IF_NOT',
+    OP_COMPARE    : 'COMPARE',
+    OP_POP        : 'POP'
 }
 
 #------------------------------------------------------------------------------#
@@ -255,10 +342,13 @@ class Code (list):
     #--------------------------------------------------------------------------#
     # Emit                                                                     #
     #--------------------------------------------------------------------------#
-    def Emit (self, op, arg = None):
+    def Emit (self, op, arg = None, pos = None):
         """Emit opcode
         """
-        self.append ((op, arg))
+        if pos is None:
+            self.append ((op, arg))
+        else:
+            self [pos] = (op, arg)
 
     #--------------------------------------------------------------------------#
     # Execute                                                                  #
@@ -323,6 +413,34 @@ class Code (list):
                 value  = stack.pop ()
                 target [item] = value
 
+            elif op == OP_JMP:
+                pos = arg
+
+            elif op == OP_JMP_IF:
+                if stack.pop ():
+                    pos = arg
+
+            elif op == OP_JMP_IF_NOT:
+                if not stack.pop ():
+                    pos = arg
+
+            elif op == OP_COMPARE:
+                second, first = stack.pop (), stack.pop ()
+                stack.append (first < second      if arg == '<' else
+                              first <= second     if arg == '<=' else
+                              first == second     if arg == '==' else
+                              first != second     if arg == '!=' else
+                              first > second      if arg == '>' else
+                              first >= second     if arg == '>=' else
+                              first in second     if arg == 'in' else
+                              first not in second if arg == 'not in' else
+                              first is second     if arg == 'is' else
+                              first is not second if arg == 'is not' else
+                              raiseError (ValueError ('Unknown compare operation: {}'.format (arg))))
+
+            elif op == OP_POP:
+                stack.pop ()
+
             else:
                 raise ValueError ('Unknown opcode: {}'.format (op))
 
@@ -336,8 +454,9 @@ class Code (list):
         """
         stream = string_type ()
         stream.write ('<Code:')
-        for op, arg in self:
-            stream.write ('\n  {:<11}{}'.format (opToName.get (op, 'UNKNOWN'), repr (arg)))
+        for pos, op_arg in enumerate (self):
+            op, arg = op_arg
+            stream.write ('\n  {:>02} {:<11}{}'.format (pos, opToName.get (op, 'UNKNOWN'), repr (arg)))
         stream.write ('>')
         return stream.getvalue ()
 
@@ -346,4 +465,11 @@ class Code (list):
         """
         return str (self)
 
+#------------------------------------------------------------------------------#
+# Helpers                                                                      #
+#------------------------------------------------------------------------------#
+def raiseError (error):
+    """Raise error
+    """
+    raise error
 # vim: nu ft=python columns=120 :

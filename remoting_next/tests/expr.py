@@ -74,6 +74,31 @@ class ExprTest (unittest.TestCase):
         event ('result')
         self.assertEqual (future.Result (), ('result',))
 
+    def testIf (self):
+        max_expr = Compile (
+            IfExpr (
+                CmpExpr ('>', LoadArgExpr (0), LoadArgExpr (1)),
+                    LoadArgExpr (0),
+                    LoadArgExpr (1)))
+
+        self.assertEqual (max_expr (3, 2).Result (), 3)
+        self.assertEqual (max_expr (2, 3).Result (), 3)
+
+    def testWhile (self):
+        while_expr = Compile (
+            WhileExpr (CmpExpr ('>', CallExpr (LoadArgExpr (0)), LoadConstExpr (0)),
+                CallExpr (LoadArgExpr (1))))
+
+        ctx = [10, 0]
+        def cond ():
+            ctx [0] -= 2
+            return ctx [0]
+        def body ():
+            ctx [1] += 1
+
+        while_expr (cond, body).Result ()
+        self.assertEqual (ctx, [0, 4])
+
 #------------------------------------------------------------------------------#
 # Compile Helper                                                               #
 #------------------------------------------------------------------------------#
