@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import io
 import sys
-import pickle
+from pickle import Pickler, Unpickler
 
 from ..hub import Hub, Sender, ReceiverSenderPair
 from ..result import Result, ResultPrintException
@@ -32,19 +32,23 @@ class Connection (object):
     def __init__ (self, hub = None, core = None):
         self.hub  = hub or Hub.Instance ()
         self.core = core or Core.Instance ()
+        self.module_map = {}
 
         self.receiver, self.sender = ReceiverSenderPair (hub = self.hub)
         self.dispose = CompositeDisposable ()
         self.state   = StateMachine (self.STATE_GRAPH)
 
-        class pickler_type (pickle.Pickler):
+        class pickler_type (Pickler):
             def persistent_id (this, target):
                 return self.pack (target)
         self.pickler_type = pickler_type
 
-        class unpickler_type (pickle.Unpickler):
+        class unpickler_type (Unpickler):
             def persistent_load (this, state):
                 return self.unpack (state)
+            def find_class (this, module, name):
+                return unpickler_find_class (this, self.module_map.get (module, module), name)
+        unpickler_find_class = Unpickler.find_class
         self.unpickler_type = unpickler_type
 
     #--------------------------------------------------------------------------#
@@ -144,6 +148,7 @@ class Connection (object):
     def dispatch (self, msg):
         """Dispatch incoming (packed) message
         """
+
         try:
             msg, src, dst = self.unpickler_type (io.BytesIO (msg)).load ()
             dst = dst - 1 # strip remote connection address
@@ -171,9 +176,7 @@ class Connection (object):
                 msg (self).Then (conn_cont)
 
         except Exception:
-            # Try to report possible cause of lock
-            if src is not None:
-                ResultPrintException (*sys.exc_info ())
+            ResultPrintException (*sys.exc_info ())
 
     #--------------------------------------------------------------------------#
     # Awaitable                                                                #
@@ -189,7 +192,7 @@ class Connection (object):
     def Proxy (self):
         """Get proxy
         """
-        return Proxy (self.sender, LoadArgExpr (0))
+        return ConnectionProxy (self.sender, LoadArgExpr (0))
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
@@ -222,5 +225,17 @@ class Connection (object):
         """String representation
         """
         return str (self)
+
+#------------------------------------------------------------------------------#
+# Connection Proxy                                                             #
+#------------------------------------------------------------------------------#
+class ConnectionProxy (Proxy):
+    """Connection proxy
+    """
+
+    def __call__ (self, target):
+        """Create proxy object from provided pickle-able constant.
+        """
+        return Proxy (self.sender, LoadConstExpr (target))
 
 # vim: nu ft=python columns=120 :

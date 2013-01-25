@@ -2,6 +2,7 @@
 import sys
 
 from .stream import StreamConnection
+from ..importer import ImporterInstall
 from ...bootstrap import Tomb
 from ...async import Async, Core, Pipe, BufferedFile
 from ...process import Process, PIPE
@@ -65,6 +66,9 @@ class ForkConnection (StreamConnection):
         out_pipe.Reader.CloseOnExec (True)
         in_pipe.Writer.CloseOnExec (True)
         yield StreamConnection.connect (self, (out_pipe.Reader, in_pipe.Writer))
+
+        # install importer
+        self.dispose.Add ((yield ImporterInstall (self)))
 
     def disconnect (self):
         """Fork disconnect implementation

@@ -3,6 +3,7 @@ import sys
 import struct
 
 from .stream import StreamConnection
+from ..importer import ImporterInstall
 from ...bootstrap import Tomb
 from ...async import Async, Core, BufferedFile
 from ...process import Process, PIPE
@@ -68,6 +69,9 @@ class SSHConnection (StreamConnection):
         yield self.process.Stdin.Flush ()
 
         yield StreamConnection.connect (self, (self.process.Stdout, self.process.Stdin))
+
+        # install importer
+        self.dispose.Add ((yield ImporterInstall (self)))
 
 #------------------------------------------------------------------------------#
 # Connection Initializer                                                       #

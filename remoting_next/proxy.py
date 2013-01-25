@@ -47,7 +47,7 @@ class Proxy (object):
     def __reduce__ (self):
         """Reduce proxy
         """
-        return Proxy, (self.sender, self.expr)
+        return type (self), (self.sender, self.expr)
 
     #--------------------------------------------------------------------------#
     # Operations                                                               #
@@ -97,7 +97,7 @@ class Proxy (object):
     def __str__ (self):
         """String representation
         """
-        return '<Proxy [addr:{} expr:{}]>'.format (
+        return '<{} [addr:{} expr:{}]>'.format (type (self).__name__,
             self.sender.dst if self.sender else None, self.expr)
 
     def __repr__ (self):

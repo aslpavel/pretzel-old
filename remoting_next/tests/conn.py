@@ -4,6 +4,7 @@ import unittest
 
 from .common import Remote, RemoteError
 from ..conn import ForkConnection
+from ..conn.conn import ConnectionProxy
 from ..proxy import Proxy
 from ...async.tests import AsyncTest
 
@@ -63,8 +64,11 @@ class ConnectionTest (unittest.TestCase):
         """
         with (yield ForkConnection ()) as c0:
             c0_pid = yield c0 (os.getpid) ()
+            self.assertTrue (isinstance (c0_pid, int))
             with (yield ~c0 (ForkConnection) ()) as c1:
                 c1_pid = yield c1 (os.getpid) ()
+                self.assertTrue (isinstance (c1_pid, int))
+                self.assertTrue (isinstance (c1, ConnectionProxy))
 
         self.assertNotEqual (c0_pid, c1_pid)
         self.assertNotEqual (os.getpid (), c0_pid)
