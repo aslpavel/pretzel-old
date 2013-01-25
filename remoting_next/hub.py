@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
+import sys
 import threading
 import itertools
 
 from .result import ResultSender
-from ..async import FutureSourcePair
+from ..async import Event, FutureSourcePair
+from ..async.future.compat import Raise
 
 __all__ = ('Hub', 'HubError', 'Receiver', 'Sender', 'ReceiverSenderPair',)
 #------------------------------------------------------------------------------#
@@ -25,6 +27,7 @@ class Hub (object):
     def __init__ (self):
         self.addr = itertools.count (1)
         self.handlers = {}
+        self.broadcast = Event ()
 
     #--------------------------------------------------------------------------#
     # Instance                                                                 #
@@ -68,25 +71,24 @@ class Hub (object):
         if not handlers_prev:
             raise HubError ('No receiver: dst:{} msg:{} src:{}'.format (dst, msg, src))
 
-        try:
-            handlers_next = []
-            for handler in handlers_prev:
+        error = None
+        handlers_next = []
+        for handler in handlers_prev:
+            try:
                 if handler (msg, src, dst):
                     handlers_next.append (handler)
+            except Exception:
+                error = sys.exc_info ()
+                handlers_next.append (handler)
 
-        except Exception:
-            handlers_next = handlers_prev
-            raise
+        if handlers_next:
+            handlers_prev = self.handlers.setdefault (dst, handlers_next)
+            if handlers_prev is not handlers_next:
+                handlers_prev.extend (handlers_next)
 
-        finally:
-            if handlers_next:
-                handlers_prev = self.handlers.setdefault (dst, handlers_next)
-                if handlers_prev is not handlers_next:
-                    handlers_prev.extend (handlers_next)
-
-            # call broadcast handlers
-            if dst and self.handlers.get (None, None):
-                self.Send (None, msg, src)
+        self.broadcast (msg, src, dst)
+        if error:
+            Raise (*error)
 
     #--------------------------------------------------------------------------#
     # Receiver                                                                 #
@@ -94,11 +96,15 @@ class Hub (object):
     def On (self, dst, handler):
         """Subscribe handler on messages with specified destination
         """
-        handlers = self.handlers.get (dst)
-        if handlers is None:
-            handlers = []
-            self.handlers [dst] = handlers
-        handlers.append (handler)
+        if dst is None:
+            # broadcast address
+            self.broadcast.On (handler)
+        else:
+            handlers = self.handlers.get (dst)
+            if handlers is None:
+                handlers = []
+                self.handlers [dst] = handlers
+            handlers.append (handler)
         return handler
 
     def Off (self, dst, handler):

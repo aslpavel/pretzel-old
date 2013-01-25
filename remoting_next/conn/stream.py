@@ -50,7 +50,7 @@ class StreamConnection (Connection):
         def dispatch_message (msg):
             # Detachment from  current coroutine is vital here because if handler
             # tries to create nested core loop to resolve future synchronously
-            # (i.g. importer proxy) it can stop dispatching coroutine
+            # (i.g. importer proxy) it can block dispatching coroutine.
             self.core.Idle ().Then (lambda r, e: self.dispatch (msg))
 
         # start receive coroutine
