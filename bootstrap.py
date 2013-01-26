@@ -202,6 +202,7 @@ if init is not None:
         else:
             module.__package__ = name.rpartition ('.') [0]
 
+        module.__initializing__ = True
         sys.modules [name] = module
         try:
             Exec (compile (source, module.__file__, 'exec'), module.__dict__)
@@ -209,6 +210,8 @@ if init is not None:
         except Exception:
             sys.modules.pop (name, None)
             raise
+        finally:
+            module.__initializing__ = False
 
     def is_package (self, name):
         """Is module identified by name a package

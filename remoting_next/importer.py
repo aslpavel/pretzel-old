@@ -158,6 +158,7 @@ class ImporterLoader (object):
         if self.ispkg:
             module.__path__= [os.path.dirname (self.filename)]
 
+        module.__initializing__ = True
         sys.modules [name] = module
         try:
             Exec (compile (self.source, module.__file__, 'exec'), module.__dict__)
@@ -165,6 +166,8 @@ class ImporterLoader (object):
         except Exception:
             sys.modules.pop (name, None)
             raise
+        finally:
+            module.__initializing__ = False
 
     #--------------------------------------------------------------------------#
     # Inspect Loader                                                           #
