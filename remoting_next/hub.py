@@ -27,7 +27,7 @@ class Hub (object):
     def __init__ (self):
         self.addr = itertools.count (1)
         self.handlers = {}
-        self.broadcast = Event ()
+        self.any = Event ()
 
     #--------------------------------------------------------------------------#
     # Instance                                                                 #
@@ -86,7 +86,7 @@ class Hub (object):
             if handlers_prev is not handlers_next:
                 handlers_prev.extend (handlers_next)
 
-        self.broadcast (msg, src, dst)
+        self.any (msg, src, dst)
         if error:
             Raise (*error)
 
@@ -97,19 +97,21 @@ class Hub (object):
         """Subscribe handler on messages with specified destination
         """
         if dst is None:
-            # broadcast address
-            self.broadcast.On (handler)
-        else:
-            handlers = self.handlers.get (dst)
-            if handlers is None:
-                handlers = []
-                self.handlers [dst] = handlers
-            handlers.append (handler)
+            return self.any.On (handler)
+
+        handlers = self.handlers.get (dst)
+        if handlers is None:
+            handlers = []
+            self.handlers [dst] = handlers
+        handlers.append (handler)
         return handler
 
     def Off (self, dst, handler):
         """Unsubscribe handler from message with specified destination
         """
+        if dst is None:
+            return self.any.Off (handler)
+
         handlers = self.handlers.get (dst)
         if handlers is None:
             return False
@@ -131,14 +133,7 @@ class Hub (object):
         Wait for the end of processing next message (or current message if
         awaiter is created inside current message handler) to any destination.
         """
-        future, source = FutureSourcePair ()
-
-        def handler (msg, src, dst):
-            source.SetResult ((msg, src, dst))
-            return False
-        self.On (None, handler)
-
-        return future
+        return self.any.Await ()
 
     #--------------------------------------------------------------------------#
     # Disposable                                                               #
