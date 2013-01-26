@@ -46,9 +46,16 @@ class Connection (object):
         class unpickler_type (Unpickler):
             def persistent_load (this, state):
                 return self.unpack (state)
-            def find_class (this, module, name):
-                return unpickler_find_class (this, self.module_map.get (module, module), name)
-        unpickler_find_class = Unpickler.find_class
+            def find_class (this, modname, name):
+                modname = self.module_map.get (modname, modname)
+                module = sys.modules.get (modname, None)
+                if module is None:
+                    __import__ (modname)
+                    module = sys.modules [modname]
+                if getattr (module, '__initializing__', False):
+                    # Module is being imported. Interrupt unpickling.
+                    raise InterruptError ()
+                return getattr (module, name)
         self.unpickler_type = unpickler_type
 
     #--------------------------------------------------------------------------#
@@ -175,6 +182,10 @@ class Connection (object):
 
                 msg (self).Then (conn_cont)
 
+        except InterruptError:
+            # Required module is being imported. Postpone message dispatch.
+            self.hub.Await ().Then (lambda r, e: self.dispatch (msg))
+
         except Exception:
             ResultPrintException (*sys.exc_info ())
 
@@ -237,5 +248,12 @@ class ConnectionProxy (Proxy):
         """Create proxy object from provided pickle-able constant.
         """
         return Proxy (self.sender, LoadConstExpr (target))
+
+#------------------------------------------------------------------------------#
+# Interrupt Error                                                              #
+#------------------------------------------------------------------------------#
+class InterruptError (BaseException):
+    """Interrupt helper exception type
+    """
 
 # vim: nu ft=python columns=120 :
