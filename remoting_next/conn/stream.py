@@ -38,20 +38,11 @@ class StreamConnection (Connection):
                 msg_next = self.in_stream.BytesRead ()
                 while True:
                     msg, msg_next = (yield msg_next), self.in_stream.BytesRead ()
-
-                    # Use separate function to dispatch message, to copy message
-                    # instead of capturing local variable inside dispatch loop.
-                    dispatch_message (msg)
+                    self.dispatch (msg)
 
             except (FutureCanceled, BrokenPipeError): pass
             finally:
                 self.Dispose ()
-
-        def dispatch_message (msg):
-            # Detachment from  current coroutine is vital here because if handler
-            # tries to create nested core loop to resolve future synchronously
-            # (i.g. importer proxy) it can block dispatching coroutine.
-            self.core.Idle ().Then (lambda r, e: self.dispatch (msg))
 
         # start receive coroutine
         dispatch_coroutine ().Traceback ('StreamConnection::dispatch_coroutine')

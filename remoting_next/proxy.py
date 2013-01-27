@@ -15,6 +15,9 @@ class Proxy (object):
     __slots__ = ('sender', 'expr', 'code',)
 
     def __init__ (self, sender, expr):
+        if sender is None:
+            raise ValueError ('Provided sender is probably from a disposed proxy')
+
         object.__setattr__ (self, 'sender', sender)
         object.__setattr__ (self, 'expr', expr)
         object.__setattr__ (self, 'code', None)
@@ -27,10 +30,15 @@ class Proxy (object):
 
         Resolves to result of expression execution.
         """
+        if self.sender is None:
+            raise ValueError ('Proxy is disposed')
+
+        # try to use cached code if any
         if self.code is None:
             code = Code ()
             self.expr.Compile (code)
             object.__setattr__ (self, 'code', code)
+
         return self.sender.Request (self.code)
 
     #--------------------------------------------------------------------------#

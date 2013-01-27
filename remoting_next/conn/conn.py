@@ -152,42 +152,52 @@ class Connection (object):
         self.pickler_type (stream, -1).dump ((msg, src, dst))
         return stream.getvalue ()
 
+    @Async
     def dispatch (self, msg):
         """Dispatch incoming (packed) message
         """
 
-        try:
-            msg, src, dst = self.unpickler_type (io.BytesIO (msg)).load ()
-            dst = dst - 1 # strip remote connection address
+        # Detachment from  current coroutine is vital here because if handler
+        # tries to create nested core loop to resolve future synchronously
+        # (i.g. importer proxy) it can block dispatching coroutine.
+        yield self.core.Idle ()
 
-            if dst:
-                # After striping remote connection address, destination is not empty
-                # so it needs to be routed.
-                self.hub.Send (dst, msg, src)
+        while True:
+            try:
+                msg, src, dst = self.unpickler_type (io.BytesIO (msg)).load ()
+                dst = dst - 1 # strip remote connection address
 
-            else:
-                # Message target is connection itself, execute code object
-                if msg is None:
-                    self.Dispose ()
-                    return
+                if dst:
+                    # After striping remote connection address, destination is not empty
+                    # so it needs to be routed.
+                    self.hub.Send (dst, msg, src)
 
-                def conn_cont (result, error):
-                    if src is not None:
-                        if error is None:
-                            src.Send (Result ().SetResult (result))
-                        else:
-                            src.Send (Result ().SetError (error))
-                    elif error is not None:
-                        ResultPrintException (*error)
+                else:
+                    # Message target is connection itself, execute code object
+                    if msg is None:
+                        self.Dispose ()
+                        return
 
-                msg (self).Then (conn_cont)
+                    def conn_cont (result, error):
+                        if src is not None:
+                            if error is None:
+                                src.Send (Result ().SetResult (result))
+                            else:
+                                src.Send (Result ().SetError (error))
+                        elif error is not None:
+                            ResultPrintException (*error)
 
-        except InterruptError:
-            # Required module is being imported. Postpone message dispatch.
-            self.hub.Await ().Then (lambda r, e: self.dispatch (msg))
+                    msg (self).Then (conn_cont)
+                break
 
-        except Exception:
-            ResultPrintException (*sys.exc_info ())
+            except InterruptError:
+                # Required module is being imported. Postpone message dispatch.
+                print ('interrupt', file = sys.stderr, flush = True)
+                yield self.hub
+
+            except Exception:
+                ResultPrintException (*sys.exc_info ())
+                raise
 
     #--------------------------------------------------------------------------#
     # Awaitable                                                                #
