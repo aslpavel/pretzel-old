@@ -18,4 +18,11 @@ def load_tests (loader, tests, pattern):
         suite.addTests (loader.loadTestsFromModule (test))
     return suite
 
+#------------------------------------------------------------------------------#
+# Load Benchmark Protocol                                                      #
+#------------------------------------------------------------------------------#
+def load_bench (benchs):
+    from . import benchmark
+    benchmark.load_bench (benchs)
+
 # vim: nu ft=python columns=120 :

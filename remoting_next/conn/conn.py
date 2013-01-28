@@ -192,7 +192,6 @@ class Connection (object):
 
             except InterruptError:
                 # Required module is being imported. Postpone message dispatch.
-                print ('interrupt', file = sys.stderr, flush = True)
                 yield self.hub
 
             except Exception:

@@ -20,4 +20,13 @@ def load_tests (loader, tests, pattern):
 
     return suite
 
+#------------------------------------------------------------------------------#
+# Load Benchmarks Protocol                                                     #
+#------------------------------------------------------------------------------#
+def load_bench (runner):
+    from . import remoting_next
+
+    for module in (remoting_next,):
+        runner.AddModule (remoting_next)
+
 # vim: nu ft=python columns=120 :
