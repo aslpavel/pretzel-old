@@ -47,15 +47,7 @@ class Connection (object):
             def persistent_load (this, state):
                 return self.unpack (state)
             def find_class (this, modname, name):
-                modname = self.module_map.get (modname, modname)
-                module = sys.modules.get (modname, None)
-                if module is None:
-                    __import__ (modname)
-                    module = sys.modules [modname]
-                if getattr (module, '__initializing__', False):
-                    # Module is being imported. Interrupt unpickling.
-                    raise InterruptError ()
-                return getattr (module, name)
+                return self.unpack_name (modname, name)
         self.unpickler_type = unpickler_type
 
     #--------------------------------------------------------------------------#
@@ -140,6 +132,19 @@ class Connection (object):
             return args
         else:
             raise ValueError ('Unknown pack type: {}'.format (pack))
+
+    def unpack_name (self, modname, name):
+        """Unpack global object by its module and name
+        """
+        modname = self.module_map.get (modname, modname)
+        module = sys.modules.get (modname, None)
+        if module is None:
+            __import__ (modname)
+            module = sys.modules [modname]
+        if getattr (module, '__initializing__', False):
+            # Module is being imported. Interrupt unpickling.
+            raise InterruptError ()
+        return getattr (module, name)
 
     #--------------------------------------------------------------------------#
     # Messaging                                                                #
