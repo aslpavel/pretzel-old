@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
-from .domains.fork import ForkDomain
-from .domains.ssh  import SSHDomain
+from . import hub, proxy, conn
 
-__all__ = ('ForkDomain', 'SSHDomain',)
+from .hub import *
+from .proxy import *
+from .conn import *
+
+__all__ = hub.__all__ + proxy.__all__ + conn.__all__
 #------------------------------------------------------------------------------#
 # Load Test Protocol                                                           #
 #------------------------------------------------------------------------------#
@@ -14,5 +17,12 @@ def load_tests (loader, tests, pattern):
     for test in (tests,):
         suite.addTests (loader.loadTestsFromModule (test))
     return suite
+
+#------------------------------------------------------------------------------#
+# Load Benchmark Protocol                                                      #
+#------------------------------------------------------------------------------#
+def load_bench (benchs):
+    from . import benchmark
+    benchmark.load_bench (benchs)
 
 # vim: nu ft=python columns=120 :

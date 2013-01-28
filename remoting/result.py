@@ -1,227 +1,233 @@
 # -*- coding: utf-8 -*-
-import os
 import io
+import os
 import sys
 import socket
-import struct
 
 from traceback import format_exception
 if sys.version_info [0] > 2:
-    import pickle
     string_type = io.StringIO
     PY2 = False
 else:
-    import cPickle as pickle
     string_type = io.BytesIO
     PY2 = True
 
-from ..async import Async, AsyncReturn
-
-__all__ = ('Result',)
+__all__ = ('Result', 'ResultSender',)
 #------------------------------------------------------------------------------#
 # Result                                                                       #
 #------------------------------------------------------------------------------#
-class ResultReturn (BaseException): pass
+class ResultReturn (BaseException):
+    """Result return exception
+    """
+    __slots__ = tuple ()
+
 class Result (object):
-    __slots__ = ('value', 'error', 'traceback',)
-    hostname      = socket.gethostname ()
-    pid           = os.getpid ()
-    result_struct = struct.Struct ('!BI')
+    """Result
 
-    def __init__ (self):
-        self.value     = None
-        self.error     = None
-        self.traceback = None
+    Serializable object containing result of the execution (value or exception).
+    """
+    __slots__ = ('state', 'value',)
 
-    #--------------------------------------------------------------------------#
-    # Factories                                                                #
-    #--------------------------------------------------------------------------#
-    @classmethod
-    def FromError (cls, error):
-        instance = cls ()
-        instance.ErrorSet (error)
-        return instance
+    pid  = os.getpid ()
+    host = socket.gethostname ()
 
-    @classmethod
-    def FromValue (cls, value):
-        instance = cls ()
-        instance.ValueSet (value)
-        return instance
+    STATE_NONE  = 0x0
+    STATE_DONE  = 0x1
+    STATE_FAIL  = 0x2
+    STATE_ERROR = STATE_DONE | STATE_FAIL
 
-    @classmethod
-    def FromBytes (cls, data):
-        stream   = io.BytesIO (data)
-        instance = cls ()
-        instance.Load (stream)
-        return instance
-
-    #--------------------------------------------------------------------------#
-    # Return                                                                   #
-    #--------------------------------------------------------------------------#
-    def __call__ (self, result = None): return self.Return (result)
-    def Return   (self, result = None):
-        raise ResultReturn (result)
-
-    def __enter__ (self):
-        return self
-
-    def __exit__ (self, et, eo, tb):
-        if et is not None:
-            if et is ResultReturn:
-                self.ValueSet (eo.args [0])
-            elif issubclass (et, Exception):
-                self.ErrorSet ((et, eo, tb))
-            else:
-                return False
-        return True
-
-    #--------------------------------------------------------------------------#
-    # Resolve                                                                  #
-    #--------------------------------------------------------------------------#
-    def Value (self):
-        if self.error is None:
-            return self.value
-        else:
-            raise self.error
-
-    def ValueSet (self, value):
+    def __init__ (self, state = None, value = None):
+        self.state = state or self.STATE_NONE
         self.value = value
 
-    def Error (self):
-        return self.error
+    #--------------------------------------------------------------------------#
+    # Set Result                                                               #
+    #--------------------------------------------------------------------------#
+    def SetResult (self, result):
+        """Set result
+        """
+        if self.state & self.STATE_DONE:
+            raise ValueError ('Result has already been set')
 
-    def ErrorSet (self, error):
-        # traceback
+        self.state |= self.STATE_DONE
+        self.value  = result
+        return self
+
+    def SetError (self, error):
+        """Set error
+        """
+        if self.state & self.STATE_DONE:
+            raise ValueError ('Result has already been set')
+
+        # create string traceback
         traceback = traceback_template.format (
-                hostname  = self.hostname,
-                pid       = self.pid,
-                name      = error [0].__name__,
-                message   = str (error [1]),
-                traceback = ''.join (format_exception (*error)))
+            host      = self.host,
+            pid       = self.pid,
+            name      = error [0].__name__,
+            message   = str (error [1]),
+            traceback = ''.join (format_exception (*error)))
 
         # saved traceback
         traceback_saved = getattr (error [1], '_saved_traceback', None)
         if traceback_saved is not None:
             traceback += traceback_saved
 
-        # error
+        # update error
         error = error [1]
         error._saved_traceback = traceback
 
-        self.error     = error
-        self.traceback = traceback
-
-    def Traceback (self):
-        return self.traceback
-
-    #--------------------------------------------------------------------------#
-    # Print Exception                                                          #
-    #--------------------------------------------------------------------------#
-    @staticmethod
-    def PrintException (et, eo, tb, file = None):
-        stream = file or string_type ()
-
-        # traceback
-        traceback = ''.join (format_exception (et, eo, tb))
-        stream.write (traceback.encode ('utf-8') if PY2 else traceback)
-
-        # saved traceback
-        traceback_saved = getattr (eo, '_saved_traceback', None)
-        if traceback_saved is not None:
-            stream.write (traceback_saved)
-
-        # flush
-        stream.flush ()
-
-        # output
-        if file is None:
-            sys.stderr.write (stream.getvalue ())
-            sys.stderr.flush ()
-
-    #--------------------------------------------------------------------------#
-    # Save | Load                                                              #
-    #--------------------------------------------------------------------------#
-    def SaveBuffer (self, stream):
-        if self.error is None:
-            if self.value is None:
-                stream.WriteBuffer (self.result_struct.pack (1, 0))
-            else:
-                stream.WriteBuffer (self.result_struct.pack (1, len (self.value)))
-                stream.WriteBuffer (self.value)
-        else:
-            try:
-                error_value = pickle.dumps ((self.error, self.traceback))
-            except Exception:
-                error_value = pickle.dumps ((type (self.error) ('Failed to pack arguments'), self.traceback))
-
-            stream.WriteBuffer (self.result_struct.pack (0, len (error_value)))
-            stream.WriteBuffer (error_value)
-
-    @Async
-    def LoadAsync (self, stream, cancel = None):
-        is_value, size = self.result_struct.unpack ((yield stream.ReadUntilSize (self.result_struct.size, cancel)))
-        data = (yield stream.ReadUntilSize (size, cancel)) if size else None
-
-        if is_value:
-            self.value = data
-        else:
-            error, traceback = pickle.loads (data)
-            error._saved_traceback = traceback
-
-            self.error     = error
-            self.traceback = traceback
-
-        AsyncReturn (self)
-
-    def Save (self, stream):
-        if self.error is None:
-            if self.value is None:
-                stream.write (self.result_struct.pack (1, 0))
-            else:
-                stream.write (self.result_struct.pack (1, len (self.value)))
-                stream.write (self.value)
-        else:
-            try:
-                error_value = pickle.dumps ((self.error, self.traceback))
-            except Exception:
-                error_value = pickle.dumps ((type (self.error) ('Failed to pack arguments'), self.traceback))
-
-            stream.write (self.result_struct.pack (0, len (error_value)))
-            stream.write (error_value)
-
-    def Load (self, stream):
-        is_value, size = self.result_struct.unpack (stream.read (self.result_struct.size))
-        data = stream.read (size) if size else None
-
-        if is_value:
-            self.value = data
-        else:
-            error, traceback = pickle.loads (data)
-            error._saved_traceback = traceback
-
-            self.error     = error
-            self.traceback = traceback
-
+        self.state |= self.STATE_ERROR
+        self.value  = error
         return self
 
-    def ToBytes (self):
-        stream = io.BytesIO ()
-        self.Save (stream)
-        return stream.getvalue ()
+    def SetCurrentError (self):
+        """Set error from current active exception
+        """
+        return self.SetError (sys.exc_info ())
 
-#------------------------------------------------------------------------------#
-# Saved Traceback Template                                                     #
-#------------------------------------------------------------------------------#
+    #--------------------------------------------------------------------------#
+    # Get Result                                                               #
+    #--------------------------------------------------------------------------#
+    def GetResult (self):
+        """Get result
+        """
+        return self ()
+
+    def __call__ (self):
+        """Get result
+        """
+        if self.state & self.STATE_DONE:
+            if self.state & self.STATE_FAIL:
+                raise self.value
+            else:
+                return self.value
+        else:
+            raise ValueError ('Result has not been resolved')
+
+    #--------------------------------------------------------------------------#
+    # Scope                                                                    #
+    #--------------------------------------------------------------------------#
+    def __enter__ (self):
+        """Enter result scope
+        """
+        def result_return (result):
+            """Return from result scope
+            """
+            raise ResultReturn (result)
+
+        return result_return
+
+    def __exit__ (self, et, eo, tb):
+        """Leave result scope
+        """
+        if et is None:
+            self.SetResult (None)
+        else:
+            if et is ResultReturn:
+                self.SetResult (eo.args [0])
+            elif issubclass (et, Exception):
+                self.SetError ((et, eo, tb))
+            else:
+                return False
+        return True
+
+    #--------------------------------------------------------------------------#
+    # Pickle                                                                   #
+    #--------------------------------------------------------------------------#
+    def __reduce__ (self):
+        """Reduce result
+        """
+        return Result, (self.state, self.value,)
+
+    #--------------------------------------------------------------------------#
+    # To String                                                                #
+    #--------------------------------------------------------------------------#
+    def __str__ (self):
+        """String representation
+        """
+        return '<{} [{}]>'.format (type (self).__name__,
+            '?' if not self.state & self.STATE_DONE else
+            '~{}'.format (self.value) if self.state & self.STATE_FAIL else
+            '={}'.format (self.value))
+
+    def __repr__ (self):
+        """String representation
+        """
+        return str (self)
+
 traceback_template = """
 `-------------------------------------------------------------------------------
-Location : {hostname}/{pid}
+Location : {host}/{pid}
 Error    : {name}: {message}
 
 {traceback}"""
 
 #------------------------------------------------------------------------------#
-# Exception Hook                                                               #
+# Result Sender                                                                #
 #------------------------------------------------------------------------------#
-sys.excepthook = Result.PrintException
+class ResultSender (object):
+    """Result sender
+    """
+    __slots__ = ('sender',)
+
+    def __init__ (self, sender):
+        self.sender = sender
+
+    #--------------------------------------------------------------------------#
+    # Send                                                                     #
+    #--------------------------------------------------------------------------#
+    def __call__ (self, result = None):
+        """Send result
+        """
+        raise ResultReturn (result)
+
+    #--------------------------------------------------------------------------#
+    # Scope                                                                    #
+    #--------------------------------------------------------------------------#
+    def __enter__ (self):
+        """Enter sender scope
+        """
+        return self
+
+    def __exit__ (self, et, eo, tb):
+        """Leave sender scope
+        """
+        if self.sender is not None:
+            try:
+                if et is None:
+                    self.sender.Send (Result ().SetResult (None))
+                else:
+                    if et is ResultReturn:
+                        self.sender.Send (Result ().SetResult (eo.args [0]))
+                    elif issubclass (et, Exception):
+                        self.sender.Send (Result ().SetError ((et, eo, tb)))
+                    else:
+                        return False
+            except Exception:
+                # Failed to send result (It is probably failed to pickle), try
+                # to send error.
+                self.sender.Send (Result ().SetCurrentError ())
+        return True
+
+#------------------------------------------------------------------------------#
+# Result Print Exception                                                       #
+#------------------------------------------------------------------------------#
+def ResultPrintException (et, eo, tb, file = None):
+    stream = file or string_type ()
+
+    traceback = ''.join (format_exception (et, eo, tb))
+    stream.write (traceback.encode ('utf-8') if PY2 else traceback)
+
+    # chain traceback
+    traceback_saved = getattr (eo, '_saved_traceback', None)
+    if traceback_saved is not None:
+        stream.write (traceback_saved)
+
+    if file is None:
+        sys.stderr.write (stream.getvalue ())
+        sys.stderr.flush ()
+
+# install exception hook
+sys.excepthook = ResultPrintException
 
 # vim: nu ft=python columns=120 :

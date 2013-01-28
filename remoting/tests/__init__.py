@@ -6,11 +6,12 @@ __all__ = tuple ()
 #------------------------------------------------------------------------------#
 def load_tests (loader, tests, pattern):
     from unittest import TestSuite
-    from . import message, linker, future, nested
+    from . import hub, result, expr, proxy, conn
 
     suite = TestSuite ()
-    for test in (message, linker, future, nested,):
+    for test in (hub, result, expr, proxy, conn,):
         suite.addTests (loader.loadTestsFromModule (test))
+
     return suite
 
 # vim: nu ft=python columns=120 :

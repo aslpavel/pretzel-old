@@ -260,6 +260,8 @@ def ImporterInstall (conn, index = None):
         module = sys.modules.get ('__main__', None)
         while module is not None:
             file = inspect.getsourcefile (module)
+            if not file:
+                break
             name = os.path.basename (file).partition ('.') [0]
 
             package = getattr (module, '__package__', None)
