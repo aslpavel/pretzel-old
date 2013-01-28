@@ -50,11 +50,11 @@ class FuncAsyncBench (FuncBench):
 # Proxy Method Benchmark                                                       #
 #------------------------------------------------------------------------------#
 class Remote (object):
-    def __init__ (self, value):
-        self.value = value
+    def __init__ (self):
+        self.count = itertools.count (1)
 
     def Method (self):
-        return self.value
+        return next (self.count)
 
 class MethodBench (Benchmark):
     """Benchmark proxy method call
@@ -66,9 +66,9 @@ class MethodBench (Benchmark):
     @Async
     def Init (self):
         self.conn  = yield ForkConnection ()
-        self.proxy = yield +self.conn (Remote) (-1)
+        self.proxy = yield +self.conn (Remote) ()
         self.method = self.proxy.Method ()
-        if (yield self.method) != -1:
+        if ((yield self.method), (yield self.method)) != (1, 2):
             raise ValueError ('Initialization test failed')
 
     def Body (self):

@@ -81,7 +81,7 @@ class Benchmark (object):
                 if result_mean is None:
                     continue
 
-                if result_error / result_mean <= error or (begin_time - stop_time) >= self.max_time:
+                if result_error / result_mean <= error or (stop_time - begin_time) >= self.max_time:
                     AsyncReturn ((result_mean, result_error))
 
         # create new execution core
