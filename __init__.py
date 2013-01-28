@@ -24,9 +24,9 @@ def load_tests (loader, tests, pattern):
 # Load Benchmarks Protocol                                                     #
 #------------------------------------------------------------------------------#
 def load_bench (runner):
-    from . import remoting_next
+    from . import remoting
 
-    for module in (remoting_next,):
-        runner.AddModule (remoting_next)
+    for module in (remoting,):
+        runner.AddModule (module)
 
 # vim: nu ft=python columns=120 :
