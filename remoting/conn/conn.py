@@ -168,6 +168,7 @@ class Connection (object):
         yield self.core.Idle ()
 
         while True:
+            src = None
             try:
                 msg, src, dst = self.unpickler_type (io.BytesIO (msg)).load ()
                 dst = dst - 1 # strip remote connection address
@@ -200,7 +201,13 @@ class Connection (object):
                 yield self.hub
 
             except Exception:
-                ResultPrintException (*sys.exc_info ())
+                error = sys.exc_info ()
+                ResultPrintException (*error)
+                if src is not None:
+                    # Optimistically send result even though it may expect
+                    # different kind of object (usually it isn't), but at least
+                    # it avoids blocking in some cases.
+                    src.Send (Result ().SetError (error))
                 raise
 
     #--------------------------------------------------------------------------#
