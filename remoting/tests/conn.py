@@ -6,6 +6,7 @@ from .common import Remote, RemoteError
 from ..conn import ForkConnection
 from ..conn.conn import ConnectionProxy
 from ..proxy import Proxy
+from ..hub import ReceiverSenderPair
 from ...async.tests import AsyncTest
 
 __all__ = ('ConnectionTest',)
@@ -75,5 +76,11 @@ class ConnectionTest (unittest.TestCase):
         self.assertNotEqual (os.getpid (), c1_pid)
 
         self.assertFalse (c0.hub.handlers)
+
+    @AsyncTest
+    def testSenderRoundTrip (self):
+        r, s = ReceiverSenderPair ()
+        with (yield ForkConnection ()) as conn:
+            self.assertEqual ((yield conn (s)), s)
 
 # vim: nu ft=python columns=120 :

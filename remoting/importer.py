@@ -211,9 +211,8 @@ def Importer (hub = None):
 
     def importer_handler (name, src, dst):
         with ResultSender (src) as send:
-            # dispose importer
             if name is None:
-                return False
+                return False # dispose importer
 
             module = sys.modules.get (name, False)
             if module is None:
