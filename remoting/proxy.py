@@ -14,12 +14,12 @@ class Proxy (object):
     """
     __slots__ = ('sender', 'expr', 'code',)
 
-    def __init__ (self, sender, expr):
+    def __init__ (self, sender, expr = None):
         if sender is None:
             raise ValueError ('Provided sender is probably from a disposed proxy')
 
         object.__setattr__ (self, 'sender', sender)
-        object.__setattr__ (self, 'expr', expr)
+        object.__setattr__ (self, 'expr', expr or LoadArgExpr (0))
         object.__setattr__ (self, 'code', None)
 
     #--------------------------------------------------------------------------#
