@@ -42,22 +42,6 @@ class Proxy (object):
         return self.sender.Request (self.code)
 
     #--------------------------------------------------------------------------#
-    # Proxy                                                                    #
-    #--------------------------------------------------------------------------#
-    def Proxy (self):
-        """Get proxy
-        """
-        return self
-
-    #--------------------------------------------------------------------------#
-    # Pickle                                                                   #
-    #--------------------------------------------------------------------------#
-    def __reduce__ (self):
-        """Reduce proxy
-        """
-        return type (self), (self.sender, self.expr)
-
-    #--------------------------------------------------------------------------#
     # Operations                                                               #
     #--------------------------------------------------------------------------#
     def __call__ (self, *args, **keys):
@@ -89,6 +73,9 @@ class Proxy (object):
         SetItemExpr (self.expr, item, value).Compile (code)
         self.sender.Send (code)
 
+    #--------------------------------------------------------------------------#
+    # Special operators                                                        #
+    #--------------------------------------------------------------------------#
     def __invert__ (self):
         """Await
         """
@@ -98,6 +85,13 @@ class Proxy (object):
         """Proxify
         """
         return Proxy (self.sender, CallExpr (LoadConstExpr (Proxify), self.expr))
+
+    def __rshift__ (self, wrapper):
+        """Wrap expressing by wrapper function
+
+        Wrapper must be pickle-able function object.
+        """
+        return Proxy (self.sender, CallExpr (LoadConstExpr (wrapper), self.expr))
 
     #--------------------------------------------------------------------------#
     # To String                                                                #
@@ -112,6 +106,19 @@ class Proxy (object):
         """String representation
         """
         return str (self)
+
+    #--------------------------------------------------------------------------#
+    # Proxy                                                                    #
+    #--------------------------------------------------------------------------#
+    def Proxy (self):
+        """Get proxy
+        """
+        return self
+
+    def __reduce__ (self):
+        """Reduce proxy
+        """
+        return type (self), (self.sender, self.expr)
 
     #--------------------------------------------------------------------------#
     # Dispose                                                                  #
