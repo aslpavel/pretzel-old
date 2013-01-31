@@ -233,15 +233,14 @@ class Sender (object):
         Return future object for returned message.
         """
         future, source = FutureSourcePair ()
+        src = self.hub.Address ()
 
         def call_handler (msg, src, dst):
             source.SetResult (msg)
             return False
-
-        src = self.hub.Address ()
         self.hub.On (src, call_handler)
-        self.hub.Send (self.dst, msg, Sender (self.hub, src))
 
+        self.Send (msg, Sender (self.hub, src))
         return future
 
     #--------------------------------------------------------------------------#
@@ -251,6 +250,7 @@ class Sender (object):
         """Request
         """
         future, source = FutureSourcePair ()
+        src = self.hub.Address ()
 
         def request_handler (result, src, dst):
             try:
@@ -258,11 +258,9 @@ class Sender (object):
             except Exception:
                 source.SetCurrentError ()
             return False
-
-        src = self.hub.Address ()
         self.hub.On (src, request_handler)
-        self.hub.Send (self.dst, msg, Sender (self.hub, src))
 
+        self.Send (msg, Sender (self.hub, src))
         return future
 
     def Response (self):
