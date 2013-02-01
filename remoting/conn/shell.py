@@ -1,26 +1,28 @@
 # -*- coding: utf-8 -*-
-import sys
+import struct
 
 from .stream import StreamConnection
 from ..importer import ImporterInstall
 from ...bootstrap import Tomb
-from ...async import Async, Core, Pipe, BufferedFile
+from ...async import Async, Core, BufferedFile
 from ...process import Process, PIPE
 
-__all__ = ('ForkConnection',)
+__all__ = ('ShellConnection',)
 #------------------------------------------------------------------------------#
-# Fork Connection                                                              #
+# Shell Connection                                                             #
 #------------------------------------------------------------------------------#
-class ForkConnection (StreamConnection):
-    """Fork connection
+class ShellConnection (StreamConnection):
+    """Process connection
 
-    Connection with forked and exec-ed process via two pipes.
+    Connection with process over standard output and input, error stream
+    is untouched.
     """
-    def __init__ (self, command = None, buffer_size = None, hub = None, core = None):
+    def __init__ (self, command, buffer_size = None, hub = None, core = None):
         StreamConnection.__init__ (self, hub, core)
 
+        self.command = list (command)
+        self.command.extend ((self.py_exec, '-c', ShellConnectionTrampoline))
         self.buffer_size = buffer_size
-        self.command = [sys.executable, '-'] if command is None else command
         self.process = None
 
     #--------------------------------------------------------------------------#
@@ -40,46 +42,26 @@ class ForkConnection (StreamConnection):
         Target is pickle-able and call-able which will be called upon successful
         connection with connection this as its only argument.
         """
-        # pipes
-        in_pipe = self.dispose.Add (Pipe (buffer_size = self.buffer_size, core = self.core))
-        out_pipe = self.dispose.Add (Pipe (buffer_size = self.buffer_size, core = self.core))
-
-        # process
-        def preexec ():
-            in_pipe.DetachReader ()
-            out_pipe.DetachWriter ()
-
-        self.process = self.dispose.Add (Process (self.command, stdin = PIPE,
-            preexec = preexec, shell = False, buffer_size = self.buffer_size, core = self.core))
-
-        # close remote side of pipes
-        in_fd  = in_pipe.Reader.Fd
-        yield in_pipe.Reader.Dispose ()
-        out_fd = out_pipe.Writer.Fd
-        yield out_pipe.Writer.Dispose ()
+        self.process = self.dispose.Add (Process (self.command, stdin = PIPE, stdout = PIPE,
+            buffer_size = self.buffer_size, core = self.core))
 
         # send payload
-        yield self.process.Stdin.Write (Tomb.FromModules ()
-            .Bootstrap (ForkConnectionInit, in_fd, out_fd, self.buffer_size).encode ())
-        yield self.process.Stdin.Dispose ()
+        payload = Tomb.FromModules ().Bootstrap (
+            ShellConnectionInit, self.buffer_size).encode ('utf-8')
+        yield self.process.Stdin.Write (struct.pack ('>I', len (payload)))
+        yield self.process.Stdin.Write (payload)
+        yield self.process.Stdin.Flush ()
 
-        out_pipe.Reader.CloseOnExec (True)
-        in_pipe.Writer.CloseOnExec (True)
-        yield StreamConnection.connect (self, (out_pipe.Reader, in_pipe.Writer))
+        yield StreamConnection.connect (self, (self.process.Stdout, self.process.Stdin))
 
         # install importer
         self.dispose.Add ((yield ImporterInstall (self)))
 
-    def disconnect (self):
-        """Fork disconnect implementation
-        """
-        self.dispose.Dispose ()
-
 #------------------------------------------------------------------------------#
 # Connection Initializer                                                       #
 #------------------------------------------------------------------------------#
-def ForkConnectionInit (in_fd, out_fd, buffer_size):
-    """Fork connection initialization function
+def ShellConnectionInit (buffer_size):
+    """Shell connection initialization function
     """
     with Core.Instance () as core:
         # initialize connection
@@ -87,9 +69,9 @@ def ForkConnectionInit (in_fd, out_fd, buffer_size):
         conn.dispose.Add (core)
 
         # connect
-        in_stream  = BufferedFile (in_fd, buffer_size = buffer_size, core = core)
+        in_stream  = BufferedFile (0, buffer_size = buffer_size, core = core)
         in_stream.CloseOnExec (True)
-        out_stream = BufferedFile (out_fd, buffer_size = buffer_size, core = core)
+        out_stream = BufferedFile (1, buffer_size = buffer_size, core = core)
         out_stream.CloseOnExec (True)
         conn.Connect ((in_stream, out_stream)).Traceback ('remote connect')
 
@@ -97,4 +79,20 @@ def ForkConnectionInit (in_fd, out_fd, buffer_size):
         if not core.Disposed:
             core ()
 
+#------------------------------------------------------------------------------#
+# Trampoline                                                                   #
+#------------------------------------------------------------------------------#
+ShellConnectionTrampoline = """'
+# load and execute payload
+import io, struct
+with io.open (0, "rb", buffering = 0, closefd = False) as stream:
+    size = struct.unpack (">I", stream.read (struct.calcsize (">I"))) [0]
+    data = io.BytesIO ()
+    while size > data.tell ():
+        chunk = stream.read (size - data.tell ())
+        if not chunk:
+            raise ValueError ("Payload is incomplete")
+        data.write (chunk)
+exec (data.getvalue ().decode ("utf-8"))
+'"""
 # vim: nu ft=python columns=120 :
