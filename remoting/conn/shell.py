@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import sys
 import struct
 
 from .stream import StreamConnection
@@ -17,12 +18,17 @@ class ShellConnection (StreamConnection):
     Connection with process over standard output and input, error stream
     is untouched.
     """
-    def __init__ (self, command, buffer_size = None, hub = None, core = None):
+    def __init__ (self, command = None, escape = None, py_exec = None,
+        buffer_size = None, hub = None, core = None):
+
         StreamConnection.__init__ (self, hub, core)
 
-        self.command = list (command)
-        self.command.extend ((self.py_exec, '-c', ShellConnectionTrampoline))
         self.buffer_size = buffer_size
+        self.py_exec = py_exec or sys.executable
+        self.command = command or []
+        self.command.extend ((self.py_exec, '-c',
+            '\'{}\''.format (ShellConnectionTrampoline) if escape else ShellConnectionTrampoline))
+
         self.process = None
 
     #--------------------------------------------------------------------------#
@@ -82,7 +88,7 @@ def ShellConnectionInit (buffer_size):
 #------------------------------------------------------------------------------#
 # Trampoline                                                                   #
 #------------------------------------------------------------------------------#
-ShellConnectionTrampoline = """'
+ShellConnectionTrampoline = """
 # load and execute payload
 import io, struct
 with io.open (0, "rb", buffering = 0, closefd = False) as stream:
@@ -94,5 +100,5 @@ with io.open (0, "rb", buffering = 0, closefd = False) as stream:
             raise ValueError ("Payload is incomplete")
         data.write (chunk)
 exec (data.getvalue ().decode ("utf-8"))
-'"""
+"""
 # vim: nu ft=python columns=120 :

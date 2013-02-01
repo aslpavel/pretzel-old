@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import sys
 
 from .shell import ShellConnection
 
@@ -17,7 +16,6 @@ class SSHConnection (ShellConnection):
         self.port = port
         self.identity_file = identity_file
         self.ssh_exec = ssh_exec or 'ssh'
-        self.py_exec = py_exec or sys.executable
 
         # ssh command
         command = [
@@ -29,6 +27,6 @@ class SSHConnection (ShellConnection):
         command.extend (('-i', self.identity_file) if self.identity_file else [])
         command.extend (('-p', self.port)          if self.port          else [])
 
-        ShellConnection.__init__ (self, command, buffer_size, hub, core)
+        ShellConnection.__init__ (self, command, True, py_exec, buffer_size, hub, core)
 
 # vim: nu ft=python columns=120 :
