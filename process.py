@@ -2,7 +2,6 @@
 import io
 import os
 import sys
-import errno
 import pickle
 import signal
 import threading
@@ -287,16 +286,58 @@ class ProcessWaiter (object):
     Waits for child process to terminate and returns its exit code. This object
     MUST BE CREATED INSIDE MAIN THREAD as signal.signal would fail otherwise.
     """
-    instance_lock = threading.RLock ()
-    instance      = None
-
     def __init__ (self):
-        self.queue = []
+        self.conts = set ()
+        self.conts_lock = threading.RLock ()
         self.handle_signal_prev = signal.signal (signal.SIGCHLD, self.handle_signal)
+
+    def __call__ (self, pid, core = None):
+        """Wait for process exit status
+
+        Will be resolved inside ``core`` context.
+        """
+        core = core or Core.Instance ()
+        future, source = FutureSourcePair ()
+
+        @Async
+        def pid_cont (dispose = False):
+            yield core.Context ()
+            if dispose:
+                source.TrySetCanceled ('Process waiter has been disposed')
+            else:
+                try:
+                    pid_res, stat_res = os.waitpid (pid, os.WNOHANG)
+                    if pid_res != 0:
+                        source.TrySetResult (os.WEXITSTATUS (stat_res))
+                except Exception:
+                    source.TrySetCurrentError ()
+
+        def deque_cont (result, error):
+            with self.conts_lock:
+                self.conts.discard (pid_cont)
+        with self.conts_lock:
+            self.conts.add (pid_cont)
+        future.Then (deque_cont)
+
+        # Run in case there is not child process with specified pid.
+        pid_cont ()
+
+        return future
+
+    def handle_signal (self, sig, frame):
+        """Handle SIGCHLD
+        """
+        with self.conts_lock:
+            conts = tuple (self.conts)
+        for cont in conts:
+            cont ()
 
     #--------------------------------------------------------------------------#
     # Instance                                                                 #
     #--------------------------------------------------------------------------#
+    instance_lock = threading.RLock ()
+    instance      = None
+
     @classmethod
     def Instance (cls, instance = None):
         """Global process waiter instance
@@ -319,53 +360,6 @@ class ProcessWaiter (object):
                 instance.Dispose ()
 
     #--------------------------------------------------------------------------#
-    # Wait                                                                     #
-    #--------------------------------------------------------------------------#
-    def __call__ (self, pid, core = None):
-        """Wait for process exit status
-
-        Returned future will be resolved inside core's context.
-        """
-        # check if process has already been terminated
-        pid, status = os.waitpid (pid, os.WNOHANG)
-        if pid != 0:
-            return CompletedFuture (os.WEXITSTATUS (status))
-
-        # enqueue source
-        with self.instance_lock:
-            future, source = FutureSourcePair ()
-            self.queue.append ((pid, source, core or Core.Instance (),))
-        return future
-
-    #--------------------------------------------------------------------------#
-    # Private                                                                  #
-    #--------------------------------------------------------------------------#
-    def handle_signal (self, sig, frame):
-        """Handle SIGCHLD
-        """
-        with self.instance_lock:
-            resolved_queue, unresolved_queue = [], []
-            for pid, source, core in self.queue:
-                try:
-                    pid, status = os.waitpid (pid, os.WNOHANG)
-                    if pid == 0:
-                        unresolved_queue.append ((pid, source, core,))
-                        continue
-                except OSError as error:
-                    if error.errno != errno.ECHILD:
-                        raise
-                    status = -1
-                resolved_queue.append ((pid, source, core, status))
-            self.queue = unresolved_queue
-
-        for pid, source, core, status in resolved_queue:
-            try:
-                # Resolve source inside calling core's thread
-                core.Context (os.WEXITSTATUS (status)) \
-                    .Then (lambda result, _: source.TrySetResult (result))
-            except FutureCanceled: pass
-
-    #--------------------------------------------------------------------------#
     # Dispose                                                                  #
     #--------------------------------------------------------------------------#
     def Dispose (self):
@@ -373,9 +367,10 @@ class ProcessWaiter (object):
         """
         signal.signal (signal.SIGCHLD, self.handle_signal_prev)
 
-        pid_source, self.pid_source = self.pid_source, {}
-        for pid, source in pid_source.items ():
-            source.TrySetException (FutureCanceled ('Process waiter has been disposed'))
+        with self.conts_lock:
+            conts, self.conts = self.conts, set ()
+        for cont in conts:
+            cont (True)
 
     def __enter__ (self):
         return self

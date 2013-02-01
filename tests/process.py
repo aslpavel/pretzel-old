@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-from ..process import Process, ProcessCall, PIPE
-from ..async import Core
+from ..process import Process, ProcessCall, ProcessWaiter, PIPE
+from ..async import Idle, Future
 from ..async.tests import AsyncTest
 
 #------------------------------------------------------------------------------#
@@ -39,15 +39,26 @@ sys.exit (117)
     def testCleanup (self):
         """Process cleanup
         """
-        yield Core.Instance ().Idle ()
-
         with Process (['cat'], stdin = PIPE, stdout = PIPE, stderr = PIPE) as proc:
             self.assertTrue (proc.Stdin.CloseOnExec ())
             self.assertTrue (proc.Stdout.CloseOnExec ())
             self.assertTrue (proc.Stderr.CloseOnExec ())
 
+        yield proc
+
         self.assertEqual (proc.Stdin, None)
         self.assertEqual (proc.Stdout, None)
         self.assertEqual (proc.Stderr, None)
+
+    @AsyncTest
+    def testStress (self):
+        procs = [ProcessCall (['uname']) for _ in range (20)]
+
+        yield Future.All (procs)
+        for proc in procs:
+            proc.Result ()
+
+        yield Idle ()
+        self.assertFalse (ProcessWaiter.Instance ().conts)
 
 # vim: nu ft=python columns=120 :
