@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import sys
+import zlib
 import struct
+import binascii
 
 from .stream import StreamConnection
 from ..importer import ImporterInstall
@@ -88,7 +90,7 @@ def ShellConnectionInit (buffer_size):
 #------------------------------------------------------------------------------#
 # Trampoline                                                                   #
 #------------------------------------------------------------------------------#
-ShellConnectionTrampoline = """
+trampoline_source = binascii.b2a_base64 (zlib.compress (b"""
 # load and execute payload
 import io, struct
 with io.open (0, "rb", buffering = 0, closefd = False) as stream:
@@ -100,5 +102,8 @@ with io.open (0, "rb", buffering = 0, closefd = False) as stream:
             raise ValueError ("Payload is incomplete")
         data.write (chunk)
 exec (data.getvalue ().decode ("utf-8"))
-"""
+""")).strip ().decode ()
+
+ShellConnectionTrampoline = 'import zlib,binascii;exec(zlib.decompress(binascii.a2b_base64(b"{}")))'.format (trampoline_source)
+
 # vim: nu ft=python columns=120 :
