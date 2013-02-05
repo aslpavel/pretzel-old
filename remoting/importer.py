@@ -258,19 +258,21 @@ def ImporterInstall (conn, index = None):
         # determine full name of __main__ module
         module = sys.modules.get ('__main__', None)
         while module is not None:
-            file = inspect.getsourcefile (module)
-            if not file:
+            try:
+                file = inspect.getsourcefile (module)
+                if not file:
+                    break
+            except TypeError:
+                # __main__ is a built-in module. Do not need to map anything
                 break
+
             name = os.path.basename (file).partition ('.') [0]
 
             package = getattr (module, '__package__', None)
             if package:
                 name = '{}.{}'.format (package, name)
             else:
-                try:
-                    source = inspect.getsource (module)
-                except Exception: break
-                loader = ImporterLoader (name, None, False, file, source)
+                loader = ImporterLoader (name, None, False, file, inspect.getsource (module))
                 yield conn (loader) ().__package__
 
             # remote_conn.module_map ['__main__'] = main

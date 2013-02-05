@@ -315,9 +315,10 @@ class ProcessWaiter (object):
         def deque_cont (result, error):
             with self.conts_lock:
                 self.conts.discard (pid_cont)
+        future.Then (deque_cont)
+
         with self.conts_lock:
             self.conts.add (pid_cont)
-        future.Then (deque_cont)
 
         # Run in case there is not child process with specified pid.
         pid_cont ()
