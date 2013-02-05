@@ -2,7 +2,7 @@
 import unittest
 
 from ..process import Process, ProcessCall, ProcessWaiter, PIPE
-from ..async import Idle, Future
+from ..async import Idle, Future, Core
 from ..async.tests import AsyncTest
 
 #------------------------------------------------------------------------------#
@@ -49,6 +49,19 @@ sys.exit (117)
         self.assertEqual (proc.Stdin, None)
         self.assertEqual (proc.Stdout, None)
         self.assertEqual (proc.Stderr, None)
+
+    @AsyncTest
+    def testBad (self):
+        """Test bad executable
+        """
+        with self.assertRaises (OSError):
+            yield ProcessCall (['does_not_exists'])
+
+        # wait for full process termination (SIGCHLD)
+        process_waiter = ProcessWaiter.Instance ()
+        for _ in Core.Instance ():
+            if not process_waiter.conts:
+                break
 
     @AsyncTest
     def testStress (self):

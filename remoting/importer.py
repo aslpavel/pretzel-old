@@ -272,7 +272,12 @@ def ImporterInstall (conn, index = None):
             if package:
                 name = '{}.{}'.format (package, name)
             else:
-                loader = ImporterLoader (name, None, False, file, inspect.getsource (module))
+                try:
+                    source = inspect.getsource (module)
+                except Exception:
+                    # __main__ source file is <stdin> or something like this
+                    break
+                loader = ImporterLoader (name, None, False, file, source)
                 yield conn (loader) ().__package__
 
             # remote_conn.module_map ['__main__'] = main

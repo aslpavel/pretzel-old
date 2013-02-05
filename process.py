@@ -182,7 +182,7 @@ class Process (object):
             # restore error from error stream if any
             error_dump = yield error_stream.ReadUntilEof ()
             if error_dump:
-                raise error_dump
+                raise pickle.loads (error_dump)
         except BrokenPipeError: pass
 
         AsyncReturn ((yield process_future))
