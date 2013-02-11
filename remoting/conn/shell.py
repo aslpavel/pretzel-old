@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import io
+import os
 import sys
 import zlib
 import struct
@@ -7,7 +9,7 @@ import binascii
 from .stream import StreamConnection
 from ..importer import ImporterInstall
 from ...bootstrap import Tomb
-from ...async import Async, Core, BufferedFile
+from ...async import Async, Core, CloseOnExecFD, BufferedFile
 from ...process import Process, PIPE
 
 __all__ = ('ShellConnection',)
@@ -71,6 +73,11 @@ class ShellConnection (StreamConnection):
 def ShellConnectionInit (buffer_size):
     """Shell connection initialization function
     """
+    # Make sure standard output and input won't be used. As it is now used
+    # for communication.
+    sys.stdin  = io.open (os.devnull, 'r'); CloseOnExecFD (sys.stdin.fileno ())
+    sys.stdout = io.open (os.devnull, 'w'); CloseOnExecFD (sys.stdout.fileno ())
+
     with Core.Instance () as core:
         # initialize connection
         conn = StreamConnection (core = core)
