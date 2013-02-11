@@ -252,7 +252,7 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
     if input is not None and stdin is not None:
         raise ProcessError ('Input cannot be consumed when stdin is set')
 
-    stdin  = PIPE if input else stdin
+    stdin  = PIPE if stdin  is None else stdin
     stdout = PIPE if stdout is None else stdout
     stderr = PIPE if stderr is None else stderr
 
@@ -267,6 +267,8 @@ def ProcessCall (command, input = None, stdin = None, stdout = None, stderr = No
             if input:
                 proc.Stdin.WriteBuffer (input)
                 proc.Stdin.Flush ().Then (lambda *_: proc.Stdin.Dispose ())
+            else:
+                proc.Stdin.Dispose ()
 
             # output
             out = proc.Stdout.ReadUntilEof (cancel) if proc.Stdout else CompletedFuture (None)
