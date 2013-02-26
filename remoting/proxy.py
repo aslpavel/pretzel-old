@@ -142,6 +142,11 @@ class Proxy (object):
 # Proxify                                                                      #
 #------------------------------------------------------------------------------#
 def Proxify (target, hub = None):
+    """Create proxy from target object
+    """
+    if isinstance (target, Proxy):
+        return +target
+
     proxy = getattr (target, 'Proxy', None)
     if proxy is not None:
         return proxy ()
