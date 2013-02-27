@@ -141,11 +141,12 @@ class Proxy (object):
 #------------------------------------------------------------------------------#
 # Proxify                                                                      #
 #------------------------------------------------------------------------------#
-def Proxify (target, hub = None):
+def Proxify (target, dispose = None, hub = None):
     """Create proxy from target object
     """
     if isinstance (target, Proxy):
-        return +target
+        return Proxy (target.sender, CallExpr (LoadConstExpr (Proxify), target.expr,
+            LoadConstExpr (dispose), LoadConstExpr (hub)))
 
     proxy = getattr (target, 'Proxy', None)
     if proxy is not None:
@@ -155,8 +156,9 @@ def Proxify (target, hub = None):
 
     def proxy_handler (msg, src, dst):
         if msg is None:
-            # Unsubscribe proxy handler
-            return False
+            if dispose is None or dispose:
+                getattr (target, '__exit__', lambda *_: None) (None, None, None)
+            return False # Unsubscribe proxy handler
 
         def proxy_cont (result, error):
             if src is not None:
