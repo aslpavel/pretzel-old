@@ -38,7 +38,7 @@ class Process (object):
         self.process_waiter = ProcessWaiter.Instance ()
 
         # vars
-        self.command = ['/bin/sh', '-c', command] if shell else command
+        self.command = ['/bin/sh', '-c', ' '.join (command)] if shell else command
         self.environ = environ
         self.kill_delay = kill_delay or self.default_kill_delay
         self.check = check is None or check
