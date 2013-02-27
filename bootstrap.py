@@ -7,6 +7,7 @@ import imp
 import zlib
 import json
 import binascii
+import textwrap
 import inspect
 import pkgutil
 import importlib
@@ -132,14 +133,15 @@ class Tomb (object):
         if init and inspect.getmodule (init).__name__ not in self.containments:
             raise ValueError ('Initialization function must reside in added modules')
 
+        wrap = lambda source: '\\\n'.join (textwrap.wrap (source, 78))
         return ''.join ((
             # tomb
             self.tomb_payload.format (
                 bootstrap = BootstrapBootstrap ('_bootstrap'),
-                dump = binascii.b2a_base64 (self.ToBytes ()).strip ().decode ('utf-8')),
+                dump = wrap (binascii.b2a_base64 (self.ToBytes ()).strip ().decode ('utf-8'))),
             # init
             '' if init is None else self.init_payload.format (
-                binascii.b2a_base64 (pickle.dumps ((init, args, keys))).strip ().decode ('utf-8'))))
+                wrap (binascii.b2a_base64 (pickle.dumps ((init, args, keys))).strip ().decode ('utf-8')))))
 
     tomb_payload = """{bootstrap}
 # install
@@ -309,8 +311,8 @@ def BootstrapSource (name, source, filename):
     Returns python source, witch when executed allows to import specified
     "source" as module with specified "name".
     """
-    data = binascii.b2a_base64 (zlib.compress (source.encode ('utf-8'))).strip ().decode ('utf-8')
-    return source_payload.format (name = name, filename = filename, data = data)
+    source = binascii.b2a_base64 (zlib.compress (source.encode ('utf-8'))).strip ().decode ('utf-8')
+    return source_payload.format (name = name, filename = filename, source = '\\\n'.join (textwrap.wrap (source, 78)))
 
 source_payload = """import sys, imp, zlib, binascii
 
@@ -323,7 +325,7 @@ def load ():
 
     sys.modules ["{name}"] = module
     try:
-        code = compile (zlib.decompress (binascii.a2b_base64 (b"{data}")), module.__file__, "exec")
+        code = compile (zlib.decompress (binascii.a2b_base64 (b"{source}")), module.__file__, "exec")
         if sys.version_info [0] > 2:
             exec (code, module.__dict__)
         else:
