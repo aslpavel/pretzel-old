@@ -53,7 +53,7 @@ class ShellConnection (StreamConnection):
         connection with connection this as its only argument.
         """
         self.process = self.dispose.Add (Process (self.command, stdin = PIPE, stdout = PIPE,
-            buffer_size = self.buffer_size, core = self.core))
+            kill_delay = -1, buffer_size = self.buffer_size, core = self.core))
 
         # send payload
         payload = Tomb.FromModules ().Bootstrap (

@@ -49,8 +49,8 @@ class ForkConnection (StreamConnection):
             in_pipe.DetachReader ()
             out_pipe.DetachWriter ()
 
-        self.process = self.dispose.Add (Process (self.command, stdin = PIPE,
-            preexec = preexec, shell = False, buffer_size = self.buffer_size, core = self.core))
+        self.process = self.dispose.Add (Process (self.command, stdin = PIPE, preexec = preexec,
+            kill_delay = -1, buffer_size = self.buffer_size, core = self.core))
 
         # close remote side of pipes
         in_fd  = in_pipe.Reader.Fd

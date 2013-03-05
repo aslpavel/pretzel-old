@@ -209,7 +209,7 @@ class Process (object):
                     yield self.core.TimeDelay (self.kill_delay, cancel = self.Status)
             except FutureCanceled: pass
             finally:
-                if not self.Status.IsCompleted ():
+                if not self.Status.IsCompleted () and self.kill_delay >= 0:
                     os.kill (self.pid, signal.SIGTERM)
         kill ()
 
