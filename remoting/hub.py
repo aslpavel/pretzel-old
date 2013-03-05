@@ -65,26 +65,20 @@ class Hub (object):
     # Sender                                                                   #
     #--------------------------------------------------------------------------#
     def Send (self, dst, msg, src):
-        """Send message to specified address
-        """
-        handlers_prev = self.handlers.pop (dst, None)
-        if not handlers_prev:
-            raise HubError ('No receiver: dst:{} msg:{} src:{}'.format (dst, msg, src))
+        handlers = self.handlers.get (dst, None)
+        if not handlers:
+            raise HubError ('No receiver: src:{} dst:{} msg:{}'.format (src, dst, msg))
 
         error = None
-        handlers_next = []
-        for handler in handlers_prev:
+        for handler in tuple (handlers):
             try:
-                if handler (msg, src, dst):
-                    handlers_next.append (handler)
+                if not handler (msg, src, dst):
+                    handlers.discard (handler)
             except Exception:
                 error = sys.exc_info ()
-                handlers_next.append (handler)
 
-        if handlers_next:
-            handlers_prev = self.handlers.setdefault (dst, handlers_next)
-            if handlers_prev is not handlers_next:
-                handlers_prev.extend (handlers_next)
+        if not handlers:
+            self.handlers.pop (dst, None)
 
         self.any (msg, src, dst)
         if error:
@@ -101,9 +95,9 @@ class Hub (object):
 
         handlers = self.handlers.get (dst)
         if handlers is None:
-            handlers = []
+            handlers = set ()
             self.handlers [dst] = handlers
-        handlers.append (handler)
+        handlers.add (handler)
         return handler
 
     def Off (self, dst, handler):
@@ -121,7 +115,7 @@ class Hub (object):
             if not handlers:
                 del self.handlers [dst]
             return True
-        except ValueError:
+        except KeyError:
             return False
 
     #--------------------------------------------------------------------------#

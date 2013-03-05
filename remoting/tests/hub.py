@@ -153,32 +153,32 @@ class HubTest (unittest.TestCase):
 
     def testFaultyHandler (self):
         r, s = ReceiverSenderPair ()
-        results = []
+        results = set ()
 
         try:
             def prev_handler (msg, src, dst):
-                results.append ('prev')
+                results.add ('prev')
                 return False
             r.On (prev_handler)
 
             def faulty_handler (msg, src, dst):
-                results.append ('bad')
+                results.add ('bad')
                 raise ValueError ()
             r.On (faulty_handler)
 
             def next_handler (msg, src, dst):
-                results.append ('next')
+                results.add ('next')
                 return False
             r.On (next_handler)
 
             with self.assertRaises (ValueError):
                 s.Send ('test')
-            self.assertEqual (results, ['prev', 'bad', 'next'])
+            self.assertEqual (results, {'prev', 'bad', 'next'})
 
-            del results [:]
+            results.clear ()
             with self.assertRaises (ValueError):
                 s.Send ('test')
-            self.assertEqual (results, ['bad'])
+            self.assertEqual (results, {'bad'})
 
         finally:
             r.Off (prev_handler)
@@ -186,5 +186,23 @@ class HubTest (unittest.TestCase):
             r.Off (next_handler)
 
             self.assertFalse (Hub.Instance ().handlers)
+
+    def testReentrancy (self):
+        r, s = ReceiverSenderPair ()
+        results = []
+        try:
+            def handler (msg, src, dst):
+                results.append (msg)
+                if msg == 'first':
+                    # new message received inside handler
+                    s.Send ('second')
+                return True
+            r.On (handler)
+
+            s.Send ('first')
+            self.assertEqual (results, ['first', 'second'])
+
+        finally:
+            r.Off (handler)
 
 # vim: nu ft=python columns=120 :

@@ -7,6 +7,7 @@ from ..conn import ForkConnection
 from ..conn.conn import ConnectionProxy
 from ..proxy import Proxy
 from ..hub import ReceiverSenderPair
+from ...async import Idle
 from ...async.tests import AsyncTest
 
 __all__ = ('ConnectionTest',)
@@ -75,6 +76,7 @@ class ConnectionTest (unittest.TestCase):
         self.assertNotEqual (os.getpid (), c0_pid)
         self.assertNotEqual (os.getpid (), c1_pid)
 
+        yield Idle () # make sure we are not in handler
         self.assertFalse (c0.hub.handlers)
 
     @AsyncTest
