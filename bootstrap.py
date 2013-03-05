@@ -237,7 +237,8 @@ if init is not None:
         containment = self.containments.get (name)
         if containment is None:
             raise ImportError ('No such module: \'{}\''.format (name))
-        return containment [0]
+        return (containment [0] if sys.version_info [0] > 2 else
+                containment [0].encode ('utf-8'))
 
     #--------------------------------------------------------------------------#
     # Serialization                                                            #
@@ -270,7 +271,7 @@ if init is not None:
         encoding = 'utf-8'
         encoding_pattern = re.compile (b'coding[:=]\s*([-\w.]+)') # PEP: 0263
 
-        with open (filename, 'rb') as stream:
+        with io.open (filename, 'rb') as stream:
             for line in stream:
                 if line.startswith (b'#'):
                     match = encoding_pattern.search (line)
